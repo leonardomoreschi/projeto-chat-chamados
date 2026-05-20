@@ -71,8 +71,10 @@ Com WEB_HOST_PORT=8188:
 
 - Login: http://localhost:8188/login
 - Chat: http://localhost:8188/chat
+- Agendamentos: http://localhost:8188/agendamentos
 - Meus chamados: http://localhost:8188/meus-chamados
 - Dashboard TI: http://localhost:8188/dashboard-ti
+- Painel de agendamentos: http://localhost:8188/painel-agendamentos
 - Relatório TI: http://localhost:8188/dashboard-ti/relatorio
 - Admin: http://localhost:8188/admin
 - WebSocket: ws://localhost:8080
@@ -167,6 +169,22 @@ Todas as rotas de API exigem sessão autenticada.
 - POST /api/chamados-taxonomias
 - DELETE /api/chamados-taxonomias/{id}
 
+### Agendamentos
+
+- GET /agendamentos
+- GET /painel-agendamentos
+- GET /api/agendamentos
+- GET /api/agendamentos/{id}
+- POST /api/agendamentos
+- PATCH /api/agendamentos/{id}/aprovar
+- PATCH /api/agendamentos/{id}/recusar
+- PATCH /api/agendamentos/{id}/cancelar
+- PATCH /api/agendamentos/{id}/encerrar
+- GET /api/servicos-agendamento
+- POST /api/servicos-agendamento
+- PATCH /api/servicos-agendamento/{id}
+- DELETE /api/servicos-agendamento/{id}
+
 ### Admin
 
 - GET /api/admin/usuarios
@@ -211,6 +229,8 @@ Tabelas principais:
 - chamado_comentarios
 - chamado_comentario_anexos
 - chamado_taxonomias
+- servicos_agendamento
+- agendamentos
 - user_presenca
 
 ## Execução sem Docker

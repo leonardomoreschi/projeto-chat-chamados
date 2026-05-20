@@ -228,6 +228,8 @@ Pasta: public/assets/css/
 - chamado_comentarios
 - chamado_comentario_anexos
 - chamado_taxonomias
+- servicos_agendamento
+- agendamentos
 - user_presenca
 
 Relações centrais:

@@ -12,6 +12,7 @@ function bootstrapDefaultData(): void
 
     try {
         ensureUniqueSectorNames($pdo);
+        ensureAgendamentoSchema($pdo);
         seedDefaultSectors($pdo);
         seedDefaultAdminUser($pdo);
     } finally {
@@ -156,4 +157,11 @@ function seedDefaultAdminUser(PDO $pdo): void
         $setorId,
         'admin',
     ]);
+}
+
+function ensureAgendamentoSchema(PDO $pdo): void
+{
+    $pdo->exec("\n        CREATE TABLE IF NOT EXISTS servicos_agendamento (\n            id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n            nome            VARCHAR(150) NOT NULL,\n            descricao       TEXT NULL,\n            duracao_minutos INT UNSIGNED NOT NULL DEFAULT 60,\n            cor_hex         VARCHAR(12) NOT NULL DEFAULT '#4f46e5',\n            ativo           TINYINT(1) NOT NULL DEFAULT 1,\n            criado_por      INT UNSIGNED NULL,\n            criado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n            atualizado_em   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n            UNIQUE KEY uniq_servicos_agendamento_nome (nome),\n            FOREIGN KEY (criado_por) REFERENCES usuarios(id) ON DELETE SET NULL\n        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci\n    ");
+
+    $pdo->exec("\n        CREATE TABLE IF NOT EXISTS agendamentos (\n            id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n            servico_id          INT UNSIGNED NOT NULL,\n            solicitante_id      INT UNSIGNED NOT NULL,\n            aprovado_por_id     INT UNSIGNED NULL,\n            cancelado_por_id    INT UNSIGNED NULL,\n            encerrado_por_id    INT UNSIGNED NULL,\n            status              ENUM('solicitado','agendado','cancelado','encerrado') NOT NULL DEFAULT 'solicitado',\n            data_inicio         DATETIME NOT NULL,\n            data_fim            DATETIME NOT NULL,\n            observacoes         TEXT NULL,\n            motivo_recusa       TEXT NULL,\n            motivo_cancelamento TEXT NULL,\n            aprovado_em         TIMESTAMP NULL DEFAULT NULL,\n            cancelado_em        TIMESTAMP NULL DEFAULT NULL,\n            encerrado_em        TIMESTAMP NULL DEFAULT NULL,\n            criado_em           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n            atualizado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n            FOREIGN KEY (servico_id) REFERENCES servicos_agendamento(id) ON DELETE RESTRICT,\n            FOREIGN KEY (solicitante_id) REFERENCES usuarios(id) ON DELETE CASCADE,\n            FOREIGN KEY (aprovado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,\n            FOREIGN KEY (cancelado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,\n            FOREIGN KEY (encerrado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,\n            INDEX idx_agendamentos_status_inicio (status, data_inicio),\n            INDEX idx_agendamentos_solicitante_status_inicio (solicitante_id, status, data_inicio),\n            INDEX idx_agendamentos_servico_inicio (servico_id, data_inicio)\n        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci\n    ");
 }

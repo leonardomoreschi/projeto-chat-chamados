@@ -158,6 +158,48 @@ INSERT IGNORE INTO chamado_taxonomias (categoria, subcategoria) VALUES
 ('Acessos', 'Novo Usuário'),
 ('Acessos', 'Permissões');
 
+CREATE TABLE IF NOT EXISTS servicos_agendamento (
+    id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    nome            VARCHAR(150) NOT NULL,
+    descricao       TEXT NULL,
+    duracao_minutos INT UNSIGNED NOT NULL DEFAULT 60,
+    cor_hex         VARCHAR(12) NOT NULL DEFAULT '#4f46e5',
+    ativo           TINYINT(1) NOT NULL DEFAULT 1,
+    criado_por      INT UNSIGNED NULL,
+    criado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_servicos_agendamento_nome (nome),
+    FOREIGN KEY (criado_por) REFERENCES usuarios(id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS agendamentos (
+    id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    servico_id          INT UNSIGNED NOT NULL,
+    solicitante_id      INT UNSIGNED NOT NULL,
+    aprovado_por_id     INT UNSIGNED NULL,
+    cancelado_por_id    INT UNSIGNED NULL,
+    encerrado_por_id    INT UNSIGNED NULL,
+    status              ENUM('solicitado','agendado','cancelado','encerrado') NOT NULL DEFAULT 'solicitado',
+    data_inicio         DATETIME NOT NULL,
+    data_fim            DATETIME NOT NULL,
+    observacoes         TEXT NULL,
+    motivo_recusa       TEXT NULL,
+    motivo_cancelamento TEXT NULL,
+    aprovado_em         TIMESTAMP NULL DEFAULT NULL,
+    cancelado_em        TIMESTAMP NULL DEFAULT NULL,
+    encerrado_em        TIMESTAMP NULL DEFAULT NULL,
+    criado_em           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (servico_id) REFERENCES servicos_agendamento(id) ON DELETE RESTRICT,
+    FOREIGN KEY (solicitante_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (aprovado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+    FOREIGN KEY (cancelado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+    FOREIGN KEY (encerrado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+    INDEX idx_agendamentos_status_inicio (status, data_inicio),
+    INDEX idx_agendamentos_solicitante_status_inicio (solicitante_id, status, data_inicio),
+    INDEX idx_agendamentos_servico_inicio (servico_id, data_inicio)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 ALTER TABLE conversas
 ADD COLUMN IF NOT EXISTS descricao TEXT NULL AFTER nome;
 

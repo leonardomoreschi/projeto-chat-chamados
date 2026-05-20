@@ -20,6 +20,7 @@ use App\Controllers\AuthController;
 use App\Controllers\ChatController;
 use App\Controllers\ChamadoController;
 use App\Controllers\AdminController;
+use App\Controllers\AgendamentoController;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\AdminMiddleware;
 use App\Support\TemplateRenderer;
@@ -49,6 +50,32 @@ $app->get('/chat', function ($request, $response) {
     return TemplateRenderer::render($response, __DIR__ . '/../templates/chat.php', [
         'userName' => $userName,
         'userId' => $userId,
+        'userPapel' => $userPapel,
+    ]);
+})->add(new AuthMiddleware());
+
+$app->get('/agendamentos', function ($request, $response) {
+    $userName  = $request->getAttribute('user_nome');
+    $userId    = $request->getAttribute('user_id');
+    $userPapel = $request->getAttribute('user_papel');
+
+    return TemplateRenderer::render($response, __DIR__ . '/../templates/agendamentos.php', [
+        'userName' => $userName,
+        'userId' => $userId,
+        'userPapel' => $userPapel,
+    ]);
+})->add(new AuthMiddleware());
+
+$app->get('/painel-agendamentos', function ($request, $response) {
+    $userName  = $request->getAttribute('user_nome');
+    $userPapel = $request->getAttribute('user_papel');
+
+    if (!in_array($userPapel, ['ti', 'admin'], true)) {
+        return $response->withHeader('Location', '/chat')->withStatus(302);
+    }
+
+    return TemplateRenderer::render($response, __DIR__ . '/../templates/painel_agendamentos.php', [
+        'userName' => $userName,
         'userPapel' => $userPapel,
     ]);
 })->add(new AuthMiddleware());
@@ -160,6 +187,19 @@ $app->group('/api', function ($group) {
     $group->get('/chamados-taxonomias/detalhe', [ChamadoController::class, 'listarTaxonomiasDetalhe']);
     $group->post('/chamados-taxonomias', [ChamadoController::class, 'salvarTaxonomia']);
     $group->delete('/chamados-taxonomias/{id}', [ChamadoController::class, 'removerTaxonomia']);
+
+    // Agendamentos
+    $group->get('/agendamentos', [AgendamentoController::class, 'listar']);
+    $group->get('/agendamentos/{id}', [AgendamentoController::class, 'obter']);
+    $group->post('/agendamentos', [AgendamentoController::class, 'solicitar']);
+    $group->patch('/agendamentos/{id}/aprovar', [AgendamentoController::class, 'aprovar']);
+    $group->patch('/agendamentos/{id}/recusar', [AgendamentoController::class, 'recusar']);
+    $group->patch('/agendamentos/{id}/cancelar', [AgendamentoController::class, 'cancelar']);
+    $group->patch('/agendamentos/{id}/encerrar', [AgendamentoController::class, 'encerrar']);
+    $group->get('/servicos-agendamento', [AgendamentoController::class, 'listarServicos']);
+    $group->post('/servicos-agendamento', [AgendamentoController::class, 'criarServico']);
+    $group->patch('/servicos-agendamento/{id}', [AgendamentoController::class, 'atualizarServico']);
+    $group->delete('/servicos-agendamento/{id}', [AgendamentoController::class, 'desativarServico']);
 
     // Admin — usuários
     $group->get('/admin/usuarios',         [AdminController::class, 'listarUsuarios']);

@@ -34,6 +34,9 @@
             <button onclick="abrirModalTaxonomias()" class="bg-gray-800 border border-gray-700 text-xs font-bold text-indigo-300 rounded-xl px-3 py-2 hover:bg-gray-700 transition">
                 Gerenciar Categorias
             </button>
+            <a href="/painel-agendamentos" class="bg-gray-800 border border-gray-700 text-xs font-bold text-indigo-300 rounded-xl px-3 py-2 hover:bg-gray-700 transition">
+                Agendamentos
+            </a>
             <a href="/dashboard-ti/relatorio" class="bg-indigo-600 hover:bg-indigo-500 border border-indigo-500 text-xs font-bold text-white rounded-xl px-3 py-2 transition">
                 Resultados
             </a>

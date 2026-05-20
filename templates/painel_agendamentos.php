@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Painel de Agendamentos - Chat Interno</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="/assets/css/light-mode.css">
+    <script src="/assets/js/utils.js"></script>
+    <script src="/assets/js/config.js"></script>
+</head>
+<body class="page-painel-agendamentos bg-gray-950 text-white min-h-screen">
+<?php
+$agendamentosBootstrap = [
+    'currentUserName' => (string) ($userName ?? ''),
+    'userPapel' => (string) ($userPapel ?? 'usuario'),
+    'mode' => 'admin',
+];
+?>
+<header class="bg-gray-900 border-b border-gray-800 px-4 md:px-6 py-4 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+    <div class="flex items-center gap-3">
+        <a href="/chat" class="w-10 h-10 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 flex items-center justify-center text-gray-300 transition" title="Voltar ao chat">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+        </a>
+        <div>
+            <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold">Administração</p>
+            <h1 class="text-xl md:text-2xl font-black text-white">Painel de Aprovação e Serviços</h1>
+        </div>
+    </div>
+    <div class="flex items-center gap-3 flex-wrap">
+        <span class="text-sm text-gray-400">Olá, <span class="text-white font-medium"><?= htmlspecialchars($userName) ?></span></span>
+        <button data-theme-toggle class="w-9 h-9 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 flex items-center justify-center transition" title="Alternar tema">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m8.66-10h-1M4.34 12h-1m15.02 6.36l-.7-.7M6.34 6.34l-.7-.7m12.02 0l-.7.7M6.34 17.66l-.7.7M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+        </button>
+        <a href="/agendamentos" class="bg-gray-800 hover:bg-gray-700 text-white text-sm font-semibold rounded-xl px-4 py-2 transition border border-gray-700">Visão do usuário</a>
+        <button onclick="abrirModalServico()" class="bg-green-600 hover:bg-green-500 text-white text-sm font-semibold rounded-xl px-4 py-2 transition">Novo serviço</button>
+    </div>
+</header>
+
+<main class="max-w-7xl mx-auto px-4 md:px-6 py-6 grid grid-cols-1 xl:grid-cols-[1.4fr_1fr] gap-6">
+    <section class="space-y-6">
+        <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">
+            <div class="flex items-center justify-between gap-3 mb-5">
+                <div>
+                    <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold">Calendário</p>
+                    <h2 id="agenda-mes-rotulo" class="text-xl font-black text-white">Carregando...</h2>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button id="btn-mes-anterior" class="w-10 h-10 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 transition">‹</button>
+                    <button id="btn-mes-hoje" class="px-4 h-10 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm text-gray-300 transition">Hoje</button>
+                    <button id="btn-mes-proximo" class="w-10 h-10 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 transition">›</button>
+                </div>
+            </div>
+            <div id="calendario-agendamentos" class="grid grid-cols-7 gap-2"></div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm uppercase tracking-[0.2em] text-gray-500 font-black">Solicitações pendentes</h3>
+                    <span id="count-pendentes" class="text-xs text-gray-400">0</span>
+                </div>
+                <div id="lista-pendentes" class="space-y-3 max-h-[420px] overflow-y-auto pr-1"></div>
+            </div>
+
+            <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h3 class="text-sm uppercase tracking-[0.2em] text-gray-500 font-black">Arquivo / Encerrados</h3>
+                    <span id="count-arquivo" class="text-xs text-gray-400">0</span>
+                </div>
+                <div id="lista-arquivo" class="space-y-3 max-h-[420px] overflow-y-auto pr-1"></div>
+            </div>
+        </div>
+    </section>
+
+    <aside class="space-y-6">
+        <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm uppercase tracking-[0.2em] text-gray-500 font-black">Serviços cadastrados</h3>
+                <span id="count-servicos" class="text-xs text-gray-400">0</span>
+            </div>
+            <div id="lista-servicos" class="space-y-3 max-h-[320px] overflow-y-auto pr-1 mb-4"></div>
+            <form id="form-servico" class="space-y-3 border-t border-gray-800 pt-4">
+                <input type="hidden" id="servico-id">
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Nome</label>
+                    <input id="servico-nome" type="text" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white" placeholder="Ex: Suporte presencial">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Descrição</label>
+                    <textarea id="servico-descricao" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white resize-none" placeholder="Detalhe o serviço"></textarea>
+                </div>
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Duração (min)</label>
+                        <input id="servico-duracao" type="number" min="1" value="60" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-300 mb-2">Cor</label>
+                        <input id="servico-cor" type="text" value="#4f46e5" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white">
+                    </div>
+                </div>
+                <label class="flex items-center gap-2 text-sm text-gray-300">
+                    <input id="servico-ativo" type="checkbox" checked>
+                    Serviço ativo
+                </label>
+                <div class="flex gap-3">
+                    <button type="button" onclick="limparFormularioServico()" class="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl py-3 text-sm font-semibold transition">Limpar</button>
+                    <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-3 text-sm font-semibold transition">Salvar</button>
+                </div>
+            </form>
+        </div>
+    </aside>
+</main>
+
+<div id="modal-solicitacao" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-xl shadow-2xl">
+        <div class="flex items-center justify-between p-6 border-b border-gray-800">
+            <div>
+                <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold">Solicitação</p>
+                <h3 class="text-xl font-black text-white">Novo agendamento</h3>
+            </div>
+            <button onclick="fecharModal('modal-solicitacao')" class="text-gray-500 hover:text-white text-2xl leading-none">×</button>
+        </div>
+        <div class="p-6 space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Serviço</label>
+                <select id="solicitacao-servico" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white"></select>
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Data e horário</label>
+                <input id="solicitacao-data-inicio" type="datetime-local" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Observações</label>
+                <textarea id="solicitacao-observacoes" rows="4" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white resize-none" placeholder="Descreva a necessidade, local, preferência de horário..."></textarea>
+            </div>
+        </div>
+        <div class="flex gap-3 px-6 pb-6">
+            <button onclick="fecharModal('modal-solicitacao')" class="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl py-3 text-sm font-semibold transition">Cancelar</button>
+            <button onclick="enviarSolicitacao()" class="flex-1 bg-green-600 hover:bg-green-500 text-white rounded-xl py-3 text-sm font-semibold transition">Enviar solicitação</button>
+        </div>
+    </div>
+</div>
+
+<div id="modal-dia" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-4xl shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between p-6 border-b border-gray-800">
+            <div>
+                <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold">Detalhe do dia</p>
+                <h3 id="modal-dia-titulo" class="text-xl font-black text-white">Agendamentos</h3>
+            </div>
+            <button onclick="fecharModal('modal-dia')" class="text-gray-500 hover:text-white text-2xl leading-none">×</button>
+        </div>
+        <div id="modal-dia-conteudo" class="p-6 space-y-3"></div>
+    </div>
+</div>
+
+<div id="modal-detalhe" class="hidden fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4">
+    <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-2xl shadow-2xl max-h-[90vh] overflow-y-auto">
+        <div class="flex items-center justify-between p-6 border-b border-gray-800">
+            <div>
+                <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold">Agendamento</p>
+                <h3 id="detalhe-servico-nome" class="text-xl font-black text-white">Detalhe</h3>
+            </div>
+            <button onclick="fecharModal('modal-detalhe')" class="text-gray-500 hover:text-white text-2xl leading-none">×</button>
+        </div>
+        <div class="p-6 space-y-5">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                <div class="bg-gray-800/70 border border-gray-700 rounded-2xl p-4"><p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold">Solicitante</p><p id="detalhe-solicitante" class="text-white mt-1"></p></div>
+                <div class="bg-gray-800/70 border border-gray-700 rounded-2xl p-4"><p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold">Status</p><p id="detalhe-status" class="text-white mt-1"></p></div>
+                <div class="bg-gray-800/70 border border-gray-700 rounded-2xl p-4"><p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold">Início</p><p id="detalhe-inicio" class="text-white mt-1"></p></div>
+                <div class="bg-gray-800/70 border border-gray-700 rounded-2xl p-4"><p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold">Fim</p><p id="detalhe-fim" class="text-white mt-1"></p></div>
+            </div>
+            <div class="bg-gray-800/70 border border-gray-700 rounded-2xl p-4">
+                <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold mb-2">Observações</p>
+                <p id="detalhe-observacoes" class="text-sm text-gray-300 whitespace-pre-wrap"></p>
+            </div>
+            <div class="flex gap-3 flex-wrap">
+                <button id="btn-detalhe-cancelar" class="hidden bg-red-600 hover:bg-red-500 text-white rounded-xl px-4 py-3 text-sm font-semibold transition">Cancelar</button>
+                <button id="btn-detalhe-aprovar" class="hidden bg-green-600 hover:bg-green-500 text-white rounded-xl px-4 py-3 text-sm font-semibold transition">Aprovar</button>
+                <button id="btn-detalhe-recusar" class="hidden bg-amber-600 hover:bg-amber-500 text-white rounded-xl px-4 py-3 text-sm font-semibold transition">Recusar</button>
+                <button id="btn-detalhe-encerrar" class="hidden bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl px-4 py-3 text-sm font-semibold transition">Encerrar</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    window.AGENDAMENTO_BOOTSTRAP = <?= json_encode($agendamentosBootstrap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+</script>
+<script src="/assets/js/theme.js"></script>
+<script src="/assets/js/agendamentos.js"></script>
+</body>
+</html>

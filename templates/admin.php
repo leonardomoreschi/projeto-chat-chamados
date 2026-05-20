@@ -28,6 +28,7 @@
     </div>
     <div class="flex items-center gap-3">
         <span class="text-sm text-gray-400">Olá, <span class="text-white font-medium"><?= htmlspecialchars($userName) ?></span></span>
+        <a href="/painel-agendamentos" class="text-xs text-indigo-300 hover:text-indigo-200 transition">Agendamentos</a>
         <a href="/logout" class="text-xs text-gray-500 hover:text-red-400 transition">Sair</a>
     </div>
 </header>

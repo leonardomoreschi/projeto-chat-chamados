@@ -1,6 +1,7 @@
 const CHAT_BOOTSTRAP = window.CHAT_BOOTSTRAP || {};
 const CURRENT_USER_ID = Number(CHAT_BOOTSTRAP.currentUserId || 0);
 const CURRENT_USER_NAME = String(CHAT_BOOTSTRAP.currentUserName || '');
+const CURRENT_USER_PAPEL = String(CHAT_BOOTSTRAP.userPapel || (CHAT_BOOTSTRAP.isAdmin ? 'admin' : 'usuario'));
 const IS_ADMIN = Boolean(CHAT_BOOTSTRAP.isAdmin);
 const CONFIG_CHAMADOS = window.APP_CONFIG || { categorias: {}, prioridades: {}, status: {} };
 let conversaAtualId = null;
@@ -32,6 +33,7 @@ function conectarWS() {
             type: 'auth',
             user_id: CURRENT_USER_ID,
             user_nome: CURRENT_USER_NAME,
+            user_papel: CURRENT_USER_PAPEL,
             conversa_id: conversaAtualId || 0,
         }));
     };

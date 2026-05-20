@@ -106,6 +106,16 @@
         </a>
     </div>
 
+    <div class="p-3 pt-0">
+        <a href="/agendamentos"
+           class="w-full bg-gray-800 hover:bg-indigo-600 text-white text-sm font-semibold rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 transition-colors border border-gray-700">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7H3v12a2 2 0 002 2z" />
+            </svg>
+            Agendamentos
+        </a>
+    </div>
+
     <?php if (in_array($userPapel, ['ti', 'admin'])): ?>
     <div class="p-3 pt-0">
         <button id="btn-painel-chamados" onclick="window.location.href='/dashboard-ti'"
@@ -479,6 +489,7 @@
 window.CHAT_BOOTSTRAP = <?= json_encode([
     'currentUserId' => (int) $userId,
     'currentUserName' => (string) $userName,
+    'userPapel' => (string) $userPapel,
     'isAdmin' => $userPapel === 'admin',
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>

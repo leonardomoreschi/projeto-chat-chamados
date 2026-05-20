@@ -30,10 +30,12 @@ class ChatServer implements MessageComponentInterface
         $this->clients->attach($conn);
         $conn->userId     = null;
         $conn->userName   = null;
+        $conn->userPapel  = null;
         $conn->conversaId = null;
         $conn->lastSeenMessageId = 0;
         $conn->lastSeenConversationId = 0;
         $conn->lastSeenDeletionAt = date('Y-m-d H:i:s');
+        $conn->lastSeenAgendamentoUpdateAt = date('Y-m-d H:i:s');
         echo "Nova conexão: #{$conn->resourceId} | Total: {$this->clients->count()}\n";
     }
 
@@ -47,10 +49,12 @@ class ChatServer implements MessageComponentInterface
             case 'auth':
                 $from->userId     = (int) ($data['user_id']    ?? 0);
                 $from->userName   = $data['user_nome']          ?? 'Anônimo';
+                $from->userPapel  = $data['user_papel']         ?? $this->buscarPapelUsuario((int) $from->userId);
                 $from->conversaId = (int) ($data['conversa_id'] ?? 0);
                 $from->lastSeenMessageId = 0;
                 $from->lastSeenConversationId = 0;
                 $from->lastSeenDeletionAt = date('Y-m-d H:i:s');
+                $from->lastSeenAgendamentoUpdateAt = date('Y-m-d H:i:s');
                 $this->atualizarPresenca($from->userId, true);
                 echo "Autenticado: {$from->userName} (#{$from->userId})\n";
                 // Sincronização inicial para pegar mensagens recentes
@@ -261,6 +265,7 @@ class ChatServer implements MessageComponentInterface
                 $this->sincronizarNovasConversas($client);
                 $this->sincronizarNovasMensagens($client);
                 $this->sincronizarApagamentos($client);
+                $this->sincronizarAgendamentos($client);
             } catch (\Throwable $e) {
                 error_log('Falha na sincronizacao WS: ' . $e->getMessage());
             }
@@ -474,6 +479,77 @@ class ChatServer implements MessageComponentInterface
         $ultima = end($apagadas);
         if ($ultima && !empty($ultima['excluida_em'])) {
             $client->lastSeenDeletionAt = (string) $ultima['excluida_em'];
+        }
+    }
+
+    private function sincronizarAgendamentos(ConnectionInterface $client): void
+    {
+        $pdo = getDbConnection();
+        $ultimoUpdate = (string) ($client->lastSeenAgendamentoUpdateAt ?? '1970-01-01 00:00:00');
+        $papel = (string) ($client->userPapel ?? $this->buscarPapelUsuario((int) ($client->userId ?? 0)));
+        $userId = (int) ($client->userId ?? 0);
+
+        if ($userId <= 0) {
+            return;
+        }
+
+        $whereVisibilidade = in_array($papel, ['admin', 'ti'], true)
+            ? '1 = 1'
+            : 'a.solicitante_id = ?';
+
+        $sql = "SELECT a.id, a.servico_id, s.nome AS servico_nome, s.cor_hex, a.solicitante_id,
+                       u.nome AS solicitante_nome, a.status, a.data_inicio, a.data_fim,
+                       a.observacoes, a.aprovado_em, a.cancelado_em, a.encerrado_em, a.atualizado_em
+                FROM agendamentos a
+                INNER JOIN servicos_agendamento s ON s.id = a.servico_id
+                INNER JOIN usuarios u ON u.id = a.solicitante_id
+                WHERE a.atualizado_em > ? AND {$whereVisibilidade}
+                ORDER BY a.atualizado_em ASC, a.id ASC";
+
+        $stmt = $pdo->prepare($sql);
+        $params = [$ultimoUpdate];
+        if (!in_array($papel, ['admin', 'ti'], true)) {
+            $params[] = $userId;
+        }
+        $stmt->execute($params);
+        $agendamentos = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        if (!$agendamentos) {
+            return;
+        }
+
+        foreach ($agendamentos as $agendamento) {
+            $payload = json_encode([
+                'type' => 'schedule_updated',
+                'agendamento' => $agendamento,
+            ], JSON_UNESCAPED_UNICODE);
+
+            if (!$payload) {
+                continue;
+            }
+
+            $client->send($payload);
+        }
+
+        $ultimo = end($agendamentos);
+        if ($ultimo && !empty($ultimo['atualizado_em'])) {
+            $client->lastSeenAgendamentoUpdateAt = (string) $ultimo['atualizado_em'];
+        }
+    }
+
+    private function buscarPapelUsuario(int $userId): string
+    {
+        if ($userId <= 0) {
+            return 'usuario';
+        }
+
+        try {
+            $pdo = getDbConnection();
+            $stmt = $pdo->prepare('SELECT papel FROM usuarios WHERE id = ? LIMIT 1');
+            $stmt->execute([$userId]);
+            return (string) ($stmt->fetchColumn() ?: 'usuario');
+        } catch (\Throwable) {
+            return 'usuario';
         }
     }
 

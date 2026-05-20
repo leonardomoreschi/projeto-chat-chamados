@@ -25,6 +25,12 @@
             em_andamento: 'Em andamento',
             resolvido: 'Resolvido',
             cancelado: 'Cancelado'
+        },
+        agendamentoStatus: {
+            solicitado: 'Solicitado',
+            agendado: 'Agendado',
+            cancelado: 'Cancelado',
+            encerrado: 'Encerrado'
         }
     };
 })();
