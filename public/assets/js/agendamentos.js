@@ -421,6 +421,10 @@ async function enviarSolicitacao() {
     });
     const data = await res.json();
     if (!res.ok) {
+        if (res.status === 409) {
+            alert(data.erro || 'Horário em conflito com outro agendamento');
+            return;
+        }
         alert(data.erro || 'Não foi possível solicitar o serviço');
         return;
     }

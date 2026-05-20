@@ -102,21 +102,41 @@ class AgendamentoController
         $inicio = new \DateTimeImmutable($dataInicio);
         $fim = $inicio->modify('+' . max(1, (int) $servico['duracao_minutos']) . ' minutes');
 
-        $stmt = $pdo->prepare(
-            'INSERT INTO agendamentos (servico_id, solicitante_id, status, data_inicio, data_fim, observacoes)
-             VALUES (?, ?, ?, ?, ?, ?)'
-        );
-        $stmt->execute([
-            $servicoId,
-            $userId,
-            'solicitado',
-            $inicio->format('Y-m-d H:i:s'),
-            $fim->format('Y-m-d H:i:s'),
-            $observacoes !== '' ? $observacoes : null,
-        ]);
+        try {
+            $pdo->beginTransaction();
 
-        $id = (int) $pdo->lastInsertId();
-        return Json::json($response, $this->buscarAgendamentoPorId($pdo, $id), 201);
+            $check = $pdo->prepare(
+                'SELECT COUNT(*) FROM agendamentos WHERE servico_id = ? AND status IN ("solicitado","agendado") AND (data_inicio < ? AND data_fim > ?)'
+            );
+            $check->execute([$servicoId, $fim->format('Y-m-d H:i:s'), $inicio->format('Y-m-d H:i:s')]);
+            $count = (int) $check->fetchColumn();
+            if ($count > 0) {
+                $pdo->rollBack();
+                return Json::erro($response, 'Horário em conflito com outro agendamento', 409);
+            }
+
+            $stmt = $pdo->prepare(
+                'INSERT INTO agendamentos (servico_id, solicitante_id, status, data_inicio, data_fim, observacoes)
+                 VALUES (?, ?, ?, ?, ?, ?)'
+            );
+            $stmt->execute([
+                $servicoId,
+                $userId,
+                'solicitado',
+                $inicio->format('Y-m-d H:i:s'),
+                $fim->format('Y-m-d H:i:s'),
+                $observacoes !== '' ? $observacoes : null,
+            ]);
+
+            $id = (int) $pdo->lastInsertId();
+            $pdo->commit();
+            return Json::json($response, $this->buscarAgendamentoPorId($pdo, $id), 201);
+        } catch (\Throwable $e) {
+            if ($pdo->inTransaction()) {
+                $pdo->rollBack();
+            }
+            return Json::erro($response, 'Erro ao criar agendamento', 500);
+        }
     }
 
     public function aprovar(Request $request, Response $response, array $args): Response
