@@ -54,27 +54,7 @@ $agendamentosBootstrap = [
             <div id="calendario-agendamentos" class="grid grid-cols-7 gap-2"></div>
         </div>
 
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-sm uppercase tracking-[0.2em] text-gray-500 font-black">Solicitações pendentes</h3>
-                    <span id="count-pendentes" class="text-xs text-gray-400">0</span>
-                </div>
-                <div id="lista-pendentes" class="space-y-3 max-h-[420px] overflow-y-auto pr-1"></div>
-            </div>
-
-            <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h3 class="text-sm uppercase tracking-[0.2em] text-gray-500 font-black">Arquivo / Encerrados</h3>
-                    <span id="count-arquivo" class="text-xs text-gray-400">0</span>
-                </div>
-                <div id="lista-arquivo" class="space-y-3 max-h-[420px] overflow-y-auto pr-1"></div>
-            </div>
-        </div>
-    </section>
-
-    <aside class="space-y-6">
-        <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">
+        <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6 mt-6">
             <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm uppercase tracking-[0.2em] text-gray-500 font-black">Serviços cadastrados</h3>
                 <span id="count-servicos" class="text-xs text-gray-400">0</span>
@@ -90,11 +70,7 @@ $agendamentosBootstrap = [
                     <label class="block text-sm font-medium text-gray-300 mb-2">Descrição</label>
                     <textarea id="servico-descricao" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white resize-none" placeholder="Detalhe o serviço"></textarea>
                 </div>
-                <div class="grid grid-cols-2 gap-3">
-                    <div>
-                        <label class="block text-sm font-medium text-gray-300 mb-2">Duração (min)</label>
-                        <input id="servico-duracao" type="number" min="1" value="60" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white">
-                    </div>
+                <div class="grid grid-cols-1 gap-3">
                     <div>
                         <label class="block text-sm font-medium text-gray-300 mb-2">Cor</label>
                         <input id="servico-cor" type="text" value="#4f46e5" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white">
@@ -109,6 +85,32 @@ $agendamentosBootstrap = [
                     <button type="submit" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-3 text-sm font-semibold transition">Salvar</button>
                 </div>
             </form>
+        </div>
+    </section>
+
+    <aside class="space-y-6">
+        <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm uppercase tracking-[0.2em] text-gray-500 font-black">Solicitações pendentes</h3>
+                <span id="count-pendentes" class="text-xs text-gray-400">0</span>
+            </div>
+            <div id="lista-pendentes" class="space-y-3 max-h-[220px] overflow-y-auto pr-1"></div>
+        </div>
+
+        <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm uppercase tracking-[0.2em] text-gray-500 font-black">Agendamentos abertos</h3>
+                <span id="count-abertos" class="text-xs text-gray-400">0</span>
+            </div>
+            <div id="lista-abertos" class="space-y-3 max-h-[220px] overflow-y-auto pr-1"></div>
+        </div>
+
+        <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">
+            <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm uppercase tracking-[0.2em] text-gray-500 font-black">Histórico / Encerrados</h3>
+                <span id="count-arquivo" class="text-xs text-gray-400">0</span>
+            </div>
+            <div id="lista-arquivo" class="space-y-3 max-h-[220px] overflow-y-auto pr-1"></div>
         </div>
     </aside>
 </main>
@@ -130,6 +132,10 @@ $agendamentosBootstrap = [
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">Data e horário</label>
                 <input id="solicitacao-data-inicio" type="datetime-local" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Data e horário de término (opcional)</label>
+                <input id="solicitacao-data-fim" type="datetime-local" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white" placeholder="Opcional">
             </div>
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">Observações</label>

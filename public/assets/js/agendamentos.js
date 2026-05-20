@@ -229,17 +229,25 @@ function renderizarSidebarStatus() {
 function renderizarAdminQueues() {
     if (!AG_EQUIP) return;
     const pendentes = agendamentosCache.filter((item) => item.status === 'solicitado');
+    const abertos = agendamentosCache.filter((item) => item.status === 'agendado');
     const arquivo = agendamentosCache.filter((item) => item.status === 'encerrado');
 
     const pendentesCount = document.getElementById('count-pendentes');
+    const abertosCount = document.getElementById('count-abertos');
     const arquivoCount = document.getElementById('count-arquivo');
     const listaPendentes = document.getElementById('lista-pendentes');
+    const listaAbertos = document.getElementById('lista-abertos');
     const listaArquivo = document.getElementById('lista-arquivo');
     if (pendentesCount) pendentesCount.textContent = String(pendentes.length);
+    if (abertosCount) abertosCount.textContent = String(abertos.length);
     if (arquivoCount) arquivoCount.textContent = String(arquivo.length);
     if (listaPendentes) {
         listaPendentes.innerHTML = pendentes.length ? pendentes.map((item) => cardFila(item)).join('') : '<p class="text-xs text-gray-600">Sem solicitações pendentes.</p>';
         listaPendentes.querySelectorAll('[data-agendamento-id]').forEach((el) => el.addEventListener('click', () => abrirDetalhe(Number(el.getAttribute('data-agendamento-id')))));
+    }
+    if (listaAbertos) {
+        listaAbertos.innerHTML = abertos.length ? abertos.map((item) => cardFila(item)).join('') : '<p class="text-xs text-gray-600">Nenhum agendamento aberto.</p>';
+        listaAbertos.querySelectorAll('[data-agendamento-id]').forEach((el) => el.addEventListener('click', () => abrirDetalhe(Number(el.getAttribute('data-agendamento-id')))));
     }
     if (listaArquivo) {
         listaArquivo.innerHTML = arquivo.length ? arquivo.slice(0, 20).map((item) => cardFila(item)).join('') : '<p class="text-xs text-gray-600">Nenhum item no arquivo.</p>';
@@ -265,7 +273,6 @@ function renderizarServicosAdmin() {
                 <p class="font-semibold text-white">${escapeHtml(servico.nome)}</p>
                 <p class="text-xs text-gray-400 mt-1">${escapeHtml(servico.descricao || 'Sem descrição')}</p>
                 <div class="flex items-center gap-2 mt-2 text-[10px] text-gray-500">
-                    <span class="px-2 py-0.5 rounded-full bg-gray-900 border border-gray-700">${formatarDuracaoMinutos(servico.duracao_minutos)}</span>
                     <span class="px-2 py-0.5 rounded-full ${Number(servico.ativo || 0) ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">${Number(servico.ativo || 0) ? 'Ativo' : 'Inativo'}</span>
                 </div>
             </button>
@@ -396,6 +403,10 @@ function abrirModalSolicitacao(dataIso) {
         const dataBase = dataIso ? parseDataServidorBrasilia(dataIso + 'T09:00:00') : new Date();
         inputData.value = dataToLocalValue(dataBase);
     }
+    const inputFim = document.getElementById('solicitacao-data-fim');
+    if (inputFim) {
+        inputFim.value = '';
+    }
     abrirModal('modal-solicitacao');
 }
 
@@ -412,12 +423,13 @@ function dataParaBanco(data) {
 async function enviarSolicitacao() {
     const servicoId = Number(document.getElementById('solicitacao-servico')?.value || 0);
     const dataInicio = document.getElementById('solicitacao-data-inicio')?.value || '';
+    const dataFim = document.getElementById('solicitacao-data-fim')?.value || '';
     const observacoes = document.getElementById('solicitacao-observacoes')?.value || '';
 
     const res = await fetch('/api/agendamentos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ servico_id: String(servicoId), data_inicio: dataInicio, observacoes })
+        body: new URLSearchParams({ servico_id: String(servicoId), data_inicio: dataInicio, data_fim: dataFim, observacoes })
     });
     const data = await res.json();
     if (!res.ok) {
@@ -483,13 +495,11 @@ function limparFormularioServico() {
     const id = document.getElementById('servico-id');
     const nome = document.getElementById('servico-nome');
     const descricao = document.getElementById('servico-descricao');
-    const duracao = document.getElementById('servico-duracao');
     const cor = document.getElementById('servico-cor');
     const ativo = document.getElementById('servico-ativo');
     if (id) id.value = '';
     if (nome) nome.value = '';
     if (descricao) descricao.value = '';
-    if (duracao) duracao.value = '60';
     if (cor) cor.value = '#4f46e5';
     if (ativo) ativo.checked = true;
 }
@@ -501,13 +511,11 @@ async function editarServico(id) {
     const idInput = document.getElementById('servico-id');
     const nome = document.getElementById('servico-nome');
     const descricao = document.getElementById('servico-descricao');
-    const duracao = document.getElementById('servico-duracao');
     const cor = document.getElementById('servico-cor');
     const ativo = document.getElementById('servico-ativo');
     if (idInput) idInput.value = servico.id;
     if (nome) nome.value = servico.nome || '';
     if (descricao) descricao.value = servico.descricao || '';
-    if (duracao) duracao.value = String(servico.duracao_minutos || 60);
     if (cor) cor.value = servico.cor_hex || '#4f46e5';
     if (ativo) ativo.checked = Number(servico.ativo || 0) === 1;
 }
@@ -516,7 +524,6 @@ async function salvarServico() {
     const payload = {
         nome: document.getElementById('servico-nome')?.value.trim() || '',
         descricao: document.getElementById('servico-descricao')?.value.trim() || '',
-        duracao_minutos: document.getElementById('servico-duracao')?.value || '60',
         cor_hex: document.getElementById('servico-cor')?.value.trim() || '#4f46e5',
         ativo: document.getElementById('servico-ativo')?.checked ? 1 : 0,
     };

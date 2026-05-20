@@ -13,12 +13,49 @@ function bootstrapDefaultData(): void
     try {
         ensureUniqueSectorNames($pdo);
         ensureAgendamentoSchema($pdo);
+        seedDefaultServices($pdo);
         seedDefaultSectors($pdo);
         seedDefaultAdminUser($pdo);
     } finally {
         if ($lockAcquired) {
             $unlockStmt = $pdo->prepare('SELECT RELEASE_LOCK(?)');
             $unlockStmt->execute([$lockName]);
+        }
+    }
+}
+
+function seedDefaultServices(PDO $pdo): void
+{
+    $defaultServices = [
+        ['Suporte Presencial', 'Atendimento presencial no local', '#28a745'],
+        ['Consultoria Técnica', 'Sessão de consultoria técnica', '#007bff'],
+        ['Instalação de Software', 'Instalação e configuração de software', '#fd7e14'],
+    ];
+
+    // tenta identificar um usuário admin para preencher criado_por, se existir
+    $adminId = null;
+    try {
+        $stmtAdmin = $pdo->query("SELECT id FROM usuarios WHERE papel = 'admin' LIMIT 1");
+        $adminId = $stmtAdmin ? $stmtAdmin->fetchColumn() : null;
+        $adminId = $adminId !== false ? (int) $adminId : null;
+    } catch (\Throwable $e) {
+        $adminId = null;
+    }
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO servicos_agendamento (nome, descricao, cor_hex, criado_por)
+         SELECT ?, ?, ?, ?
+         WHERE NOT EXISTS (
+             SELECT 1 FROM servicos_agendamento WHERE nome = ? LIMIT 1
+         )'
+    );
+
+    foreach ($defaultServices as [$nome, $descricao, $cor]) {
+        try {
+            $stmt->execute([$nome, $descricao, $cor, $adminId, $nome]);
+        } catch (\Throwable $e) {
+            // não falhar a inicialização inteira por um único insert
+            error_log('seedDefaultServices: ' . $e->getMessage());
         }
     }
 }

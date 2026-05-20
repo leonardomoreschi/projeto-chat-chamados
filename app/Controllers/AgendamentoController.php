@@ -47,7 +47,7 @@ class AgendamentoController
         }
 
         $sql = "SELECT a.id, a.servico_id, s.nome AS servico_nome, s.descricao AS servico_descricao,
-                       s.duracao_minutos, s.cor_hex, s.ativo AS servico_ativo,
+                   s.cor_hex, s.ativo AS servico_ativo,
                        a.solicitante_id, u.nome AS solicitante_nome, u.email AS solicitante_email,
                        a.aprovado_por_id, ap.nome AS aprovado_por_nome,
                        a.cancelado_por_id, ca.nome AS cancelado_por_nome,
@@ -100,7 +100,20 @@ class AgendamentoController
         }
 
         $inicio = new \DateTimeImmutable($dataInicio);
-        $fim = $inicio->modify('+' . max(1, (int) $servico['duracao_minutos']) . ' minutes');
+        $dataFim = $this->normalizarDataHora((string) ($data['data_fim'] ?? ''));
+        if ($dataFim) {
+            try {
+                $fim = new \DateTimeImmutable($dataFim);
+            } catch (\Throwable $e) {
+                return Json::erro($response, 'Data de fim inválida');
+            }
+            if ($fim <= $inicio) {
+                return Json::erro($response, 'Data de fim deve ser posterior à data de início');
+            }
+        } else {
+            // por compatibilidade, quando não informado assume 1 hora de duração
+            $fim = $inicio->modify('+1 hour');
+        }
 
         try {
             $pdo->beginTransaction();
@@ -209,7 +222,7 @@ class AgendamentoController
         $params = $request->getQueryParams();
         $incluirInativos = in_array($papel, ['admin', 'ti'], true) && !empty($params['incluir_inativos']);
 
-        $sql = "SELECT id, nome, descricao, duracao_minutos, cor_hex, ativo, criado_por, criado_em, atualizado_em
+        $sql = "SELECT id, nome, descricao, cor_hex, ativo, criado_por, criado_em, atualizado_em
                 FROM servicos_agendamento";
         if (!$incluirInativos) {
             $sql .= ' WHERE ativo = 1';
@@ -229,7 +242,7 @@ class AgendamentoController
         $data = (array) $request->getParsedBody();
         $nome = trim((string) ($data['nome'] ?? ''));
         $descricao = trim((string) ($data['descricao'] ?? ''));
-        $duracao = max(1, (int) ($data['duracao_minutos'] ?? 60));
+        $cor = trim((string) ($data['cor_hex'] ?? '#4f46e5'));
         $cor = trim((string) ($data['cor_hex'] ?? '#4f46e5'));
 
         if ($nome === '') {
@@ -244,13 +257,12 @@ class AgendamentoController
         }
 
         $stmt = $pdo->prepare(
-            'INSERT INTO servicos_agendamento (nome, descricao, duracao_minutos, cor_hex, criado_por)
-             VALUES (?, ?, ?, ?, ?)'
+            'INSERT INTO servicos_agendamento (nome, descricao, cor_hex, criado_por)
+             VALUES (?, ?, ?, ?)'
         );
         $stmt->execute([
             $nome,
             $descricao !== '' ? $descricao : null,
-            $duracao,
             $this->normalizarCorHex($cor),
             (int) $request->getAttribute('user_id'),
         ]);
@@ -282,10 +294,6 @@ class AgendamentoController
             $descricao = trim((string) $data['descricao']);
             $campos[] = 'descricao = ?';
             $values[] = $descricao !== '' ? $descricao : null;
-        }
-        if (array_key_exists('duracao_minutos', $data)) {
-            $campos[] = 'duracao_minutos = ?';
-            $values[] = max(1, (int) $data['duracao_minutos']);
         }
         if (array_key_exists('cor_hex', $data)) {
             $campos[] = 'cor_hex = ?';
@@ -386,7 +394,7 @@ class AgendamentoController
     {
         $stmt = $pdo->prepare(
             'SELECT a.id, a.servico_id, s.nome AS servico_nome, s.descricao AS servico_descricao,
-                    s.duracao_minutos, s.cor_hex, s.ativo AS servico_ativo,
+                s.cor_hex, s.ativo AS servico_ativo,
                     a.solicitante_id, u.nome AS solicitante_nome, u.email AS solicitante_email,
                     a.aprovado_por_id, ap.nome AS aprovado_por_nome,
                     a.cancelado_por_id, ca.nome AS cancelado_por_nome,
@@ -410,7 +418,7 @@ class AgendamentoController
 
     private function buscarServicoAtivo(\PDO $pdo, int $servicoId): ?array
     {
-        $stmt = $pdo->prepare('SELECT id, nome, descricao, duracao_minutos, cor_hex, ativo FROM servicos_agendamento WHERE id = ? LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, nome, descricao, cor_hex, ativo FROM servicos_agendamento WHERE id = ? LIMIT 1');
         $stmt->execute([$servicoId]);
         $servico = $stmt->fetch(\PDO::FETCH_ASSOC);
         if (!$servico || (int) ($servico['ativo'] ?? 0) !== 1) {
