@@ -162,7 +162,6 @@ CREATE TABLE IF NOT EXISTS servicos_agendamento (
     id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     nome            VARCHAR(150) NOT NULL,
     descricao       TEXT NULL,
-    duracao_minutos INT UNSIGNED NOT NULL DEFAULT 60,
     cor_hex         VARCHAR(12) NOT NULL DEFAULT '#4f46e5',
     ativo           TINYINT(1) NOT NULL DEFAULT 1,
     criado_por      INT UNSIGNED NULL,

@@ -55,7 +55,158 @@ function dataParaLocalInput(data) {
 
 function chaveDia(data) {
     if (!data) return '';
-    return data.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+    const partes = new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Sao_Paulo',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+    }).formatToParts(data);
+    const valor = (tipo) => partes.find((item) => item.type === tipo)?.value || '00';
+    return `${valor('year')}-${valor('month')}-${valor('day')}`;
+}
+
+function inicioDia(data) {
+    return new Date(data.getFullYear(), data.getMonth(), data.getDate(), 0, 0, 0, 0);
+}
+
+function fimDia(data) {
+    return new Date(data.getFullYear(), data.getMonth(), data.getDate(), 23, 59, 59, 999);
+}
+
+function agendamentoCobreDia(item, data) {
+    const inicio = parseDataServidorBrasilia(item.data_inicio);
+    const fim = parseDataServidorBrasilia(item.data_fim || item.data_inicio);
+    if (!inicio || !fim) return false;
+
+    return inicioDia(data) <= fimDia(fim) && fimDia(data) >= inicioDia(inicio);
+}
+
+function agendamentosDoDia(data) {
+    return agendamentosCache.filter((item) => agendamentoCobreDia(item, data));
+}
+
+function intervaloFaixaClass(item, data) {
+    const inicio = parseDataServidorBrasilia(item.data_inicio);
+    const fim = parseDataServidorBrasilia(item.data_fim || item.data_inicio);
+    if (!inicio || !fim) return 'rounded-full';
+
+    const chaveAtual = chaveDia(data);
+    const chaveInicio = chaveDia(inicio);
+    const chaveFim = chaveDia(fim);
+
+    if (chaveInicio === chaveFim) {
+        return 'rounded-full';
+    }
+    if (chaveAtual === chaveInicio) {
+        return 'rounded-l-full rounded-r-none';
+    }
+    if (chaveAtual === chaveFim) {
+        return 'rounded-r-full rounded-l-none';
+    }
+    return 'rounded-none';
+}
+
+function diasVisiveisDoEvento(item, inicioMesVisivel, fimMesVisivel) {
+    const inicio = parseDataServidorBrasilia(item.data_inicio);
+    const fim = parseDataServidorBrasilia(item.data_fim || item.data_inicio);
+    if (!inicio || !fim) return [];
+
+    const dias = [];
+    let cursor = inicioDia(inicio > inicioMesVisivel ? inicio : inicioMesVisivel);
+    const ultimoDia = fimDia(fim < fimMesVisivel ? fim : fimMesVisivel);
+
+    while (cursor <= ultimoDia) {
+        if (cursor >= inicioMesVisivel && cursor <= fimMesVisivel) {
+            dias.push(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), 12, 0, 0, 0));
+        }
+        cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, 12, 0, 0, 0);
+    }
+
+    return dias;
+}
+
+function renderizarFaixasCalendario(container, itens, inicioVisivel, fimVisivel) {
+    const antigas = container.querySelector('.calendar-overlay-layer');
+    if (antigas) antigas.remove();
+
+    const overlay = document.createElement('div');
+    overlay.className = 'calendar-overlay-layer';
+    overlay.style.position = 'absolute';
+    overlay.style.inset = '0';
+    overlay.style.pointerEvents = 'none';
+    overlay.style.zIndex = '5';
+
+    const celulas = new Map();
+    container.querySelectorAll('[data-date]').forEach((el) => {
+        celulas.set(el.getAttribute('data-date'), el.getBoundingClientRect());
+    });
+
+    const rectContainer = container.getBoundingClientRect();
+    const lanePorLinha = new Map();
+
+    itens.forEach((item) => {
+        const dias = diasVisiveisDoEvento(item, inicioVisivel, fimVisivel);
+        if (!dias.length) return;
+
+        const agrupadoPorLinha = new Map();
+        dias.forEach((dia) => {
+            const chave = chaveDia(dia);
+            const cellRect = celulas.get(chave);
+            if (!cellRect) return;
+            const linha = Math.round((cellRect.top - rectContainer.top) / cellRect.height);
+            if (!agrupadoPorLinha.has(linha)) {
+                agrupadoPorLinha.set(linha, []);
+            }
+            agrupadoPorLinha.get(linha).push({ chave, rect: cellRect, data: dia });
+        });
+
+        agrupadoPorLinha.forEach((lista, linha) => {
+            lista.sort((a, b) => a.rect.left - b.rect.left);
+            const laneAtual = lanePorLinha.get(linha) || 0;
+            lanePorLinha.set(linha, laneAtual + 1);
+
+            const primeiro = lista[0].rect;
+            const ultimo = lista[lista.length - 1].rect;
+            const faixa = document.createElement('div');
+            faixa.className = 'agenda-range-band';
+            faixa.style.position = 'absolute';
+            faixa.style.left = `${primeiro.left - rectContainer.left + 6}px`;
+            faixa.style.width = `${(ultimo.right - primeiro.left) - 12}px`;
+            faixa.style.top = `${primeiro.top - rectContainer.top + 26 + (laneAtual * 28)}px`;
+            faixa.style.height = '22px';
+            faixa.style.backgroundColor = item.cor_hex || '#4f46e5';
+            faixa.style.border = '1px solid rgba(255,255,255,0.22)';
+            faixa.style.boxShadow = '0 8px 18px rgba(0,0,0,0.18)';
+            faixa.style.borderRadius = '9999px';
+            faixa.style.overflow = 'hidden';
+
+            if (lista.length > 1) {
+                faixa.style.borderTopLeftRadius = '9999px';
+                faixa.style.borderBottomLeftRadius = '9999px';
+                faixa.style.borderTopRightRadius = '9999px';
+                faixa.style.borderBottomRightRadius = '9999px';
+            }
+
+            const label = document.createElement('div');
+            label.style.position = 'absolute';
+            label.style.inset = '0';
+            label.style.display = 'flex';
+            label.style.alignItems = 'center';
+            label.style.padding = '0 10px';
+            label.style.color = '#ffffff';
+            label.style.fontSize = '10px';
+            label.style.fontWeight = '700';
+            label.style.whiteSpace = 'nowrap';
+            label.style.overflow = 'hidden';
+            label.style.textOverflow = 'ellipsis';
+            label.textContent = item.servico_nome;
+            faixa.appendChild(label);
+
+            overlay.appendChild(faixa);
+        });
+    });
+
+    container.appendChild(overlay);
 }
 
 function inicioMes(data) {
@@ -161,6 +312,7 @@ function renderizarCalendario() {
     const titulo = document.getElementById('agenda-mes-rotulo');
     if (!container) return;
 
+    container.style.position = 'relative';
     if (titulo) titulo.textContent = nomeMes(mesAtual);
 
     const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
@@ -178,19 +330,25 @@ function renderizarCalendario() {
     for (let dia = 1; dia <= totalDias; dia += 1) {
         const data = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), dia, 12, 0, 0, 0);
         const chave = chaveDia(data);
-        const itens = agendamentosCache.filter((item) => chaveDia(parseDataServidorBrasilia(item.data_inicio)) === chave);
+        const itens = agendamentosDoDia(data);
         const isSelected = diaSelecionado === chave;
 
         partes.push(`
-            <button type="button" data-date="${chave}" class="calendar-day h-24 rounded-2xl border ${isSelected ? 'is-selected bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-100'} ${itens.length ? 'has-items' : ''} p-3 text-left hover:border-indigo-500 transition flex flex-col justify-between">
+            <button type="button" data-date="${chave}" class="calendar-day min-h-32 rounded-2xl border ${isSelected ? 'is-selected bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-100'} ${itens.length ? 'has-items' : ''} p-3 text-left hover:border-indigo-500 transition flex flex-col justify-between">
                 <div class="flex items-center justify-between gap-2">
                     <span class="text-sm font-bold">${dia}</span>
                     ${itens.length ? `<span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-white/10">${itens.length}</span>` : ''}
                 </div>
-                <div class="space-y-1 overflow-hidden">
-                    ${itens.slice(0, 2).map((item) => `
-                        <div class="text-[10px] ${statusClasses(item.status)} truncate" style="background-color:${escapeHtml(item.cor_hex || '#4f46e5')}">${escapeHtml(item.servico_nome)}</div>
+                <div class="space-y-1 overflow-hidden mt-2">
+                    ${itens.slice(0, 4).map((item) => `
+                        <div class="relative h-6 overflow-hidden ${intervaloFaixaClass(item, data)}" style="background-color:${escapeHtml(item.cor_hex || '#4f46e5')}">
+                            <div class="absolute inset-0 flex items-center gap-2 px-2 text-[10px] font-semibold text-white whitespace-nowrap overflow-hidden">
+                                <span class="w-2 h-2 rounded-full bg-white/80 shrink-0"></span>
+                                <span class="truncate">${escapeHtml(item.servico_nome)}</span>
+                            </div>
+                        </div>
                     `).join('')}
+                    ${itens.length > 4 ? `<div class="text-[10px] text-gray-400 font-semibold">+${itens.length - 4} serviços</div>` : ''}
                 </div>
             </button>
         `);
@@ -200,6 +358,8 @@ function renderizarCalendario() {
     container.querySelectorAll('[data-date]').forEach((el) => {
         el.addEventListener('click', () => abrirDia(el.getAttribute('data-date')));
     });
+
+    renderizarFaixasCalendario(container, agendamentosCache, inicioMes(mesAtual), fimMes(mesAtual));
 }
 
 function renderizarSidebarStatus() {
@@ -318,13 +478,13 @@ function abrirDia(dataIso) {
     diaSelecionado = dataIso;
     const data = parseDataServidorBrasilia(dataIso + 'T12:00:00');
     const titulo = document.getElementById('modal-dia-titulo');
-    const conteudo = document.getElementById('lista-agendamentos-dia');
+    const conteudo = document.getElementById('lista-agendamentos-dia') || document.getElementById('modal-dia-conteudo');
     const rótulo = document.getElementById('dia-selecionado-rotulo');
 
     if (titulo && data) titulo.textContent = data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
     if (rótulo && data) rótulo.textContent = data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
 
-    const itens = agendamentosCache.filter((item) => chaveDia(parseDataServidorBrasilia(item.data_inicio)) === dataIso);
+    const itens = agendamentosDoDia(data || new Date());
     if (!conteudo) return;
 
     if (!itens.length) {

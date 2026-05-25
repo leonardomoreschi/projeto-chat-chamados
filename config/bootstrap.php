@@ -24,42 +24,6 @@ function bootstrapDefaultData(): void
     }
 }
 
-function seedDefaultServices(PDO $pdo): void
-{
-    $defaultServices = [
-        ['Suporte Presencial', 'Atendimento presencial no local', '#28a745'],
-        ['Consultoria Técnica', 'Sessão de consultoria técnica', '#007bff'],
-        ['Instalação de Software', 'Instalação e configuração de software', '#fd7e14'],
-    ];
-
-    // tenta identificar um usuário admin para preencher criado_por, se existir
-    $adminId = null;
-    try {
-        $stmtAdmin = $pdo->query("SELECT id FROM usuarios WHERE papel = 'admin' LIMIT 1");
-        $adminId = $stmtAdmin ? $stmtAdmin->fetchColumn() : null;
-        $adminId = $adminId !== false ? (int) $adminId : null;
-    } catch (\Throwable $e) {
-        $adminId = null;
-    }
-
-    $stmt = $pdo->prepare(
-        'INSERT INTO servicos_agendamento (nome, descricao, cor_hex, criado_por)
-         SELECT ?, ?, ?, ?
-         WHERE NOT EXISTS (
-             SELECT 1 FROM servicos_agendamento WHERE nome = ? LIMIT 1
-         )'
-    );
-
-    foreach ($defaultServices as [$nome, $descricao, $cor]) {
-        try {
-            $stmt->execute([$nome, $descricao, $cor, $adminId, $nome]);
-        } catch (\Throwable $e) {
-            // não falhar a inicialização inteira por um único insert
-            error_log('seedDefaultServices: ' . $e->getMessage());
-        }
-    }
-}
-
 function ensureUniqueSectorNames(PDO $pdo): void
 {
     static $alreadyChecked = false;
@@ -84,8 +48,6 @@ function ensureUniqueSectorNames(PDO $pdo): void
         try {
             $pdo->exec('ALTER TABLE setores ADD UNIQUE KEY uniq_setores_nome (nome)');
         } catch (\PDOException $e) {
-            // Se houve corrida de inicializacao ou nomes com espacos/case variantes,
-            // tenta deduplicar mais uma vez e reaplicar a constraint.
             deduplicateSectors($pdo);
             try {
                 $pdo->exec('ALTER TABLE setores ADD UNIQUE KEY uniq_setores_nome (nome)');
@@ -177,7 +139,6 @@ function seedDefaultAdminUser(PDO $pdo): void
         return;
     }
 
-    $setorId = null;
     $stmtSetor = $pdo->prepare('SELECT id FROM setores WHERE nome = ? LIMIT 1');
     $stmtSetor->execute(['TI']);
     $setorId = $stmtSetor->fetchColumn();
@@ -196,9 +157,52 @@ function seedDefaultAdminUser(PDO $pdo): void
     ]);
 }
 
+function seedDefaultServices(PDO $pdo): void
+{
+    $defaultServices = [
+        ['Suporte Presencial', 'Atendimento presencial no local', '#28a745'],
+        ['Consultoria Técnica', 'Sessão de consultoria técnica', '#007bff'],
+        ['Instalação de Software', 'Instalação e configuração de software', '#fd7e14'],
+    ];
+
+    $adminId = null;
+    try {
+        $stmtAdmin = $pdo->query("SELECT id FROM usuarios WHERE papel = 'admin' LIMIT 1");
+        $adminId = $stmtAdmin ? $stmtAdmin->fetchColumn() : null;
+        $adminId = $adminId !== false ? (int) $adminId : null;
+    } catch (\Throwable $e) {
+        $adminId = null;
+    }
+
+    $stmt = $pdo->prepare(
+        'INSERT INTO servicos_agendamento (nome, descricao, cor_hex, criado_por)
+         SELECT ?, ?, ?, ?
+         WHERE NOT EXISTS (
+             SELECT 1 FROM servicos_agendamento WHERE nome = ? LIMIT 1
+         )'
+    );
+
+    foreach ($defaultServices as [$nome, $descricao, $cor]) {
+        try {
+            $stmt->execute([$nome, $descricao, $cor, $adminId, $nome]);
+        } catch (\Throwable $e) {
+            error_log('seedDefaultServices: ' . $e->getMessage());
+        }
+    }
+}
+
 function ensureAgendamentoSchema(PDO $pdo): void
 {
-    $pdo->exec("\n        CREATE TABLE IF NOT EXISTS servicos_agendamento (\n            id              INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n            nome            VARCHAR(150) NOT NULL,\n            descricao       TEXT NULL,\n            duracao_minutos INT UNSIGNED NOT NULL DEFAULT 60,\n            cor_hex         VARCHAR(12) NOT NULL DEFAULT '#4f46e5',\n            ativo           TINYINT(1) NOT NULL DEFAULT 1,\n            criado_por      INT UNSIGNED NULL,\n            criado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n            atualizado_em   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n            UNIQUE KEY uniq_servicos_agendamento_nome (nome),\n            FOREIGN KEY (criado_por) REFERENCES usuarios(id) ON DELETE SET NULL\n        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci\n    ");
+    $pdo->exec("\n        CREATE TABLE IF NOT EXISTS servicos_agendamento (\n            id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n            nome          VARCHAR(150) NOT NULL,\n            descricao     TEXT NULL,\n            cor_hex       VARCHAR(12) NOT NULL DEFAULT '#4f46e5',\n            ativo         TINYINT(1) NOT NULL DEFAULT 1,\n            criado_por    INT UNSIGNED NULL,\n            criado_em     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n            atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n            UNIQUE KEY uniq_servicos_agendamento_nome (nome),\n            FOREIGN KEY (criado_por) REFERENCES usuarios(id) ON DELETE SET NULL\n        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci\n    ");
+
+    try {
+        $columnCheck = $pdo->query("\n            SELECT COUNT(*)\n            FROM information_schema.columns\n            WHERE table_schema = DATABASE()\n              AND table_name = 'servicos_agendamento'\n              AND column_name = 'duracao_minutos'\n        ");
+        if ($columnCheck && (int) $columnCheck->fetchColumn() > 0) {
+            $pdo->exec('ALTER TABLE servicos_agendamento DROP COLUMN duracao_minutos');
+        }
+    } catch (\Throwable $e) {
+        error_log('Nao foi possivel remover duracao_minutos: ' . $e->getMessage());
+    }
 
     $pdo->exec("\n        CREATE TABLE IF NOT EXISTS agendamentos (\n            id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n            servico_id          INT UNSIGNED NOT NULL,\n            solicitante_id      INT UNSIGNED NOT NULL,\n            aprovado_por_id     INT UNSIGNED NULL,\n            cancelado_por_id    INT UNSIGNED NULL,\n            encerrado_por_id    INT UNSIGNED NULL,\n            status              ENUM('solicitado','agendado','cancelado','encerrado') NOT NULL DEFAULT 'solicitado',\n            data_inicio         DATETIME NOT NULL,\n            data_fim            DATETIME NOT NULL,\n            observacoes         TEXT NULL,\n            motivo_recusa       TEXT NULL,\n            motivo_cancelamento TEXT NULL,\n            aprovado_em         TIMESTAMP NULL DEFAULT NULL,\n            cancelado_em        TIMESTAMP NULL DEFAULT NULL,\n            encerrado_em        TIMESTAMP NULL DEFAULT NULL,\n            criado_em           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n            atualizado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n            FOREIGN KEY (servico_id) REFERENCES servicos_agendamento(id) ON DELETE RESTRICT,\n            FOREIGN KEY (solicitante_id) REFERENCES usuarios(id) ON DELETE CASCADE,\n            FOREIGN KEY (aprovado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,\n            FOREIGN KEY (cancelado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,\n            FOREIGN KEY (encerrado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,\n            INDEX idx_agendamentos_status_inicio (status, data_inicio),\n            INDEX idx_agendamentos_solicitante_status_inicio (solicitante_id, status, data_inicio),\n            INDEX idx_agendamentos_servico_inicio (servico_id, data_inicio)\n        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci\n    ");
 }

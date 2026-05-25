@@ -136,6 +136,10 @@ $agendamentosBootstrap = [
                 <input id="solicitacao-data-inicio" type="datetime-local" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white">
             </div>
             <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Data e horário de término (opcional)</label>
+                <input id="solicitacao-data-fim" type="datetime-local" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white">
+            </div>
+            <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">Observações</label>
                 <textarea id="solicitacao-observacoes" rows="4" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white resize-none" placeholder="Descreva a necessidade, local, preferência de horário..."></textarea>
             </div>

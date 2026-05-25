@@ -33,8 +33,8 @@ class AgendamentoController
             $fim = (new \DateTimeImmutable('last day of this month 23:59:59'))->format('Y-m-d H:i:s');
         }
 
-        $where = ['a.data_inicio BETWEEN ? AND ?'];
-        $values = [$inicio, $fim];
+        $where = ['a.data_inicio < ? AND a.data_fim > ?'];
+        $values = [$fim, $inicio];
 
         if ($status !== '' && in_array($status, self::STATUS_VALIDOS, true)) {
             $where[] = 'a.status = ?';
