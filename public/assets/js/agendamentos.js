@@ -750,8 +750,8 @@ function conectarWSAgendamentos() {
         wsAgendamentos.onmessage = function (event) {
             const data = JSON.parse(event.data);
             if (data.type === 'schedule_updated') {
-                carregarServicos().catch(() => {});
-                carregarAgendamentos().catch(() => {});
+                carregarServicos().catch(() => { });
+                carregarAgendamentos().catch(() => { });
                 if (agendamentoAtual && Number(data.agendamento?.id || 0) === Number(agendamentoAtual.id || 0)) {
                     abrirDetalhe(Number(agendamentoAtual.id));
                 }
