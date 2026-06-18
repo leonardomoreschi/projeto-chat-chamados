@@ -1,3 +1,4 @@
+// ── Bootstrap ──────────────────────────────────────────────────────────────
 const AG_BOOT = window.AGENDAMENTO_BOOTSTRAP || {};
 const AG_USER_ID = Number(AG_BOOT.currentUserId || 0);
 const AG_USER_NAME = String(AG_BOOT.currentUserName || '');
@@ -5,264 +6,135 @@ const AG_USER_PAPEL = String(AG_BOOT.userPapel || 'usuario');
 const AG_MODO = String(AG_BOOT.mode || 'user');
 const AG_EQUIP = ['admin', 'ti'].includes(AG_USER_PAPEL);
 
+// ── Estado ─────────────────────────────────────────────────────────────────
 let agendamentosCache = [];
 let servicosCache = [];
-let mesAtual = new Date();
+let dataAtual = new Date();
+let viewMode = 'month'; // 'month' | 'week' | 'day'
 let diaSelecionado = null;
 let agendamentoAtual = null;
 let editandoServicoId = null;
 let wsAgendamentos = null;
 
-function parseDataServidorBrasilia(valorData) {
-    if (!valorData) return null;
-    if (typeof valorData === 'string') {
-        const base = valorData.includes('T') ? valorData : valorData.replace(' ', 'T');
-        const possuiTimezone = /Z|[+-]\d{2}:?\d{2}$/.test(base);
-        const normalizada = possuiTimezone ? base : (base + '-03:00');
-        const data = new Date(normalizada);
-        if (!Number.isNaN(data.getTime())) return data;
-    }
-    const fallback = new Date(valorData);
-    return Number.isNaN(fallback.getTime()) ? null : fallback;
+const HORA_INICIO = 7;
+const HORA_FIM = 21;
+const PX_HORA = 64;
+
+// ── Utilitários de data ─────────────────────────────────────────────────────
+function parseDataServidorBrasilia(v) {
+    if (!v) return null;
+    const s = String(v);
+    const base = s.includes('T') ? s : s.replace(' ', 'T');
+    const comTZ = /Z|[+-]\d{2}:?\d{2}$/.test(base) ? base : base + '-03:00';
+    const d = new Date(comTZ);
+    return isNaN(d.getTime()) ? null : d;
 }
 
-function formatarDataAgendamento(valorData) {
-    const data = parseDataServidorBrasilia(valorData);
-    if (!data) return 'Não informado';
-    return data.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+function formatarDataAgendamento(v) {
+    const d = parseDataServidorBrasilia(v);
+    return d ? d.toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : 'Não informado';
 }
 
-function formatarDataCurtaAgendamento(valorData) {
-    const data = parseDataServidorBrasilia(valorData);
-    if (!data) return '';
-    return data.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+function formatarDataCurtaAgendamento(v) {
+    const d = parseDataServidorBrasilia(v);
+    return d ? d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '';
 }
 
-function formatarHoraAgendamento(valorData) {
-    const data = parseDataServidorBrasilia(valorData);
-    if (!data) return '';
-    return data.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
-}
-
-function dataParaLocalInput(data) {
-    const pad = (n) => String(n).padStart(2, '0');
-    return [
-        data.getFullYear(),
-        pad(data.getMonth() + 1),
-        pad(data.getDate())
-    ].join('-') + 'T' + [pad(data.getHours()), pad(data.getMinutes())].join(':');
+function formatarHoraAgendamento(v) {
+    const d = parseDataServidorBrasilia(v);
+    return d ? d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }) : '';
 }
 
 function chaveDia(data) {
     if (!data) return '';
-    const partes = new Intl.DateTimeFormat('en-CA', {
-        timeZone: 'America/Sao_Paulo',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-    }).formatToParts(data);
-    const valor = (tipo) => partes.find((item) => item.type === tipo)?.value || '00';
-    return `${valor('year')}-${valor('month')}-${valor('day')}`;
+    const p = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(data);
+    const v = t => p.find(x => x.type === t)?.value || '00';
+    return `${v('year')}-${v('month')}-${v('day')}`;
 }
 
-function inicioDia(data) {
-    return new Date(data.getFullYear(), data.getMonth(), data.getDate(), 0, 0, 0, 0);
-}
+function inicioDia(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0); }
+function fimDia(d)   { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
+function inicioMes(d) { return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0); }
+function fimMes(d)   { return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999); }
 
-function fimDia(data) {
-    return new Date(data.getFullYear(), data.getMonth(), data.getDate(), 23, 59, 59, 999);
+function inicioDaSemana(d) {
+    const r = new Date(d);
+    r.setDate(d.getDate() - d.getDay());
+    r.setHours(0, 0, 0, 0);
+    return r;
 }
+function fimDaSemana(d) {
+    const r = inicioDaSemana(d);
+    r.setDate(r.getDate() + 6);
+    r.setHours(23, 59, 59, 999);
+    return r;
+}
+function addDias(d, n) { const r = new Date(d); r.setDate(r.getDate() + n); return r; }
+
+function nomeMes(d) { return d.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }); }
 
 function agendamentoCobreDia(item, data) {
-    const inicio = parseDataServidorBrasilia(item.data_inicio);
+    const ini = parseDataServidorBrasilia(item.data_inicio);
     const fim = parseDataServidorBrasilia(item.data_fim || item.data_inicio);
-    if (!inicio || !fim) return false;
-
-    return inicioDia(data) <= fimDia(fim) && fimDia(data) >= inicioDia(inicio);
+    return ini && fim && inicioDia(data) <= fim && fimDia(data) >= ini;
 }
 
-function agendamentosDoDia(data) {
-    return agendamentosCache.filter((item) => agendamentoCobreDia(item, data));
-}
-
-function intervaloFaixaClass(item, data) {
-    const inicio = parseDataServidorBrasilia(item.data_inicio);
+function ehMultiDia(item) {
+    const ini = parseDataServidorBrasilia(item.data_inicio);
     const fim = parseDataServidorBrasilia(item.data_fim || item.data_inicio);
-    if (!inicio || !fim) return 'rounded-full';
+    return ini && fim && chaveDia(ini) !== chaveDia(fim);
+}
 
-    const chaveAtual = chaveDia(data);
-    const chaveInicio = chaveDia(inicio);
-    const chaveFim = chaveDia(fim);
+function dataParaBanco(data) {
+    const p = n => String(n).padStart(2, '0');
+    return `${data.getFullYear()}-${p(data.getMonth()+1)}-${p(data.getDate())} ${p(data.getHours())}:${p(data.getMinutes())}:00`;
+}
 
-    if (chaveInicio === chaveFim) {
-        return 'rounded-full';
+function dataToLocalValue(d) {
+    const p = n => String(n).padStart(2, '0');
+    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function statusLabel(s) {
+    return window.APP_CONFIG?.agendamentoStatus?.[s] || s;
+}
+
+function statusClasses(s) {
+    const b = 'text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded agenda-pill';
+    if (s === 'solicitado') return b + ' bg-amber-600';
+    if (s === 'agendado')   return b + ' bg-green-600';
+    if (s === 'cancelado')  return b + ' bg-red-600';
+    return b + ' bg-indigo-600';
+}
+
+// ── Range da API por modo de visão ──────────────────────────────────────────
+function rangeVisivel() {
+    if (viewMode === 'week') {
+        const ini = inicioDaSemana(dataAtual);
+        ini.setDate(ini.getDate() - 7);
+        const fim = fimDaSemana(dataAtual);
+        fim.setDate(fim.getDate() + 7);
+        return { inicio: ini, fim };
     }
-    if (chaveAtual === chaveInicio) {
-        return 'rounded-l-full rounded-r-none';
+    if (viewMode === 'day') {
+        return { inicio: inicioDia(dataAtual), fim: fimDia(dataAtual) };
     }
-    if (chaveAtual === chaveFim) {
-        return 'rounded-r-full rounded-l-none';
-    }
-    return 'rounded-none';
+    const ini = inicioMes(dataAtual);
+    ini.setMonth(ini.getMonth() - 1);
+    const fim = fimMes(dataAtual);
+    fim.setMonth(fim.getMonth() + 1);
+    return { inicio: ini, fim };
 }
 
-function diasVisiveisDoEvento(item, inicioMesVisivel, fimMesVisivel) {
-    const inicio = parseDataServidorBrasilia(item.data_inicio);
-    const fim = parseDataServidorBrasilia(item.data_fim || item.data_inicio);
-    if (!inicio || !fim) return [];
-
-    const dias = [];
-    let cursor = inicioDia(inicio > inicioMesVisivel ? inicio : inicioMesVisivel);
-    const ultimoDia = fimDia(fim < fimMesVisivel ? fim : fimMesVisivel);
-
-    while (cursor <= ultimoDia) {
-        if (cursor >= inicioMesVisivel && cursor <= fimMesVisivel) {
-            dias.push(new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate(), 12, 0, 0, 0));
-        }
-        cursor = new Date(cursor.getFullYear(), cursor.getMonth(), cursor.getDate() + 1, 12, 0, 0, 0);
-    }
-
-    return dias;
-}
-
-function renderizarFaixasCalendario(container, itens, inicioVisivel, fimVisivel) {
-    const antigas = container.querySelector('.calendar-overlay-layer');
-    if (antigas) antigas.remove();
-
-    const overlay = document.createElement('div');
-    overlay.className = 'calendar-overlay-layer';
-    overlay.style.position = 'absolute';
-    overlay.style.inset = '0';
-    overlay.style.pointerEvents = 'none';
-    overlay.style.zIndex = '5';
-
-    const celulas = new Map();
-    container.querySelectorAll('[data-date]').forEach((el) => {
-        celulas.set(el.getAttribute('data-date'), el.getBoundingClientRect());
-    });
-
-    const rectContainer = container.getBoundingClientRect();
-    const lanePorLinha = new Map();
-
-    itens.forEach((item) => {
-        const dias = diasVisiveisDoEvento(item, inicioVisivel, fimVisivel);
-        if (!dias.length) return;
-
-        const agrupadoPorLinha = new Map();
-        dias.forEach((dia) => {
-            const chave = chaveDia(dia);
-            const cellRect = celulas.get(chave);
-            if (!cellRect) return;
-            const linha = Math.round((cellRect.top - rectContainer.top) / cellRect.height);
-            if (!agrupadoPorLinha.has(linha)) {
-                agrupadoPorLinha.set(linha, []);
-            }
-            agrupadoPorLinha.get(linha).push({ chave, rect: cellRect, data: dia });
-        });
-
-        agrupadoPorLinha.forEach((lista, linha) => {
-            lista.sort((a, b) => a.rect.left - b.rect.left);
-            const laneAtual = lanePorLinha.get(linha) || 0;
-            lanePorLinha.set(linha, laneAtual + 1);
-
-            const primeiro = lista[0].rect;
-            const ultimo = lista[lista.length - 1].rect;
-            const faixa = document.createElement('div');
-            faixa.className = 'agenda-range-band';
-            faixa.style.position = 'absolute';
-            faixa.style.left = `${primeiro.left - rectContainer.left + 6}px`;
-            faixa.style.width = `${(ultimo.right - primeiro.left) - 12}px`;
-            faixa.style.top = `${primeiro.top - rectContainer.top + 26 + (laneAtual * 28)}px`;
-            faixa.style.height = '22px';
-            faixa.style.backgroundColor = item.cor_hex || '#4f46e5';
-            faixa.style.border = '1px solid rgba(255,255,255,0.22)';
-            faixa.style.boxShadow = '0 8px 18px rgba(0,0,0,0.18)';
-            faixa.style.borderRadius = '9999px';
-            faixa.style.overflow = 'hidden';
-
-            if (lista.length > 1) {
-                faixa.style.borderTopLeftRadius = '9999px';
-                faixa.style.borderBottomLeftRadius = '9999px';
-                faixa.style.borderTopRightRadius = '9999px';
-                faixa.style.borderBottomRightRadius = '9999px';
-            }
-
-            const label = document.createElement('div');
-            label.style.position = 'absolute';
-            label.style.inset = '0';
-            label.style.display = 'flex';
-            label.style.alignItems = 'center';
-            label.style.padding = '0 10px';
-            label.style.color = '#ffffff';
-            label.style.fontSize = '10px';
-            label.style.fontWeight = '700';
-            label.style.whiteSpace = 'nowrap';
-            label.style.overflow = 'hidden';
-            label.style.textOverflow = 'ellipsis';
-            label.textContent = item.servico_nome;
-            faixa.appendChild(label);
-
-            overlay.appendChild(faixa);
-        });
-    });
-
-    container.appendChild(overlay);
-}
-
-function inicioMes(data) {
-    return new Date(data.getFullYear(), data.getMonth(), 1, 0, 0, 0, 0);
-}
-
-function fimMes(data) {
-    return new Date(data.getFullYear(), data.getMonth() + 1, 0, 23, 59, 59, 999);
-}
-
-function nomeMes(data) {
-    return data.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-}
-
-function statusLabel(status) {
-    return (window.APP_CONFIG && window.APP_CONFIG.agendamentoStatus && window.APP_CONFIG.agendamentoStatus[status]) || status;
-}
-
-function statusClasses(status) {
-    const base = 'text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded agenda-pill';
-    if (status === 'solicitado') return base + ' bg-amber-600';
-    if (status === 'agendado') return base + ' bg-green-600';
-    if (status === 'cancelado') return base + ' bg-red-600';
-    return base + ' bg-indigo-600';
-}
-
+// ── API ─────────────────────────────────────────────────────────────────────
 async function carregarServicos() {
-    const url = AG_EQUIP ? '/api/servicos-agendamento?incluir_inativos=1' : '/api/servicos-agendamento';
-    const res = await fetch(url);
-    const data = await res.json();
-    servicosCache = Array.isArray(data) ? data : [];
-    popularSelectServicos();
-    renderizarServicosAdmin();
-}
-
-function popularSelectServicos() {
-    const select = document.getElementById('solicitacao-servico');
-    if (!select) return;
-    select.innerHTML = servicosCache
-        .filter((servico) => AG_EQUIP || Number(servico.ativo || 0) === 1)
-        .map((servico) => `<option value="${servico.id}">${escapeHtml(servico.nome)}${Number(servico.ativo || 0) === 0 ? ' (inativo)' : ''}</option>`)
-        .join('');
+    await _carregarServicosUmaVez();
 }
 
 async function carregarAgendamentos() {
-    const inicio = inicioMes(mesAtual);
-    inicio.setMonth(inicio.getMonth() - 1);
-    const fim = fimMes(mesAtual);
-    fim.setMonth(fim.getMonth() + 1);
-
-    const params = new URLSearchParams({
-        inicio: dataParaBanco(inicio),
-        fim: dataParaBanco(fim),
-    });
-
-    const res = await fetch('/api/agendamentos?' + params.toString());
+    const { inicio, fim } = rangeVisivel();
+    const params = new URLSearchParams({ inicio: dataParaBanco(inicio), fim: dataParaBanco(fim) });
+    const res = await fetch('/api/agendamentos?' + params);
     const data = await res.json();
     agendamentosCache = Array.isArray(data) ? data : [];
     renderizarCalendario();
@@ -270,438 +142,610 @@ async function carregarAgendamentos() {
     renderizarAdminQueues();
 }
 
-function prepararAgenda() {
-    const mesRef = document.getElementById('agenda-mes-rotulo');
-    if (mesRef) mesRef.textContent = nomeMes(mesAtual);
-
-    const btnAnterior = document.getElementById('btn-mes-anterior');
-    const btnProximo = document.getElementById('btn-mes-proximo');
-    const btnHoje = document.getElementById('btn-mes-hoje');
-    const btnSolicitarDia = document.getElementById('btn-abrir-solicitacao-dia');
-
-    if (btnAnterior) btnAnterior.onclick = async () => { mesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() - 1, 1); await carregarAgendamentos(); };
-    if (btnProximo) btnProximo.onclick = async () => { mesAtual = new Date(mesAtual.getFullYear(), mesAtual.getMonth() + 1, 1); await carregarAgendamentos(); };
-    if (btnHoje) btnHoje.onclick = async () => { mesAtual = new Date(); await carregarAgendamentos(); };
-    if (btnSolicitarDia) btnSolicitarDia.onclick = () => abrirModalSolicitacao(diaSelecionado);
-
-    const formServico = document.getElementById('form-servico');
-    if (formServico) {
-        formServico.addEventListener('submit', async (event) => {
-            event.preventDefault();
-            await salvarServico();
-        });
-    }
-
-    const btnCancelar = document.getElementById('btn-detalhe-cancelar');
-    const btnAprovar = document.getElementById('btn-detalhe-aprovar');
-    const btnRecusar = document.getElementById('btn-detalhe-recusar');
-    const btnEncerrar = document.getElementById('btn-detalhe-encerrar');
-    if (btnCancelar) btnCancelar.onclick = async () => { if (agendamentoAtual) await alterarStatus(agendamentoAtual.id, 'cancelar'); };
-    if (btnAprovar) btnAprovar.onclick = async () => { if (agendamentoAtual) await alterarStatus(agendamentoAtual.id, 'aprovar'); };
-    if (btnRecusar) btnRecusar.onclick = async () => {
-        if (!agendamentoAtual) return;
-        const motivo = prompt('Informe o motivo da recusa:') || '';
-        if (!motivo.trim()) return;
-        await alterarStatus(agendamentoAtual.id, 'recusar', { motivo });
-    };
-    if (btnEncerrar) btnEncerrar.onclick = async () => { if (agendamentoAtual) await alterarStatus(agendamentoAtual.id, 'encerrar'); };
+function popularSelectServicos() {
+    const sel = document.getElementById('solicitacao-servico');
+    if (!sel) return;
+    sel.innerHTML = servicosCache
+        .filter(s => AG_EQUIP || Number(s.ativo) === 1)
+        .map(s => `<option value="${s.id}">${escapeHtml(s.nome)}${Number(s.ativo) === 0 ? ' (inativo)' : ''}</option>`)
+        .join('');
 }
 
+// ── Navegação ───────────────────────────────────────────────────────────────
+function atualizarRotulo() {
+    const el = document.getElementById('agenda-mes-rotulo');
+    if (!el) return;
+    if (viewMode === 'month') { el.textContent = nomeMes(dataAtual); return; }
+    if (viewMode === 'week') {
+        const ini = inicioDaSemana(dataAtual);
+        const fim = fimDaSemana(dataAtual);
+        el.textContent = `${ini.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} – ${fim.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })}`;
+        return;
+    }
+    el.textContent = dataAtual.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' });
+}
+
+async function navAnterior() {
+    if (viewMode === 'month') dataAtual = new Date(dataAtual.getFullYear(), dataAtual.getMonth() - 1, 1);
+    else if (viewMode === 'week') dataAtual = addDias(dataAtual, -7);
+    else dataAtual = addDias(dataAtual, -1);
+    await carregarAgendamentos();
+}
+
+async function navProximo() {
+    if (viewMode === 'month') dataAtual = new Date(dataAtual.getFullYear(), dataAtual.getMonth() + 1, 1);
+    else if (viewMode === 'week') dataAtual = addDias(dataAtual, 7);
+    else dataAtual = addDias(dataAtual, 1);
+    await carregarAgendamentos();
+}
+
+async function navHoje() {
+    dataAtual = new Date();
+    await carregarAgendamentos();
+}
+
+async function mudarView(modo) {
+    viewMode = modo;
+    ['month', 'week', 'day'].forEach(m => {
+        const btn = document.getElementById('btn-view-' + m);
+        if (!btn) return;
+        const ativo = m === modo;
+        btn.classList.toggle('bg-indigo-600', ativo);
+        btn.classList.toggle('text-white', ativo);
+        btn.classList.toggle('bg-gray-800', !ativo);
+        btn.classList.toggle('text-gray-300', !ativo);
+        btn.classList.toggle('border-gray-700', !ativo);
+    });
+    await carregarAgendamentos();
+}
+
+// ── Dispatch de render ──────────────────────────────────────────────────────
 function renderizarCalendario() {
+    atualizarRotulo();
+    if (viewMode === 'week') { renderizarSemanal(); return; }
+    if (viewMode === 'day')  { renderizarDiario(); return; }
+    renderizarMensal();
+}
+
+// ── Visão Mensal ────────────────────────────────────────────────────────────
+function renderizarMensal() {
     const container = document.getElementById('calendario-agendamentos');
-    const titulo = document.getElementById('agenda-mes-rotulo');
     if (!container) return;
+    container.style.cssText = 'position:relative;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:0.5rem;';
 
-    container.style.position = 'relative';
-    if (titulo) titulo.textContent = nomeMes(mesAtual);
+    const nomesDias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+    const ini = inicioMes(dataAtual);
+    const primeiroDow = ini.getDay();
+    const totalDias = fimMes(dataAtual).getDate();
+    const hoje = chaveDia(new Date());
 
-    const dias = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
-    const inicio = inicioMes(mesAtual);
-    const fim = fimMes(mesAtual);
-    const primeiroDiaSemana = inicio.getDay();
-    const totalDias = fim.getDate();
+    const partes = nomesDias.map(d =>
+        `<div class="text-[11px] uppercase tracking-widest text-gray-500 font-black px-2 py-1 text-center">${d}</div>`
+    );
 
-    const partes = dias.map((dia) => `<div class="text-[11px] uppercase tracking-widest text-gray-500 font-black px-2 py-1 text-center">${dia}</div>`);
-
-    for (let i = 0; i < primeiroDiaSemana; i += 1) {
-        partes.push('<div class="h-24 rounded-2xl border border-transparent"></div>');
+    for (let i = 0; i < primeiroDow; i++) {
+        partes.push('<div class="rounded-2xl border border-transparent" style="min-height:7rem;"></div>');
     }
 
-    for (let dia = 1; dia <= totalDias; dia += 1) {
-        const data = new Date(mesAtual.getFullYear(), mesAtual.getMonth(), dia, 12, 0, 0, 0);
+    for (let dia = 1; dia <= totalDias; dia++) {
+        const data = new Date(dataAtual.getFullYear(), dataAtual.getMonth(), dia, 12, 0, 0);
         const chave = chaveDia(data);
-        const itens = agendamentosDoDia(data);
-        const isSelected = diaSelecionado === chave;
+        const itens = agendamentosCache.filter(item => item.status !== 'encerrado' && agendamentoCobreDia(item, data));
+        const sel = diaSelecionado === chave;
+        const isHoje = chave === hoje;
 
         partes.push(`
-            <button type="button" data-date="${chave}" class="calendar-day min-h-32 rounded-2xl border ${isSelected ? 'is-selected bg-indigo-600 border-indigo-500 text-white' : 'bg-gray-800 border-gray-700 text-gray-100'} ${itens.length ? 'has-items' : ''} p-3 text-left hover:border-indigo-500 transition flex flex-col justify-between">
-                <div class="flex items-center justify-between gap-2">
-                    <span class="text-sm font-bold">${dia}</span>
-                    ${itens.length ? `<span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-white/10">${itens.length}</span>` : ''}
+            <button type="button" data-date="${chave}" class="calendar-day rounded-2xl border ${sel ? 'is-selected bg-indigo-600 border-indigo-500 text-white' : isHoje ? 'bg-gray-800 border-indigo-500/60 text-gray-100' : 'bg-gray-800 border-gray-700 text-gray-100'} ${itens.length ? 'has-items' : ''} p-3 text-left hover:border-indigo-500 transition flex flex-col" style="min-height:7rem;">
+                <div class="flex items-center justify-between gap-1 mb-1">
+                    <span class="text-sm font-bold ${isHoje && !sel ? 'text-indigo-400' : ''}">${dia}</span>
+                    ${itens.length ? `<span class="text-[10px] font-black px-1.5 py-0.5 rounded-full bg-white/10">${itens.length}</span>` : ''}
                 </div>
-                <div class="space-y-1 overflow-hidden mt-2">
-                    ${itens.slice(0, 4).map((item) => `
-                        <div class="relative h-6 overflow-hidden ${intervaloFaixaClass(item, data)}" style="background-color:${escapeHtml(item.cor_hex || '#4f46e5')}">
-                            <div class="absolute inset-0 flex items-center gap-2 px-2 text-[10px] font-semibold text-white whitespace-nowrap overflow-hidden">
-                                <span class="w-2 h-2 rounded-full bg-white/80 shrink-0"></span>
-                                <span class="truncate">${escapeHtml(item.servico_nome)}</span>
-                            </div>
+                <div class="space-y-0.5 overflow-hidden flex-1">
+                    ${itens.slice(0, 3).map(item => `
+                        <div class="h-4 rounded-full overflow-hidden flex items-center px-2 gap-1" style="background:${escapeHtml(item.cor_hex || '#4f46e5')}">
+                            <span class="text-[9px] font-bold text-white truncate leading-none">${escapeHtml(item.servico_nome)}</span>
                         </div>
                     `).join('')}
-                    ${itens.length > 4 ? `<div class="text-[10px] text-gray-400 font-semibold">+${itens.length - 4} serviços</div>` : ''}
+                    ${itens.length > 3 ? `<div class="text-[9px] text-gray-400 font-semibold pl-1">+${itens.length - 3} mais</div>` : ''}
                 </div>
             </button>
         `);
     }
 
     container.innerHTML = partes.join('');
-    container.querySelectorAll('[data-date]').forEach((el) => {
-        el.addEventListener('click', () => abrirDia(el.getAttribute('data-date')));
-    });
-
-    renderizarFaixasCalendario(container, agendamentosCache, inicioMes(mesAtual), fimMes(mesAtual));
+    container.querySelectorAll('[data-date]').forEach(el =>
+        el.addEventListener('click', () => abrirDia(el.getAttribute('data-date')))
+    );
 }
 
-function renderizarSidebarStatus() {
-    const grupos = { solicitado: [], agendado: [], cancelado: [], encerrado: [] };
-    agendamentosCache.forEach((item) => {
-        if (grupos[item.status]) grupos[item.status].push(item);
+// ── Layout de eventos sobrepostos ───────────────────────────────────────────
+// Algoritmo de column-packing: eventos que se sobrepõem no horário são
+// distribuídos em sub-colunas com largura proporcional (como Google Calendar).
+function calcularLayoutEventos(eventos) {
+    if (!eventos.length) return [];
+
+    const sorted = [...eventos].sort((a, b) => {
+        const d = parseDataServidorBrasilia(a.data_inicio) - parseDataServidorBrasilia(b.data_inicio);
+        if (d !== 0) return d;
+        // Em empate de início: evento mais longo primeiro
+        const aD = parseDataServidorBrasilia(a.data_fim) - parseDataServidorBrasilia(a.data_inicio);
+        const bD = parseDataServidorBrasilia(b.data_fim) - parseDataServidorBrasilia(b.data_inicio);
+        return bD - aD;
     });
 
-    Object.keys(grupos).forEach((status) => {
+    // Atribui cada evento à menor coluna onde não há sobreposição
+    const colEndTimes = []; // colEndTimes[c] = fim do último evento na coluna c
+    const assigned = sorted.map(ag => {
+        const ini = parseDataServidorBrasilia(ag.data_inicio);
+        const fim = parseDataServidorBrasilia(ag.data_fim || ag.data_inicio);
+        let col = colEndTimes.findIndex(end => end <= ini);
+        if (col === -1) { col = colEndTimes.length; }
+        colEndTimes[col] = fim;
+        return { ag, col, ini, fim };
+    });
+
+    // Para cada evento, totalCols = número de colunas ativas durante seu intervalo
+    return assigned.map(entry => {
+        let maxCol = entry.col;
+        assigned.forEach(other => {
+            if (other.ini < entry.fim && other.fim > entry.ini) {
+                maxCol = Math.max(maxCol, other.col);
+            }
+        });
+        return { ag: entry.ag, col: entry.col, totalCols: maxCol + 1 };
+    });
+}
+
+// ── Visão Semanal ───────────────────────────────────────────────────────────
+function renderizarSemanal() {
+    const container = document.getElementById('calendario-agendamentos');
+    if (!container) return;
+    container.style.cssText = '';
+
+    const semIni = inicioDaSemana(dataAtual);
+    const dias = Array.from({ length: 7 }, (_, i) => addDias(semIni, i));
+    const hoje = chaveDia(new Date());
+    const totalH = (HORA_FIM - HORA_INICIO) * PX_HORA;
+    const gutter = '52px';
+    const bgLinhas = `repeating-linear-gradient(to bottom,transparent 0px,transparent ${PX_HORA - 1}px,#1f2937 ${PX_HORA - 1}px,#1f2937 ${PX_HORA}px)`;
+
+    const agsDaSemana = agendamentosCache.filter(ag => ag.status !== 'encerrado' && dias.some(d => agendamentoCobreDia(ag, d)));
+    const allDayAgs = agsDaSemana.filter(ehMultiDia);
+    const timedAgs  = agsDaSemana.filter(ag => !ehMultiDia(ag));
+
+    // ── cabeçalho de dias ──
+    const headerCols = dias.map(dia => {
+        const chave = chaveDia(dia);
+        const isHoje = chave === hoje;
+        const abrev = dia.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+        return `<div style="flex:1;border-left:1px solid #1f2937;text-align:center;padding:8px 4px 6px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:${isHoje ? '#818cf8' : '#6b7280'};">${escapeHtml(abrev)}</div>
+            <div style="font-size:20px;font-weight:900;line-height:1.1;color:${isHoje ? '#fff' : '#d1d5db'};">
+                ${isHoje ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:#4f46e5;color:#fff;">${dia.getDate()}</span>` : dia.getDate()}
+            </div>
+        </div>`;
+    }).join('');
+
+    // ── all-day row ──
+    const allDayCols = dias.map((dia, idx) => {
+        const evsAqui = allDayAgs.filter(ag => agendamentoCobreDia(ag, dia));
+        if (!evsAqui.length) return `<div style="flex:1;border-left:1px solid #1f2937;min-height:28px;padding:3px 2px;" data-date="${chaveDia(dia)}"></div>`;
+        const html = evsAqui.map(ag => {
+            const iniChave = chaveDia(parseDataServidorBrasilia(ag.data_inicio));
+            const fimChave = chaveDia(parseDataServidorBrasilia(ag.data_fim || ag.data_inicio));
+            const isFirst = iniChave === chaveDia(dia) || idx === 0;
+            const isLast  = fimChave === chaveDia(dia) || idx === 6;
+            const br = `${isFirst ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isFirst ? '9999px' : '0'}`;
+            return `<button data-agendamento-id="${ag.id}" style="display:block;width:100%;height:18px;border-radius:${br};background:${ag.cor_hex || '#4f46e5'};border:none;padding:0 ${isFirst ? 6 : 0}px;color:#fff;font-size:9px;font-weight:700;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;cursor:pointer;">${isFirst ? escapeHtml(ag.servico_nome) : ''}</button>`;
+        }).join('');
+        return `<div style="flex:1;border-left:1px solid #1f2937;min-height:28px;padding:3px 2px;" data-date="${chaveDia(dia)}">${html}</div>`;
+    }).join('');
+
+    // ── colunas de eventos com hora ──
+    const eventCols = dias.map(dia => {
+        const evsAqui = timedAgs.filter(ag => agendamentoCobreDia(ag, dia));
+        const chave   = chaveDia(dia);
+        const layout  = calcularLayoutEventos(evsAqui);
+        const evHtml  = layout.map(({ ag, col, totalCols }) => {
+            const ini = parseDataServidorBrasilia(ag.data_inicio);
+            const fim = parseDataServidorBrasilia(ag.data_fim || ag.data_inicio);
+            if (!ini || !fim) return '';
+            const iniH   = ini.getHours() + ini.getMinutes() / 60;
+            const fimH   = fim.getHours() + fim.getMinutes() / 60;
+            const top    = Math.max(0, (iniH - HORA_INICIO) * PX_HORA);
+            const height = Math.max(18, (fimH - iniH) * PX_HORA);
+            const small  = height < 34;
+            const lPct   = (col / totalCols * 100).toFixed(2);
+            const wPct   = (100 / totalCols).toFixed(2);
+            return `<button data-agendamento-id="${ag.id}" style="position:absolute;top:${top}px;height:${height}px;left:calc(${lPct}% + 2px);width:calc(${wPct}% - 4px);background:${ag.cor_hex || '#4f46e5'};border-radius:5px;overflow:hidden;z-index:2;cursor:pointer;border:none;text-align:left;box-shadow:0 1px 4px rgba(0,0,0,.3);">
+                <div style="padding:${small ? '1px' : '3px'} 5px;color:#fff;height:100%;display:flex;flex-direction:column;justify-content:flex-start;gap:1px;overflow:hidden;">
+                    <div style="font-size:${small ? 9 : 10}px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;">${escapeHtml(ag.servico_nome)}</div>
+                    ${!small ? `<div style="font-size:9px;opacity:.85;white-space:nowrap;overflow:hidden;">${formatarHoraAgendamento(ag.data_inicio)}–${formatarHoraAgendamento(ag.data_fim)}</div>` : ''}
+                </div>
+            </button>`;
+        }).join('');
+        return `<div style="flex:1;border-left:1px solid #1f2937;height:${totalH}px;position:relative;background-image:${bgLinhas};cursor:pointer;" data-date="${chave}">${evHtml}</div>`;
+    }).join('');
+
+    // ── labels de hora ──
+    let horaLabels = '';
+    for (let h = HORA_INICIO; h <= HORA_FIM; h++) {
+        horaLabels += `<div style="height:${PX_HORA}px;padding-right:8px;text-align:right;font-size:10px;color:#4b5563;line-height:1;padding-top:3px;">${String(h).padStart(2,'0')}:00</div>`;
+    }
+
+    container.innerHTML = `
+        <div style="min-width:480px;display:flex;flex-direction:column;overflow:hidden;">
+            <div style="display:flex;background:#111827;border-bottom:2px solid #374151;">
+                <div style="width:${gutter};flex-shrink:0;"></div>
+                ${headerCols}
+            </div>
+            <div style="display:flex;background:#0f172a;border-bottom:1px solid #374151;">
+                <div style="width:${gutter};flex-shrink:0;font-size:9px;color:#4b5563;text-align:right;padding-right:6px;padding-top:6px;">dia int.</div>
+                ${allDayCols}
+            </div>
+            <div style="overflow-y:auto;max-height:520px;overflow-x:hidden;">
+                <div style="display:flex;">
+                    <div style="width:${gutter};flex-shrink:0;">${horaLabels}</div>
+                    <div style="flex:1;display:flex;min-width:0;">${eventCols}</div>
+                </div>
+            </div>
+        </div>`;
+
+    container.querySelectorAll('[data-agendamento-id]').forEach(el =>
+        el.addEventListener('click', e => { e.stopPropagation(); abrirDetalhe(Number(el.getAttribute('data-agendamento-id'))); })
+    );
+    container.querySelectorAll('[data-date]').forEach(el =>
+        el.addEventListener('click', () => {
+            const chave = el.getAttribute('data-date');
+            if (!chave) return;
+            diaSelecionado = chave;
+            const lblEl = document.getElementById('dia-selecionado-rotulo');
+            if (lblEl) {
+                const d = parseDataServidorBrasilia(chave + 'T12:00:00');
+                if (d) lblEl.textContent = d.toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+            }
+        })
+    );
+}
+
+// ── Visão Diária ────────────────────────────────────────────────────────────
+function renderizarDiario() {
+    const container = document.getElementById('calendario-agendamentos');
+    if (!container) return;
+    container.style.cssText = '';
+
+    const chave = chaveDia(dataAtual);
+    const agsDia  = agendamentosCache.filter(ag => ag.status !== 'encerrado' && agendamentoCobreDia(ag, dataAtual));
+    const timedAgs   = agsDia.filter(ag => !ehMultiDia(ag));
+    const allDayAgs  = agsDia.filter(ehMultiDia);
+    const totalH  = (HORA_FIM - HORA_INICIO) * PX_HORA;
+    const bgLinhas = `repeating-linear-gradient(to bottom,transparent 0px,transparent ${PX_HORA - 1}px,#1f2937 ${PX_HORA - 1}px,#1f2937 ${PX_HORA}px)`;
+
+    let horaLabels = '';
+    for (let h = HORA_INICIO; h <= HORA_FIM; h++) {
+        horaLabels += `<div style="height:${PX_HORA}px;padding-right:8px;text-align:right;font-size:10px;color:#4b5563;line-height:1;padding-top:3px;">${String(h).padStart(2,'0')}:00</div>`;
+    }
+
+    const layoutDia = calcularLayoutEventos(timedAgs);
+    const evHtml = layoutDia.map(({ ag, col, totalCols }) => {
+        const ini = parseDataServidorBrasilia(ag.data_inicio);
+        const fim = parseDataServidorBrasilia(ag.data_fim || ag.data_inicio);
+        if (!ini || !fim) return '';
+        const iniH   = ini.getHours() + ini.getMinutes() / 60;
+        const fimH   = fim.getHours() + fim.getMinutes() / 60;
+        const top    = Math.max(0, (iniH - HORA_INICIO) * PX_HORA);
+        const height = Math.max(24, (fimH - iniH) * PX_HORA);
+        const lPct   = (col / totalCols * 100).toFixed(2);
+        const wPct   = (100 / totalCols).toFixed(2);
+        return `<button data-agendamento-id="${ag.id}" style="position:absolute;top:${top}px;height:${height}px;left:calc(${lPct}% + 4px);width:calc(${wPct}% - 8px);background:${ag.cor_hex || '#4f46e5'};border-radius:8px;overflow:hidden;z-index:2;cursor:pointer;border:none;text-align:left;box-shadow:0 2px 8px rgba(0,0,0,.3);">
+            <div style="padding:6px 10px;color:#fff;height:100%;display:flex;flex-direction:column;gap:2px;overflow:hidden;">
+                <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ag.servico_nome)}</div>
+                <div style="font-size:10px;opacity:.9;">${formatarHoraAgendamento(ag.data_inicio)} – ${formatarHoraAgendamento(ag.data_fim)}</div>
+                <div style="font-size:10px;opacity:.75;">${escapeHtml(ag.solicitante_nome || '')}</div>
+                <div style="margin-top:2px;"><span class="${statusClasses(ag.status)}">${statusLabel(ag.status)}</span></div>
+            </div>
+        </button>`;
+    }).join('');
+
+    const allDayHtml = allDayAgs.map(ag => `
+        <button data-agendamento-id="${ag.id}" class="w-full text-left rounded-xl overflow-hidden cursor-pointer border-none mb-2" style="background:${ag.cor_hex || '#4f46e5'};">
+            <div style="padding:5px 10px;color:#fff;">
+                <div style="font-size:11px;font-weight:700;">${escapeHtml(ag.servico_nome)}</div>
+                <div style="font-size:10px;opacity:.85;">${formatarDataCurtaAgendamento(ag.data_inicio)} – ${formatarDataCurtaAgendamento(ag.data_fim)}</div>
+            </div>
+        </button>
+    `).join('');
+
+    container.innerHTML = `
+        <div style="display:flex;flex-direction:column;min-width:220px;">
+            ${allDayAgs.length ? `
+                <div style="padding:8px 8px 4px 60px;background:#0f172a;border-bottom:1px solid #1f2937;">
+                    <div style="font-size:9px;color:#4b5563;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">Dia inteiro</div>
+                    ${allDayHtml}
+                </div>` : ''}
+            <div style="overflow-y:auto;max-height:580px;">
+                <div style="display:flex;">
+                    <div style="width:52px;flex-shrink:0;">${horaLabels}</div>
+                    <div style="flex:1;position:relative;border-left:1px solid #374151;height:${totalH}px;background-image:${bgLinhas};cursor:pointer;" data-date="${chave}">
+                        ${evHtml}
+                        ${!timedAgs.length && !allDayAgs.length ? `
+                            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#4b5563;">
+                                <div style="font-size:14px;">Nenhum agendamento neste dia</div>
+                                <button onclick="abrirModalSolicitacao('${chave}')" style="padding:8px 18px;background:#4f46e5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">Solicitar serviço</button>
+                            </div>` : ''}
+                    </div>
+                </div>
+            </div>
+        </div>`;
+
+    container.querySelectorAll('[data-agendamento-id]').forEach(el =>
+        el.addEventListener('click', e => { e.stopPropagation(); abrirDetalhe(Number(el.getAttribute('data-agendamento-id'))); })
+    );
+    container.querySelectorAll('[data-date]').forEach(el =>
+        el.addEventListener('click', () => {
+            const d = el.getAttribute('data-date');
+            if (d) { diaSelecionado = d; abrirModalSolicitacao(d); }
+        })
+    );
+}
+
+// ── Sidebar ─────────────────────────────────────────────────────────────────
+function renderizarSidebarStatus() {
+    const grupos = { solicitado: [], agendado: [], cancelado: [], encerrado: [] };
+    agendamentosCache.forEach(item => { if (grupos[item.status]) grupos[item.status].push(item); });
+
+    Object.keys(grupos).forEach(status => {
         const countEl = document.getElementById('count-status-' + status);
-        const listEl = document.getElementById('lista-status-' + status);
+        const listEl  = document.getElementById('lista-status-' + status);
         if (countEl) countEl.textContent = String(grupos[status].length);
         if (!listEl) return;
-
-        if (!grupos[status].length) {
-            listEl.innerHTML = '<p class="text-xs text-gray-600">Nenhum serviço nesta categoria.</p>';
-            return;
-        }
-
-        listEl.innerHTML = grupos[status].slice(0, 5).map((item) => cardAgendamentoCompacto(item)).join('');
-        listEl.querySelectorAll('[data-agendamento-id]').forEach((el) => {
-            el.addEventListener('click', () => abrirDetalhe(Number(el.getAttribute('data-agendamento-id'))));
-        });
+        if (!grupos[status].length) { listEl.innerHTML = '<p class="text-xs text-gray-600">Nenhum.</p>'; return; }
+        listEl.innerHTML = grupos[status].slice(0, 5).map(cardAgendamentoCompacto).join('');
+        listEl.querySelectorAll('[data-agendamento-id]').forEach(el =>
+            el.addEventListener('click', () => abrirDetalhe(Number(el.getAttribute('data-agendamento-id'))))
+        );
     });
 }
 
 function renderizarAdminQueues() {
     if (!AG_EQUIP) return;
-    const pendentes = agendamentosCache.filter((item) => item.status === 'solicitado');
-    const abertos = agendamentosCache.filter((item) => item.status === 'agendado');
-    const arquivo = agendamentosCache.filter((item) => item.status === 'encerrado');
-
-    const pendentesCount = document.getElementById('count-pendentes');
-    const abertosCount = document.getElementById('count-abertos');
-    const arquivoCount = document.getElementById('count-arquivo');
-    const listaPendentes = document.getElementById('lista-pendentes');
-    const listaAbertos = document.getElementById('lista-abertos');
-    const listaArquivo = document.getElementById('lista-arquivo');
-    if (pendentesCount) pendentesCount.textContent = String(pendentes.length);
-    if (abertosCount) abertosCount.textContent = String(abertos.length);
-    if (arquivoCount) arquivoCount.textContent = String(arquivo.length);
-    if (listaPendentes) {
-        listaPendentes.innerHTML = pendentes.length ? pendentes.map((item) => cardFila(item)).join('') : '<p class="text-xs text-gray-600">Sem solicitações pendentes.</p>';
-        listaPendentes.querySelectorAll('[data-agendamento-id]').forEach((el) => el.addEventListener('click', () => abrirDetalhe(Number(el.getAttribute('data-agendamento-id')))));
-    }
-    if (listaAbertos) {
-        listaAbertos.innerHTML = abertos.length ? abertos.map((item) => cardFila(item)).join('') : '<p class="text-xs text-gray-600">Nenhum agendamento aberto.</p>';
-        listaAbertos.querySelectorAll('[data-agendamento-id]').forEach((el) => el.addEventListener('click', () => abrirDetalhe(Number(el.getAttribute('data-agendamento-id')))));
-    }
-    if (listaArquivo) {
-        listaArquivo.innerHTML = arquivo.length ? arquivo.slice(0, 20).map((item) => cardFila(item)).join('') : '<p class="text-xs text-gray-600">Nenhum item no arquivo.</p>';
-        listaArquivo.querySelectorAll('[data-agendamento-id]').forEach((el) => el.addEventListener('click', () => abrirDetalhe(Number(el.getAttribute('data-agendamento-id')))));
-    }
-}
-
-function renderizarServicosAdmin() {
-    const lista = document.getElementById('lista-servicos');
-    const count = document.getElementById('count-servicos');
-    if (!lista) return;
-
-    if (count) count.textContent = String(servicosCache.length);
-
-    if (!servicosCache.length) {
-        lista.innerHTML = '<p class="text-xs text-gray-600">Nenhum serviço cadastrado.</p>';
-        return;
-    }
-
-    lista.innerHTML = servicosCache.map((servico) => `
-        <div class="bg-gray-800/70 border border-gray-700 rounded-2xl p-3 flex items-start justify-between gap-3">
-            <button type="button" class="text-left flex-1" data-servico-id="${servico.id}">
-                <p class="font-semibold text-white">${escapeHtml(servico.nome)}</p>
-                <p class="text-xs text-gray-400 mt-1">${escapeHtml(servico.descricao || 'Sem descrição')}</p>
-                <div class="flex items-center gap-2 mt-2 text-[10px] text-gray-500">
-                    <span class="px-2 py-0.5 rounded-full ${Number(servico.ativo || 0) ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">${Number(servico.ativo || 0) ? 'Ativo' : 'Inativo'}</span>
-                </div>
-            </button>
-            <div class="flex flex-col gap-2 shrink-0">
-                <button type="button" onclick="editarServico(${servico.id})" class="text-xs text-indigo-300 hover:text-indigo-200 px-2 py-1 rounded-lg hover:bg-indigo-500/10">Editar</button>
-                <button type="button" onclick="desativarServico(${servico.id})" class="text-xs text-red-300 hover:text-red-200 px-2 py-1 rounded-lg hover:bg-red-500/10">Desativar</button>
-            </div>
-        </div>
-    `).join('');
-
-    lista.querySelectorAll('[data-servico-id]').forEach((el) => {
-        el.addEventListener('click', () => editarServico(Number(el.getAttribute('data-servico-id'))));
+    const filas = [
+        ['pendentes', agendamentosCache.filter(i => i.status === 'solicitado')],
+        ['abertos',   agendamentosCache.filter(i => i.status === 'agendado')],
+        ['arquivo',   agendamentosCache.filter(i => i.status === 'encerrado')],
+    ];
+    filas.forEach(([key, items]) => {
+        const countEl = document.getElementById('count-' + key);
+        const listEl  = document.getElementById('lista-' + key);
+        if (countEl) countEl.textContent = String(items.length);
+        if (!listEl) return;
+        listEl.innerHTML = items.length
+            ? items.slice(0, 20).map(cardFila).join('')
+            : '<p class="text-xs text-gray-600">Nenhum item.</p>';
+        listEl.querySelectorAll('[data-agendamento-id]').forEach(el =>
+            el.addEventListener('click', () => abrirDetalhe(Number(el.getAttribute('data-agendamento-id'))))
+        );
     });
 }
 
+// ── Cards ───────────────────────────────────────────────────────────────────
 function cardAgendamentoCompacto(item) {
-    return `
-        <button type="button" data-agendamento-id="${item.id}" class="w-full text-left bg-gray-800/70 border border-gray-700 rounded-2xl p-3 hover:border-indigo-500 transition">
-            <div class="flex items-center justify-between gap-2 mb-1">
-                <span class="text-xs font-semibold text-white truncate">${escapeHtml(item.servico_nome)}</span>
-                <span class="text-[10px] ${statusClasses(item.status)}">${escapeHtml(statusLabel(item.status))}</span>
-            </div>
-            <p class="text-[11px] text-gray-400 truncate">${escapeHtml(item.solicitante_nome || 'Usuário')}</p>
-            <p class="text-[10px] text-gray-500 mt-1">${escapeHtml(formatarHoraAgendamento(item.data_inicio))}</p>
-        </button>
-    `;
+    return `<button type="button" data-agendamento-id="${item.id}" class="w-full text-left bg-gray-800/70 border border-gray-700 rounded-2xl p-3 hover:border-indigo-500 transition">
+        <div class="flex items-center justify-between gap-2 mb-1">
+            <span class="text-xs font-semibold text-white truncate">${escapeHtml(item.servico_nome)}</span>
+            <span class="${statusClasses(item.status)}">${escapeHtml(statusLabel(item.status))}</span>
+        </div>
+        <p class="text-[11px] text-gray-400 truncate">${escapeHtml(item.solicitante_nome || 'Usuário')}</p>
+        <p class="text-[10px] text-gray-500 mt-1">${escapeHtml(formatarDataAgendamento(item.data_inicio))}</p>
+    </button>`;
 }
 
 function cardFila(item) {
-    return `
-        <button type="button" data-agendamento-id="${item.id}" class="w-full text-left bg-gray-800/70 border border-gray-700 rounded-2xl p-3 hover:border-indigo-500 transition">
-            <div class="flex items-center justify-between gap-2 mb-1">
-                <span class="text-xs font-semibold text-white truncate">${escapeHtml(item.servico_nome)}</span>
-                <span class="text-[10px] ${statusClasses(item.status)}">${escapeHtml(statusLabel(item.status))}</span>
+    return `<button type="button" data-agendamento-id="${item.id}" class="w-full text-left bg-gray-800/70 border border-gray-700 rounded-2xl p-3 hover:border-indigo-500 transition">
+        <div class="flex items-center justify-between gap-2 mb-1">
+            <span class="text-xs font-semibold text-white truncate">${escapeHtml(item.servico_nome)}</span>
+            <span class="${statusClasses(item.status)}">${escapeHtml(statusLabel(item.status))}</span>
+        </div>
+        <p class="text-[11px] text-gray-400 truncate">${escapeHtml(item.solicitante_nome || 'Usuário')}</p>
+        <p class="text-[10px] text-gray-500 mt-1">${escapeHtml(formatarDataAgendamento(item.data_inicio))}</p>
+    </button>`;
+}
+
+// ── Abertura de dia ─────────────────────────────────────────────────────────
+function _buildItensDoDialHtml(itens) {
+    if (!itens.length) {
+        return '<p class="text-sm text-gray-500 px-1">Nenhum serviço agendado para este dia.</p>';
+    }
+    return itens.map(item => `
+        <button type="button" data-agendamento-id="${item.id}" class="w-full bg-gray-800/70 border border-gray-700 rounded-2xl p-4 text-left hover:border-indigo-500 transition flex flex-col gap-2">
+            <div class="flex items-center justify-between gap-2">
+                <div class="min-w-0 flex-1">
+                    <p class="text-sm font-semibold text-white truncate">${escapeHtml(item.servico_nome)}</p>
+                    <p class="text-xs text-gray-400 truncate">${escapeHtml(item.solicitante_nome || '')}</p>
+                </div>
+                <span class="${statusClasses(item.status)} shrink-0">${escapeHtml(statusLabel(item.status))}</span>
             </div>
-            <p class="text-[11px] text-gray-400 truncate">${escapeHtml(item.solicitante_nome || 'Usuário')}</p>
-            <p class="text-[10px] text-gray-500 mt-1">${escapeHtml(formatarDataAgendamento(item.data_inicio))}</p>
+            <div class="text-xs text-gray-400">${escapeHtml(formatarHoraAgendamento(item.data_inicio))} – ${escapeHtml(formatarHoraAgendamento(item.data_fim))}</div>
         </button>
-    `;
+    `).join('');
+}
+
+function _bindItensDoDialListeners(el) {
+    if (!el) return;
+    el.querySelectorAll('[data-agendamento-id]').forEach(btn =>
+        btn.addEventListener('click', () => abrirDetalhe(Number(btn.getAttribute('data-agendamento-id'))))
+    );
 }
 
 function abrirDia(dataIso) {
     diaSelecionado = dataIso;
     const data = parseDataServidorBrasilia(dataIso + 'T12:00:00');
-    const titulo = document.getElementById('modal-dia-titulo');
-    const conteudo = document.getElementById('lista-agendamentos-dia') || document.getElementById('modal-dia-conteudo');
-    const rótulo = document.getElementById('dia-selecionado-rotulo');
+    const itens = agendamentosCache.filter(item => agendamentoCobreDia(item, data || new Date()));
+    const html  = _buildItensDoDialHtml(itens);
 
-    if (titulo && data) titulo.textContent = data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
-    if (rótulo && data) rótulo.textContent = data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
-
-    const itens = agendamentosDoDia(data || new Date());
-    if (!conteudo) return;
-
-    if (!itens.length) {
-        conteudo.innerHTML = '<p class="text-sm text-gray-500">Nenhum serviço agendado para este dia.</p>';
-    } else {
-        conteudo.innerHTML = itens.map((item) => `
-            <button type="button" data-agendamento-id="${item.id}" class="w-full bg-gray-800/70 border border-gray-700 rounded-2xl p-4 text-left hover:border-indigo-500 transition flex flex-col gap-2">
-                <div class="flex items-center justify-between gap-2">
-                    <div>
-                        <p class="text-sm font-semibold text-white">${escapeHtml(item.servico_nome)}</p>
-                        <p class="text-xs text-gray-400">${escapeHtml(item.solicitante_nome || 'Usuário')}</p>
-                    </div>
-                    <span class="text-[10px] ${statusClasses(item.status)}">${escapeHtml(statusLabel(item.status))}</span>
-                </div>
-                <div class="text-xs text-gray-400 flex items-center gap-2">
-                    <span>${escapeHtml(formatarHoraAgendamento(item.data_inicio))}</span>
-                    <span>•</span>
-                    <span>${escapeHtml(formatarHoraAgendamento(item.data_fim))}</span>
-                </div>
-            </button>
-        `).join('');
-        conteudo.querySelectorAll('[data-agendamento-id]').forEach((el) => el.addEventListener('click', () => abrirDetalhe(Number(el.getAttribute('data-agendamento-id')))));
+    if (data) {
+        const longo  = data.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric', timeZone:'America/Sao_Paulo' });
+        const curto  = data.toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric', timeZone:'America/Sao_Paulo' });
+        const titulo = document.getElementById('modal-dia-titulo');
+        const rotulo = document.getElementById('dia-selecionado-rotulo');
+        if (titulo) titulo.textContent = longo;
+        if (rotulo) rotulo.textContent = curto;
     }
 
-    abrirModal('modal-dia');
+    // Popula o painel lateral inline (agendamentos.php)
+    const painelInline = document.getElementById('lista-agendamentos-dia');
+    if (painelInline) { painelInline.innerHTML = html; _bindItensDoDialListeners(painelInline); }
+
+    // Popula o conteúdo do modal (ambos os templates)
+    const modalConteudo = document.getElementById('modal-dia-conteudo');
+    if (modalConteudo) { modalConteudo.innerHTML = html; _bindItensDoDialListeners(modalConteudo); }
+
+    if (viewMode === 'month') abrirModal('modal-dia');
 }
 
+// ── Detalhe ─────────────────────────────────────────────────────────────────
 async function abrirDetalhe(id) {
     const res = await fetch('/api/agendamentos/' + id);
     const data = await res.json();
-    if (!res.ok) {
-        alert(data.erro || 'Não foi possível carregar o agendamento');
-        return;
-    }
+    if (!res.ok) { alert(data.erro || 'Não foi possível carregar o agendamento'); return; }
 
     agendamentoAtual = data;
-    const nome = document.getElementById('detalhe-servico-nome');
-    const solicitante = document.getElementById('detalhe-solicitante');
-    const status = document.getElementById('detalhe-status');
-    const inicio = document.getElementById('detalhe-inicio');
-    const fim = document.getElementById('detalhe-fim');
-    const obs = document.getElementById('detalhe-observacoes');
+    const set = (elId, val) => { const el = document.getElementById(elId); if (el) el.textContent = val; };
+    const setHtml = (elId, html) => { const el = document.getElementById(elId); if (el) el.innerHTML = html; };
 
-    if (nome) nome.textContent = data.servico_nome || 'Agendamento';
-    if (solicitante) solicitante.textContent = data.solicitante_nome + (data.solicitante_email ? ' • ' + data.solicitante_email : '');
-    if (status) status.innerHTML = `<span class="${statusClasses(data.status)}">${statusLabel(data.status)}</span>`;
-    if (inicio) inicio.textContent = formatarDataAgendamento(data.data_inicio);
-    if (fim) fim.textContent = formatarDataAgendamento(data.data_fim);
-    if (obs) obs.textContent = data.observacoes || 'Sem observações';
+    set('detalhe-servico-nome', data.servico_nome || 'Agendamento');
+    set('detalhe-solicitante', data.solicitante_nome + (data.solicitante_email ? ' • ' + data.solicitante_email : ''));
+    setHtml('detalhe-status', `<span class="${statusClasses(data.status)}">${statusLabel(data.status)}</span>`);
+    set('detalhe-inicio', formatarDataAgendamento(data.data_inicio));
+    set('detalhe-fim', formatarDataAgendamento(data.data_fim));
+    set('detalhe-observacoes', data.observacoes || 'Sem observações');
 
     configurarAcoesDetalhe(data);
     abrirModal('modal-detalhe');
 }
 
 function configurarAcoesDetalhe(data) {
-    const btnCancelar = document.getElementById('btn-detalhe-cancelar');
-    const btnAprovar = document.getElementById('btn-detalhe-aprovar');
-    const btnRecusar = document.getElementById('btn-detalhe-recusar');
-    const btnEncerrar = document.getElementById('btn-detalhe-encerrar');
+    const btns = ['cancelar','aprovar','recusar','encerrar'].reduce((acc, k) => {
+        acc[k] = document.getElementById('btn-detalhe-' + k);
+        return acc;
+    }, {});
+    Object.values(btns).forEach(b => b?.classList.add('hidden'));
 
-    [btnCancelar, btnAprovar, btnRecusar, btnEncerrar].forEach((btn) => btn && btn.classList.add('hidden'));
+    if (btns.cancelar && (Number(data.solicitante_id) === AG_USER_ID || AG_EQUIP) && !['encerrado','cancelado'].includes(data.status))
+        btns.cancelar.classList.remove('hidden');
 
-    const podeCancelar = Number(data.solicitante_id || 0) === AG_USER_ID || AG_EQUIP;
-    if (btnCancelar && podeCancelar && data.status !== 'encerrado') btnCancelar.classList.remove('hidden');
     if (!AG_EQUIP) return;
-
-    if (btnAprovar && data.status === 'solicitado') btnAprovar.classList.remove('hidden');
-    if (btnRecusar && data.status === 'solicitado') btnRecusar.classList.remove('hidden');
-    if (btnEncerrar && data.status === 'agendado') btnEncerrar.classList.remove('hidden');
+    if (btns.aprovar && data.status === 'solicitado') btns.aprovar.classList.remove('hidden');
+    if (btns.recusar && data.status === 'solicitado') btns.recusar.classList.remove('hidden');
+    if (btns.encerrar && data.status === 'agendado')  btns.encerrar.classList.remove('hidden');
 }
 
+// ── Modal de solicitação ────────────────────────────────────────────────────
 function abrirModalSolicitacao(dataIso) {
-    const modal = document.getElementById('modal-solicitacao');
-    const inputData = document.getElementById('solicitacao-data-inicio');
-    if (inputData) {
-        const dataBase = dataIso ? parseDataServidorBrasilia(dataIso + 'T09:00:00') : new Date();
-        inputData.value = dataToLocalValue(dataBase);
+    const inputIni = document.getElementById('solicitacao-data-inicio');
+    if (inputIni) {
+        const base = dataIso ? parseDataServidorBrasilia(dataIso + 'T09:00:00') : new Date();
+        inputIni.value = dataToLocalValue(base || new Date());
     }
     const inputFim = document.getElementById('solicitacao-data-fim');
-    if (inputFim) {
-        inputFim.value = '';
-    }
+    if (inputFim) inputFim.value = '';
+    const inputObs = document.getElementById('solicitacao-observacoes');
+    if (inputObs) inputObs.value = '';
     abrirModal('modal-solicitacao');
 }
 
-function dataToLocalValue(data) {
-    const pad = (n) => String(n).padStart(2, '0');
-    return data.getFullYear() + '-' + pad(data.getMonth() + 1) + '-' + pad(data.getDate()) + 'T' + pad(data.getHours()) + ':' + pad(data.getMinutes());
-}
-
-function dataParaBanco(data) {
-    const pad = (n) => String(n).padStart(2, '0');
-    return data.getFullYear() + '-' + pad(data.getMonth() + 1) + '-' + pad(data.getDate()) + ' ' + pad(data.getHours()) + ':' + pad(data.getMinutes()) + ':00';
-}
-
 async function enviarSolicitacao() {
-    const servicoId = Number(document.getElementById('solicitacao-servico')?.value || 0);
+    const servicoId  = Number(document.getElementById('solicitacao-servico')?.value || 0);
     const dataInicio = document.getElementById('solicitacao-data-inicio')?.value || '';
-    const dataFim = document.getElementById('solicitacao-data-fim')?.value || '';
+    const dataFim    = document.getElementById('solicitacao-data-fim')?.value || '';
     const observacoes = document.getElementById('solicitacao-observacoes')?.value || '';
 
     const res = await fetch('/api/agendamentos', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ servico_id: String(servicoId), data_inicio: dataInicio, data_fim: dataFim, observacoes })
+        body: new URLSearchParams({ servico_id: String(servicoId), data_inicio: dataInicio, data_fim: dataFim, observacoes }),
     });
     const data = await res.json();
-    if (!res.ok) {
-        if (res.status === 409) {
-            alert(data.erro || 'Horário em conflito com outro agendamento');
-            return;
-        }
-        alert(data.erro || 'Não foi possível solicitar o serviço');
-        return;
-    }
-
+    if (!res.ok) { alert(data.erro || 'Não foi possível solicitar o serviço'); return; }
     fecharModal('modal-solicitacao');
     await carregarAgendamentos();
-    if (diaSelecionado) abrirDia(diaSelecionado);
 }
 
+// ── Ações de status ─────────────────────────────────────────────────────────
 async function alterarStatus(id, acao, payload = {}) {
-    const rotas = {
-        aprovar: '/api/agendamentos/' + id + '/aprovar',
-        recusar: '/api/agendamentos/' + id + '/recusar',
-        cancelar: '/api/agendamentos/' + id + '/cancelar',
-        encerrar: '/api/agendamentos/' + id + '/encerrar',
-    };
-    const res = await fetch(rotas[acao], {
+    const res = await fetch(`/api/agendamentos/${id}/${acao}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(payload)
+        body: new URLSearchParams(payload),
     });
     const data = await res.json();
-    if (!res.ok) {
-        alert(data.erro || 'Não foi possível atualizar o agendamento');
-        return;
-    }
-
+    if (!res.ok) { alert(data.erro || 'Não foi possível atualizar o agendamento'); return; }
     agendamentoAtual = data;
+    fecharModal('modal-detalhe');
     await carregarAgendamentos();
-    if (diaSelecionado) abrirDia(diaSelecionado);
-    if (data.id) {
-        await abrirDetalhe(data.id);
-    }
+    if (data.id) await abrirDetalhe(data.id);
 }
 
-function abrirModal(id) {
-    const modal = document.getElementById(id);
-    if (modal) modal.classList.remove('hidden');
+// ── Modais ──────────────────────────────────────────────────────────────────
+function abrirModal(id)  { document.getElementById(id)?.classList.remove('hidden'); }
+function fecharModal(id) { document.getElementById(id)?.classList.add('hidden'); }
+
+// ── Serviços (CRUD) ─────────────────────────────────────────────────────────
+function renderizarServicosAdmin() {
+    const lista  = document.getElementById('lista-servicos');
+    const count  = document.getElementById('count-servicos');
+    if (!lista) return;
+    if (count) count.textContent = String(servicosCache.length);
+    if (!servicosCache.length) { lista.innerHTML = '<p class="text-xs text-gray-600">Nenhum serviço cadastrado.</p>'; return; }
+
+    lista.innerHTML = servicosCache.map(s => `
+        <div class="bg-gray-800/70 border border-gray-700 rounded-2xl p-3 flex items-start justify-between gap-3">
+            <div class="flex items-center gap-3 flex-1 min-w-0">
+                <div style="width:10px;height:10px;border-radius:50%;background:${escapeHtml(s.cor_hex || '#4f46e5')};flex-shrink:0;"></div>
+                <div class="flex-1 min-w-0">
+                    <p class="font-semibold text-white text-sm truncate">${escapeHtml(s.nome)}</p>
+                    <p class="text-xs text-gray-400 truncate">${escapeHtml(s.descricao || 'Sem descrição')}</p>
+                    <span class="text-[10px] px-2 py-0.5 rounded-full mt-1 inline-block ${Number(s.ativo) ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}">${Number(s.ativo) ? 'Ativo' : 'Inativo'}</span>
+                </div>
+            </div>
+            <div class="flex flex-col gap-1 shrink-0">
+                <button type="button" onclick="editarServico(${s.id})" class="text-xs text-indigo-300 hover:text-indigo-200 px-2 py-1 rounded-lg hover:bg-indigo-500/10 transition">Editar</button>
+                <button type="button" onclick="desativarServico(${s.id})" class="text-xs text-red-300 hover:text-red-200 px-2 py-1 rounded-lg hover:bg-red-500/10 transition">Desativar</button>
+            </div>
+        </div>
+    `).join('');
 }
 
-function fecharModal(id) {
-    const modal = document.getElementById(id);
-    if (modal) modal.classList.add('hidden');
-}
-
-function abrirModalServico() {
-    limparFormularioServico();
-    const form = document.getElementById('form-servico');
-    if (form) {
-        form.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }
+async function editarServico(id) {
+    const s = servicosCache.find(i => Number(i.id) === Number(id));
+    if (!s) return;
+    editandoServicoId = s.id;
+    const pairs = { 'servico-id': s.id, 'servico-nome': s.nome || '', 'servico-descricao': s.descricao || '', 'servico-cor': s.cor_hex || '#4f46e5' };
+    Object.entries(pairs).forEach(([fid, val]) => { const el = document.getElementById(fid); if (el) el.value = val; });
+    const ativo = document.getElementById('servico-ativo');
+    if (ativo) ativo.checked = Number(s.ativo) === 1;
+    document.getElementById('form-servico')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 function limparFormularioServico() {
     editandoServicoId = null;
-    const id = document.getElementById('servico-id');
-    const nome = document.getElementById('servico-nome');
-    const descricao = document.getElementById('servico-descricao');
-    const cor = document.getElementById('servico-cor');
-    const ativo = document.getElementById('servico-ativo');
-    if (id) id.value = '';
-    if (nome) nome.value = '';
-    if (descricao) descricao.value = '';
-    if (cor) cor.value = '#4f46e5';
-    if (ativo) ativo.checked = true;
-}
-
-async function editarServico(id) {
-    const servico = servicosCache.find((item) => Number(item.id) === Number(id));
-    if (!servico) return;
-    editandoServicoId = servico.id;
-    const idInput = document.getElementById('servico-id');
-    const nome = document.getElementById('servico-nome');
-    const descricao = document.getElementById('servico-descricao');
-    const cor = document.getElementById('servico-cor');
-    const ativo = document.getElementById('servico-ativo');
-    if (idInput) idInput.value = servico.id;
-    if (nome) nome.value = servico.nome || '';
-    if (descricao) descricao.value = servico.descricao || '';
-    if (cor) cor.value = servico.cor_hex || '#4f46e5';
-    if (ativo) ativo.checked = Number(servico.ativo || 0) === 1;
+    ['servico-id','servico-nome','servico-descricao'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    const cor = document.getElementById('servico-cor'); if (cor) cor.value = '#4f46e5';
+    const ativo = document.getElementById('servico-ativo'); if (ativo) ativo.checked = true;
 }
 
 async function salvarServico() {
     const payload = {
-        nome: document.getElementById('servico-nome')?.value.trim() || '',
+        nome:      document.getElementById('servico-nome')?.value.trim() || '',
         descricao: document.getElementById('servico-descricao')?.value.trim() || '',
-        cor_hex: document.getElementById('servico-cor')?.value.trim() || '#4f46e5',
-        ativo: document.getElementById('servico-ativo')?.checked ? 1 : 0,
+        cor_hex:   document.getElementById('servico-cor')?.value.trim() || '#4f46e5',
+        ativo:     document.getElementById('servico-ativo')?.checked ? 1 : 0,
     };
-
-    const url = editandoServicoId ? '/api/servicos-agendamento/' + editandoServicoId : '/api/servicos-agendamento';
+    const url    = editandoServicoId ? '/api/servicos-agendamento/' + editandoServicoId : '/api/servicos-agendamento';
     const method = editandoServicoId ? 'PATCH' : 'POST';
-
-    const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(payload)
-    });
+    const res = await fetch(url, { method, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(payload) });
     const data = await res.json();
-    if (!res.ok) {
-        alert(data.erro || 'Não foi possível salvar o serviço');
-        return;
-    }
-
+    if (!res.ok) { alert(data.erro || 'Não foi possível salvar o serviço'); return; }
     limparFormularioServico();
     await carregarServicos();
     await carregarAgendamentos();
@@ -711,57 +755,87 @@ async function desativarServico(id) {
     if (!confirm('Desativar este serviço?')) return;
     const res = await fetch('/api/servicos-agendamento/' + id, { method: 'DELETE' });
     const data = await res.json();
-    if (!res.ok) {
-        alert(data.erro || 'Não foi possível desativar');
-        return;
-    }
-
+    if (!res.ok) { alert(data.erro || 'Não foi possível desativar'); return; }
     await carregarServicos();
+}
+
+function abrirModalServico() {
+    limparFormularioServico();
+    document.getElementById('form-servico')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+// ── Init ────────────────────────────────────────────────────────────────────
+function prepararAgenda() {
+    document.getElementById('btn-mes-anterior')?.addEventListener('click', navAnterior);
+    document.getElementById('btn-mes-proximo')?.addEventListener('click', navProximo);
+    document.getElementById('btn-mes-hoje')?.addEventListener('click', navHoje);
+
+    document.getElementById('btn-view-month')?.addEventListener('click', () => mudarView('month'));
+    document.getElementById('btn-view-week')?.addEventListener('click',  () => mudarView('week'));
+    document.getElementById('btn-view-day')?.addEventListener('click',   () => mudarView('day'));
+
+    document.getElementById('btn-abrir-solicitacao-dia')?.addEventListener('click', () => abrirModalSolicitacao(diaSelecionado));
+
+    document.getElementById('form-servico')?.addEventListener('submit', async e => { e.preventDefault(); await salvarServico(); });
+
+    const detalheAcoes = {
+        'btn-detalhe-cancelar': async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'cancelar'),
+        'btn-detalhe-aprovar':  async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'aprovar'),
+        'btn-detalhe-encerrar': async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'encerrar'),
+        'btn-detalhe-recusar':  async () => {
+            if (!agendamentoAtual) return;
+            const motivo = prompt('Informe o motivo da recusa:') || '';
+            if (!motivo.trim()) return;
+            await alterarStatus(agendamentoAtual.id, 'recusar', { motivo });
+        },
+    };
+    Object.entries(detalheAcoes).forEach(([id, fn]) => document.getElementById(id)?.addEventListener('click', fn));
+
+    document.addEventListener('click', e => {
+        const key = e.target?.getAttribute?.('data-close-modal');
+        if (key) fecharModal(key);
+    });
+}
+
+// ── WebSocket ───────────────────────────────────────────────────────────────
+function conectarWSAgendamentos() {
+    try {
+        wsAgendamentos = new WebSocket(`ws://${location.hostname}:8080`);
+        wsAgendamentos.onopen = () => wsAgendamentos.send(JSON.stringify({
+            type: 'auth', user_id: AG_USER_ID, user_nome: AG_USER_NAME, user_papel: AG_USER_PAPEL, conversa_id: 0,
+        }));
+        wsAgendamentos.onmessage = e => {
+            try {
+                const msg = JSON.parse(e.data);
+                if (msg.type === 'schedule_updated') {
+                    carregarServicos().catch(() => {});
+                    carregarAgendamentos().catch(() => {});
+                    if (agendamentoAtual && Number(msg.agendamento?.id) === Number(agendamentoAtual.id))
+                        abrirDetalhe(Number(agendamentoAtual.id));
+                }
+            } catch (_) {}
+        };
+        wsAgendamentos.onclose = () => setTimeout(conectarWSAgendamentos, 3000);
+    } catch (e) {
+        console.error('WS agendamentos', e);
+    }
+}
+
+// ── Carrega servicos uma vez só ─────────────────────────────────────────────
+async function _carregarServicosUmaVez() {
+    const url = AG_EQUIP ? '/api/servicos-agendamento?incluir_inativos=1' : '/api/servicos-agendamento';
+    const res = await fetch(url);
+    const data = await res.json();
+    servicosCache = Array.isArray(data) ? data : [];
+    popularSelectServicos();
+    renderizarServicosAdmin();
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
     prepararAgenda();
     conectarWSAgendamentos();
-    document.addEventListener('click', (event) => {
-        if (event.target && event.target.matches('[data-close-modal]')) {
-            fecharModal(event.target.getAttribute('data-close-modal'));
-        }
-    });
-    await carregarServicos();
+    mudarView('month');
+    await _carregarServicosUmaVez();
     await carregarAgendamentos();
-    setInterval(carregarAgendamentos, 20000);
+    setInterval(carregarAgendamentos, 30000);
 });
-
-function conectarWSAgendamentos() {
-    try {
-        const host = window.location.hostname;
-        wsAgendamentos = new WebSocket('ws://' + host + ':8080');
-
-        wsAgendamentos.onopen = function () {
-            wsAgendamentos.send(JSON.stringify({
-                type: 'auth',
-                user_id: AG_USER_ID,
-                user_nome: AG_USER_NAME,
-                user_papel: AG_USER_PAPEL,
-                conversa_id: 0,
-            }));
-        };
-
-        wsAgendamentos.onmessage = function (event) {
-            const data = JSON.parse(event.data);
-            if (data.type === 'schedule_updated') {
-                carregarServicos().catch(() => { });
-                carregarAgendamentos().catch(() => { });
-                if (agendamentoAtual && Number(data.agendamento?.id || 0) === Number(agendamentoAtual.id || 0)) {
-                    abrirDetalhe(Number(agendamentoAtual.id));
-                }
-            }
-        };
-
-        wsAgendamentos.onclose = function () {
-            setTimeout(conectarWSAgendamentos, 3000);
-        };
-    } catch (error) {
-        console.error('Falha ao conectar WS de agendamentos', error);
-    }
-}

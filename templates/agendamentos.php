@@ -48,13 +48,18 @@ $agendamentosBootstrap = [
                     <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold">Calendário</p>
                     <h2 id="agenda-mes-rotulo" class="text-xl font-black text-white">Carregando...</h2>
                 </div>
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-2 flex-wrap">
+                    <div class="flex items-center bg-gray-800 border border-gray-700 rounded-xl p-1 gap-0.5">
+                        <button id="btn-view-month" class="px-3 h-8 rounded-lg text-xs font-semibold transition bg-indigo-600 text-white">Mês</button>
+                        <button id="btn-view-week"  class="px-3 h-8 rounded-lg text-xs font-semibold transition bg-gray-800 text-gray-300 border border-gray-700">Semana</button>
+                        <button id="btn-view-day"   class="px-3 h-8 rounded-lg text-xs font-semibold transition bg-gray-800 text-gray-300 border border-gray-700">Dia</button>
+                    </div>
                     <button id="btn-mes-anterior" class="w-10 h-10 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 transition">‹</button>
                     <button id="btn-mes-hoje" class="px-4 h-10 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm text-gray-300 transition">Hoje</button>
                     <button id="btn-mes-proximo" class="w-10 h-10 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 text-gray-300 transition">›</button>
                 </div>
             </div>
-            <div id="calendario-agendamentos" class="grid grid-cols-7 gap-2"></div>
+            <div id="calendario-agendamentos" class="overflow-x-auto" style="position:relative;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:0.5rem;"></div>
         </div>
 
         <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">

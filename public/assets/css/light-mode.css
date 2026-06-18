@@ -355,6 +355,27 @@ body.page-painel-agendamentos.theme-light .agenda-pill {
     color: #fff !important;
 }
 
+/* Grade semanal/diária em light mode */
+body.page-agendamentos.theme-light #btn-view-month,
+body.page-agendamentos.theme-light #btn-view-week,
+body.page-agendamentos.theme-light #btn-view-day,
+body.page-painel-agendamentos.theme-light #btn-view-month,
+body.page-painel-agendamentos.theme-light #btn-view-week,
+body.page-painel-agendamentos.theme-light #btn-view-day {
+    border-color: #cbd5e1 !important;
+}
+
+body.page-agendamentos.theme-light #btn-view-month.bg-indigo-600,
+body.page-agendamentos.theme-light #btn-view-week.bg-indigo-600,
+body.page-agendamentos.theme-light #btn-view-day.bg-indigo-600,
+body.page-painel-agendamentos.theme-light #btn-view-month.bg-indigo-600,
+body.page-painel-agendamentos.theme-light #btn-view-week.bg-indigo-600,
+body.page-painel-agendamentos.theme-light #btn-view-day.bg-indigo-600 {
+    background-color: var(--lm-primary) !important;
+    color: #fff !important;
+    border-color: transparent !important;
+}
+
 /* Shared component styles */
 ::-webkit-scrollbar {
     width: 6px;

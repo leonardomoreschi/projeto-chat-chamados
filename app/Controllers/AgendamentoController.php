@@ -118,16 +118,6 @@ class AgendamentoController
         try {
             $pdo->beginTransaction();
 
-            $check = $pdo->prepare(
-                'SELECT COUNT(*) FROM agendamentos WHERE servico_id = ? AND status IN ("solicitado","agendado") AND (data_inicio < ? AND data_fim > ?)'
-            );
-            $check->execute([$servicoId, $fim->format('Y-m-d H:i:s'), $inicio->format('Y-m-d H:i:s')]);
-            $count = (int) $check->fetchColumn();
-            if ($count > 0) {
-                $pdo->rollBack();
-                return Json::erro($response, 'Horário em conflito com outro agendamento', 409);
-            }
-
             $stmt = $pdo->prepare(
                 'INSERT INTO agendamentos (servico_id, solicitante_id, status, data_inicio, data_fim, observacoes)
                  VALUES (?, ?, ?, ?, ?, ?)'
