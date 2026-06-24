@@ -112,6 +112,15 @@ $agendamentosBootstrap = [
 
         <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">
             <div class="flex items-center justify-between mb-4">
+                <h3 class="text-sm uppercase tracking-[0.2em] text-gray-500 font-black">Em avaliação</h3>
+                <span id="count-avaliacao" class="text-xs text-gray-400">0</span>
+            </div>
+            <p class="text-xs text-gray-500 -mt-2 mb-3">Agendamentos cujo período já passou e aguardam fechamento.</p>
+            <div id="lista-avaliacao" class="space-y-3 max-h-[220px] overflow-y-auto pr-1"></div>
+        </div>
+
+        <div class="agenda-card bg-gray-900 border border-gray-800 rounded-3xl p-5 md:p-6">
+            <div class="flex items-center justify-between mb-4">
                 <h3 class="text-sm uppercase tracking-[0.2em] text-gray-500 font-black">Histórico / Encerrados</h3>
                 <span id="count-arquivo" class="text-xs text-gray-400">0</span>
             </div>
@@ -186,6 +195,19 @@ $agendamentosBootstrap = [
             <div class="bg-gray-800/70 border border-gray-700 rounded-2xl p-4">
                 <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold mb-2">Observações</p>
                 <p id="detalhe-observacoes" class="text-sm text-gray-300 whitespace-pre-wrap"></p>
+            </div>
+            <div id="bloco-fechamento-info" class="hidden bg-gray-800/70 border border-gray-700 rounded-2xl p-4">
+                <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold mb-2">Fechamento</p>
+                <p class="text-sm text-gray-300">Serviço realizado: <span id="detalhe-realizado" class="text-white font-semibold"></span></p>
+                <p id="detalhe-observacao-fechamento" class="text-sm text-gray-300 whitespace-pre-wrap mt-1"></p>
+            </div>
+            <div id="bloco-fechamento-form" class="hidden bg-gray-800/70 border border-indigo-700/60 rounded-2xl p-4 space-y-3">
+                <p class="text-xs uppercase tracking-[0.2em] text-indigo-300 font-bold">Fechar agendamento</p>
+                <label class="flex items-center gap-2 text-sm text-gray-300">
+                    <input id="fechamento-realizado" type="checkbox" checked>
+                    Serviço foi realizado
+                </label>
+                <textarea id="fechamento-observacao" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white resize-none" placeholder="Observações do fechamento (opcional)"></textarea>
             </div>
             <div class="flex gap-3 flex-wrap">
                 <button id="btn-detalhe-cancelar" class="hidden bg-red-600 hover:bg-red-500 text-white rounded-xl px-4 py-3 text-sm font-semibold transition">Cancelar</button>

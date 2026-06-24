@@ -101,9 +101,10 @@ function statusLabel(s) {
 
 function statusClasses(s) {
     const b = 'text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded agenda-pill';
-    if (s === 'solicitado') return b + ' bg-amber-600';
-    if (s === 'agendado')   return b + ' bg-green-600';
-    if (s === 'cancelado')  return b + ' bg-red-600';
+    if (s === 'solicitado')   return b + ' bg-amber-600';
+    if (s === 'agendado')     return b + ' bg-green-600';
+    if (s === 'em_avaliacao') return b + ' bg-purple-600';
+    if (s === 'cancelado')    return b + ' bg-red-600';
     return b + ' bg-indigo-600';
 }
 
@@ -230,7 +231,7 @@ function renderizarMensal() {
     for (let dia = 1; dia <= totalDias; dia++) {
         const data = new Date(dataAtual.getFullYear(), dataAtual.getMonth(), dia, 12, 0, 0);
         const chave = chaveDia(data);
-        const itens = agendamentosCache.filter(item => item.status !== 'encerrado' && agendamentoCobreDia(item, data));
+        const itens = agendamentosCache.filter(item => !['encerrado', 'em_avaliacao'].includes(item.status) && agendamentoCobreDia(item, data));
         const sel = diaSelecionado === chave;
         const isHoje = chave === hoje;
 
@@ -309,7 +310,7 @@ function renderizarSemanal() {
     const gutter = '52px';
     const bgLinhas = `repeating-linear-gradient(to bottom,transparent 0px,transparent ${PX_HORA - 1}px,#1f2937 ${PX_HORA - 1}px,#1f2937 ${PX_HORA}px)`;
 
-    const agsDaSemana = agendamentosCache.filter(ag => ag.status !== 'encerrado' && dias.some(d => agendamentoCobreDia(ag, d)));
+    const agsDaSemana = agendamentosCache.filter(ag => !['encerrado', 'em_avaliacao'].includes(ag.status) && dias.some(d => agendamentoCobreDia(ag, d)));
     const allDayAgs = agsDaSemana.filter(ehMultiDia);
     const timedAgs  = agsDaSemana.filter(ag => !ehMultiDia(ag));
 
@@ -415,7 +416,7 @@ function renderizarDiario() {
     container.style.cssText = '';
 
     const chave = chaveDia(dataAtual);
-    const agsDia  = agendamentosCache.filter(ag => ag.status !== 'encerrado' && agendamentoCobreDia(ag, dataAtual));
+    const agsDia  = agendamentosCache.filter(ag => !['encerrado', 'em_avaliacao'].includes(ag.status) && agendamentoCobreDia(ag, dataAtual));
     const timedAgs   = agsDia.filter(ag => !ehMultiDia(ag));
     const allDayAgs  = agsDia.filter(ehMultiDia);
     const totalH  = (HORA_FIM - HORA_INICIO) * PX_HORA;
@@ -491,7 +492,7 @@ function renderizarDiario() {
 
 // ── Sidebar ─────────────────────────────────────────────────────────────────
 function renderizarSidebarStatus() {
-    const grupos = { solicitado: [], agendado: [], cancelado: [], encerrado: [] };
+    const grupos = { solicitado: [], agendado: [], em_avaliacao: [], cancelado: [], encerrado: [] };
     agendamentosCache.forEach(item => { if (grupos[item.status]) grupos[item.status].push(item); });
 
     Object.keys(grupos).forEach(status => {
@@ -510,9 +511,10 @@ function renderizarSidebarStatus() {
 function renderizarAdminQueues() {
     if (!AG_EQUIP) return;
     const filas = [
-        ['pendentes', agendamentosCache.filter(i => i.status === 'solicitado')],
-        ['abertos',   agendamentosCache.filter(i => i.status === 'agendado')],
-        ['arquivo',   agendamentosCache.filter(i => i.status === 'encerrado')],
+        ['pendentes',  agendamentosCache.filter(i => i.status === 'solicitado')],
+        ['abertos',    agendamentosCache.filter(i => i.status === 'agendado')],
+        ['avaliacao',  agendamentosCache.filter(i => i.status === 'em_avaliacao')],
+        ['arquivo',    agendamentosCache.filter(i => i.status === 'encerrado')],
     ];
     filas.forEach(([key, items]) => {
         const countEl = document.getElementById('count-' + key);
@@ -620,6 +622,20 @@ async function abrirDetalhe(id) {
     set('detalhe-fim', formatarDataAgendamento(data.data_fim));
     set('detalhe-observacoes', data.observacoes || 'Sem observações');
 
+    const blocoInfo = document.getElementById('bloco-fechamento-info');
+    if (data.status === 'encerrado' && (data.realizado !== null && data.realizado !== undefined || data.observacao_fechamento)) {
+        blocoInfo?.classList.remove('hidden');
+        set('detalhe-realizado', data.realizado === null || data.realizado === undefined ? 'Não informado' : (Number(data.realizado) === 1 ? 'Sim' : 'Não'));
+        set('detalhe-observacao-fechamento', data.observacao_fechamento || '');
+    } else {
+        blocoInfo?.classList.add('hidden');
+    }
+
+    const checkRealizado = document.getElementById('fechamento-realizado');
+    if (checkRealizado) checkRealizado.checked = true;
+    const obsFechamento = document.getElementById('fechamento-observacao');
+    if (obsFechamento) obsFechamento.value = '';
+
     configurarAcoesDetalhe(data);
     abrirModal('modal-detalhe');
 }
@@ -630,6 +646,7 @@ function configurarAcoesDetalhe(data) {
         return acc;
     }, {});
     Object.values(btns).forEach(b => b?.classList.add('hidden'));
+    document.getElementById('bloco-fechamento-form')?.classList.add('hidden');
 
     if (btns.cancelar && (Number(data.solicitante_id) === AG_USER_ID || AG_EQUIP) && !['encerrado','cancelado'].includes(data.status))
         btns.cancelar.classList.remove('hidden');
@@ -637,7 +654,10 @@ function configurarAcoesDetalhe(data) {
     if (!AG_EQUIP) return;
     if (btns.aprovar && data.status === 'solicitado') btns.aprovar.classList.remove('hidden');
     if (btns.recusar && data.status === 'solicitado') btns.recusar.classList.remove('hidden');
-    if (btns.encerrar && data.status === 'agendado')  btns.encerrar.classList.remove('hidden');
+    if (btns.encerrar && ['agendado', 'em_avaliacao'].includes(data.status)) {
+        btns.encerrar.classList.remove('hidden');
+        document.getElementById('bloco-fechamento-form')?.classList.remove('hidden');
+    }
 }
 
 // ── Modal de solicitação ────────────────────────────────────────────────────
@@ -781,7 +801,12 @@ function prepararAgenda() {
     const detalheAcoes = {
         'btn-detalhe-cancelar': async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'cancelar'),
         'btn-detalhe-aprovar':  async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'aprovar'),
-        'btn-detalhe-encerrar': async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'encerrar'),
+        'btn-detalhe-encerrar': async () => {
+            if (!agendamentoAtual) return;
+            const realizado = document.getElementById('fechamento-realizado')?.checked ? '1' : '0';
+            const observacao_fechamento = document.getElementById('fechamento-observacao')?.value.trim() || '';
+            await alterarStatus(agendamentoAtual.id, 'encerrar', { realizado, observacao_fechamento });
+        },
         'btn-detalhe-recusar':  async () => {
             if (!agendamentoAtual) return;
             const motivo = prompt('Informe o motivo da recusa:') || '';

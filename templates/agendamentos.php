@@ -92,6 +92,10 @@ $agendamentosBootstrap = [
                     <p id="count-status-agendado" class="text-2xl font-black mt-1 text-white">0</p>
                 </div>
                 <div class="bg-gray-800/70 border border-gray-700 rounded-2xl p-3">
+                    <p class="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-bold">Em avaliação</p>
+                    <p id="count-status-em_avaliacao" class="text-2xl font-black mt-1 text-white">0</p>
+                </div>
+                <div class="bg-gray-800/70 border border-gray-700 rounded-2xl p-3">
                     <p class="text-[10px] uppercase tracking-[0.2em] text-gray-500 font-bold">Cancelados</p>
                     <p id="count-status-cancelado" class="text-2xl font-black mt-1 text-white">0</p>
                 </div>
@@ -108,6 +112,10 @@ $agendamentosBootstrap = [
                 <div>
                     <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold mb-2">Agendados</p>
                     <div id="lista-status-agendado" class="space-y-2"></div>
+                </div>
+                <div>
+                    <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold mb-2">Em avaliação</p>
+                    <div id="lista-status-em_avaliacao" class="space-y-2"></div>
                 </div>
                 <div>
                     <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold mb-2">Cancelados</p>
@@ -188,6 +196,19 @@ $agendamentosBootstrap = [
             <div class="bg-gray-800/70 border border-gray-700 rounded-2xl p-4">
                 <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold mb-2">Observações</p>
                 <p id="detalhe-observacoes" class="text-sm text-gray-300 whitespace-pre-wrap"></p>
+            </div>
+            <div id="bloco-fechamento-info" class="hidden bg-gray-800/70 border border-gray-700 rounded-2xl p-4">
+                <p class="text-xs uppercase tracking-[0.2em] text-gray-500 font-bold mb-2">Fechamento</p>
+                <p class="text-sm text-gray-300">Serviço realizado: <span id="detalhe-realizado" class="text-white font-semibold"></span></p>
+                <p id="detalhe-observacao-fechamento" class="text-sm text-gray-300 whitespace-pre-wrap mt-1"></p>
+            </div>
+            <div id="bloco-fechamento-form" class="hidden bg-gray-800/70 border border-indigo-700/60 rounded-2xl p-4 space-y-3">
+                <p class="text-xs uppercase tracking-[0.2em] text-indigo-300 font-bold">Fechar agendamento</p>
+                <label class="flex items-center gap-2 text-sm text-gray-300">
+                    <input id="fechamento-realizado" type="checkbox" checked>
+                    Serviço foi realizado
+                </label>
+                <textarea id="fechamento-observacao" rows="3" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white resize-none" placeholder="Observações do fechamento (opcional)"></textarea>
             </div>
             <div class="flex gap-3 flex-wrap">
                 <button id="btn-detalhe-cancelar" class="hidden bg-red-600 hover:bg-red-500 text-white rounded-xl px-4 py-3 text-sm font-semibold transition">Cancelar</button>

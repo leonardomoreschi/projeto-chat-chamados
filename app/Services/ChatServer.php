@@ -23,6 +23,11 @@ class ChatServer implements MessageComponentInterface
         Loop::addPeriodicTimer(0.8, function (): void {
             $this->sincronizarAtualizacoes();
         });
+
+        // Move agendamentos vencidos para avaliacao mesmo sem requisicoes HTTP ativas
+        Loop::addPeriodicTimer(60, function (): void {
+            $this->arquivarAgendamentosVencidos();
+        });
     }
 
     public function onOpen(ConnectionInterface $conn): void
@@ -479,6 +484,20 @@ class ChatServer implements MessageComponentInterface
         $ultima = end($apagadas);
         if ($ultima && !empty($ultima['excluida_em'])) {
             $client->lastSeenDeletionAt = (string) $ultima['excluida_em'];
+        }
+    }
+
+    private function arquivarAgendamentosVencidos(): void
+    {
+        try {
+            $pdo = getDbConnection();
+            $pdo->prepare(
+                "UPDATE agendamentos
+                 SET status = 'em_avaliacao', avaliado_em = NOW()
+                 WHERE status = 'agendado' AND data_fim < NOW()"
+            )->execute();
+        } catch (\Throwable $e) {
+            error_log('Falha ao arquivar agendamentos vencidos: ' . $e->getMessage());
         }
     }
 

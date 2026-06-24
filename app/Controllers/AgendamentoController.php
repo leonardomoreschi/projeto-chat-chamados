@@ -9,11 +9,12 @@ use Psr\Http\Message\ServerRequestInterface as Request;
 
 class AgendamentoController
 {
-    private const STATUS_VALIDOS = ['solicitado', 'agendado', 'cancelado', 'encerrado'];
+    private const STATUS_VALIDOS = ['solicitado', 'agendado', 'em_avaliacao', 'cancelado', 'encerrado'];
 
     public function listar(Request $request, Response $response): Response
     {
         $pdo = getDbConnection();
+        $this->arquivarAgendamentosVencidos($pdo);
         $userId = (int) $request->getAttribute('user_id');
         $papel = (string) $request->getAttribute('user_papel');
         $params = $request->getQueryParams();
@@ -53,7 +54,8 @@ class AgendamentoController
                        a.cancelado_por_id, ca.nome AS cancelado_por_nome,
                        a.encerrado_por_id, en.nome AS encerrado_por_nome,
                        a.status, a.data_inicio, a.data_fim, a.observacoes, a.motivo_recusa,
-                       a.motivo_cancelamento, a.aprovado_em, a.cancelado_em, a.encerrado_em,
+                       a.motivo_cancelamento, a.realizado, a.observacao_fechamento,
+                       a.aprovado_em, a.avaliado_em, a.cancelado_em, a.encerrado_em,
                        a.criado_em, a.atualizado_em
                 FROM agendamentos a
                 INNER JOIN servicos_agendamento s ON s.id = a.servico_id
@@ -144,7 +146,7 @@ class AgendamentoController
 
     public function aprovar(Request $request, Response $response, array $args): Response
     {
-        return $this->alterarStatusEquipe($request, $response, (int) ($args['id'] ?? 0), 'agendado', true, false);
+        return $this->alterarStatusEquipe($request, $response, (int) ($args['id'] ?? 0), 'agendado', true);
     }
 
     public function recusar(Request $request, Response $response, array $args): Response
@@ -202,7 +204,31 @@ class AgendamentoController
 
     public function encerrar(Request $request, Response $response, array $args): Response
     {
-        return $this->alterarStatusEquipe($request, $response, (int) ($args['id'] ?? 0), 'encerrado', false, true);
+        if (!$this->ehEquipe($request)) {
+            return Json::erro($response, 'Acesso restrito a Admin/TI', 403);
+        }
+
+        $agendamento = $this->buscarAgendamentoVisivel($request, (int) ($args['id'] ?? 0));
+        if (!$agendamento) {
+            return Json::erro($response, 'Agendamento não encontrado', 404);
+        }
+
+        $data = (array) $request->getParsedBody();
+        $observacaoFechamento = trim((string) ($data['observacao_fechamento'] ?? ''));
+        $realizadoBruto = $data['realizado'] ?? null;
+        $realizado = ($realizadoBruto === null || $realizadoBruto === '')
+            ? null
+            : (int) filter_var($realizadoBruto, FILTER_VALIDATE_BOOLEAN);
+
+        $this->atualizarAgendamento((int) $agendamento['id'], [
+            'status' => 'encerrado',
+            'encerrado_por_id' => (int) $request->getAttribute('user_id'),
+            'encerrado_em' => date('Y-m-d H:i:s'),
+            'realizado' => $realizado,
+            'observacao_fechamento' => $observacaoFechamento !== '' ? $observacaoFechamento : null,
+        ]);
+
+        return Json::json($response, $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']));
     }
 
     public function listarServicos(Request $request, Response $response): Response
@@ -320,7 +346,7 @@ class AgendamentoController
         return Json::json($response, ['ok' => true]);
     }
 
-    private function alterarStatusEquipe(Request $request, Response $response, int $id, string $status, bool $aprovar, bool $encerrar): Response
+    private function alterarStatusEquipe(Request $request, Response $response, int $id, string $status, bool $aprovar): Response
     {
         if (!$this->ehEquipe($request)) {
             return Json::erro($response, 'Acesso restrito a Admin/TI', 403);
@@ -335,10 +361,6 @@ class AgendamentoController
         if ($aprovar) {
             $campos['aprovado_por_id'] = (int) $request->getAttribute('user_id');
             $campos['aprovado_em'] = date('Y-m-d H:i:s');
-        }
-        if ($encerrar) {
-            $campos['encerrado_por_id'] = (int) $request->getAttribute('user_id');
-            $campos['encerrado_em'] = date('Y-m-d H:i:s');
         }
 
         $this->atualizarAgendamento($id, $campos);
@@ -364,9 +386,20 @@ class AgendamentoController
         $stmt->execute($values);
     }
 
+    private function arquivarAgendamentosVencidos(\PDO $pdo): void
+    {
+        $pdo->prepare(
+            "UPDATE agendamentos
+             SET status = 'em_avaliacao', avaliado_em = NOW()
+             WHERE status = 'agendado' AND data_fim < NOW()"
+        )->execute();
+    }
+
     private function buscarAgendamentoVisivel(Request $request, int $id): ?array
     {
-        $agendamento = $this->buscarAgendamentoPorId(getDbConnection(), $id);
+        $pdo = getDbConnection();
+        $this->arquivarAgendamentosVencidos($pdo);
+        $agendamento = $this->buscarAgendamentoPorId($pdo, $id);
         if (!$agendamento) {
             return null;
         }
@@ -390,7 +423,8 @@ class AgendamentoController
                     a.cancelado_por_id, ca.nome AS cancelado_por_nome,
                     a.encerrado_por_id, en.nome AS encerrado_por_nome,
                     a.status, a.data_inicio, a.data_fim, a.observacoes, a.motivo_recusa,
-                    a.motivo_cancelamento, a.aprovado_em, a.cancelado_em, a.encerrado_em,
+                    a.motivo_cancelamento, a.realizado, a.observacao_fechamento,
+                    a.aprovado_em, a.avaliado_em, a.cancelado_em, a.encerrado_em,
                     a.criado_em, a.atualizado_em
              FROM agendamentos a
              INNER JOIN servicos_agendamento s ON s.id = a.servico_id

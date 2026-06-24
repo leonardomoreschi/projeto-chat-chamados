@@ -29,6 +29,7 @@
         agendamentoStatus: {
             solicitado: 'Solicitado',
             agendado: 'Agendado',
+            em_avaliacao: 'Em avaliação',
             cancelado: 'Cancelado',
             encerrado: 'Encerrado'
         }
