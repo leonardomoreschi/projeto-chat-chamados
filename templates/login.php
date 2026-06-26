@@ -7,15 +7,25 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="/assets/css/light-mode.css">
     <style>
+        #neat-gradient {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            z-index: 0;
+        }
+        body > *:not(#neat-gradient) {
+            position: relative;
+            z-index: 1;
+        }
+        a[href*="firecms"], a[href*="neat"] {
+            display: none !important;
+        }
     </style>
 </head>
-<body class="page-login bg-gray-950 min-h-screen flex items-center justify-center p-4">
+<body class="page-login min-h-screen flex items-center justify-center p-4" style="background:#010101">
 
-<button data-theme-toggle class="fixed top-6 right-6 z-20 w-9 h-9 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 flex items-center justify-center transition" title="Alternar tema">
-    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m8.66-10h-1M4.34 12h-1m15.02 6.36l-.7-.7M6.34 6.34l-.7-.7m12.02 0l-.7.7M6.34 17.66l-.7.7M12 8a4 4 0 100 8 4 4 0 000-8z"/>
-    </svg>
-</button>
+<canvas id="neat-gradient"></canvas>
+
 
 <div class="w-full max-w-sm">
 
@@ -32,7 +42,7 @@
     </div>
 
     <!-- Card do formulário -->
-    <div class="bg-gray-900 border border-gray-800 rounded-2xl p-8 shadow-2xl">
+    <div class="rounded-2xl p-8 shadow-2xl" style="background:rgba(10,10,18,0.72);border:1px solid rgba(255,255,255,0.07);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)">
 
         <?php if (!empty($_SESSION['flash_error'])): ?>
         <div class="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl px-4 py-3 mb-6 flex items-center gap-2">
@@ -72,5 +82,107 @@
 </div>
 
 <script src="/assets/js/theme.js"></script>
+<script type="module">
+import { NeatGradient } from "https://esm.sh/@firecms/neat@latest";
+
+const gradient = new NeatGradient({
+    ref: document.getElementById("neat-gradient"),
+    colors: [
+        { color: '#000000', enabled: true },
+        { color: '#001129', enabled: true },
+        { color: '#0F0025', enabled: true },
+        { color: '#14080A', enabled: true },
+        { color: '#001129', enabled: true },
+    ],
+    speed: 4,
+    horizontalPressure: 4,
+    verticalPressure: 4,
+    waveFrequencyX: 3,
+    waveFrequencyY: 2,
+    waveAmplitude: 1,
+    shadows: 2,
+    highlights: 6,
+    colorBrightness: 1,
+    colorSaturation: -2,
+    wireframe: false,
+    colorBlending: 7,
+    backgroundColor: '#010101',
+    backgroundAlpha: 0.8,
+    grainScale: 0,
+    grainSparsity: 0,
+    grainIntensity: 0.325,
+    grainSpeed: 1,
+    resolution: 1.25,
+    yOffset: 3278,
+    yOffsetWaveMultiplier: 2.2,
+    yOffsetColorMultiplier: 2.5,
+    yOffsetFlowMultiplier: 2.8,
+    flowDistortionA: 3.7,
+    flowDistortionB: 1.4,
+    flowScale: 2.9,
+    flowEase: 0.32,
+    flowEnabled: false,
+    enableProceduralTexture: false,
+    transparentTextureVoid: false,
+    textureVoidLikelihood: 0.27,
+    textureVoidWidthMin: 60,
+    textureVoidWidthMax: 420,
+    textureBandDensity: 1.2,
+    textureColorBlending: 0.06,
+    textureSeed: 333,
+    textureEase: 0.68,
+    proceduralBackgroundColor: '#0E0707',
+    textureShapeTriangles: 20,
+    textureShapeCircles: 15,
+    textureShapeBars: 15,
+    textureShapeSquiggles: 10,
+    domainWarpEnabled: false,
+    domainWarpIntensity: 0,
+    domainWarpScale: 3,
+    vignetteIntensity: 0,
+    vignetteRadius: 0.8,
+    fresnelEnabled: false,
+    fresnelPower: 2,
+    fresnelIntensity: 0.5,
+    fresnelColor: '#FFFFFF',
+    iridescenceEnabled: false,
+    iridescenceIntensity: 0.5,
+    iridescenceSpeed: 1,
+    bloomIntensity: 0.7,
+    bloomThreshold: 0.75,
+    chromaticAberration: 0,
+    shapeType: 'plane',
+    shapeRotationX: 0,
+    shapeRotationY: 0,
+    shapeRotationZ: 0,
+    shapeAutoRotateSpeedX: 0,
+    shapeAutoRotateSpeedY: 0,
+    sphereRadius: 15,
+    torusRadius: 15,
+    torusTube: 5,
+    cylinderRadius: 10,
+    cylinderHeight: 40,
+    planeBend: 0,
+    planeTwist: 0,
+    silhouetteFade: 0.25,
+    cylinderFade: 0.08,
+    ribbonFade: 0.05,
+    flatShading: true,
+    cameraLock: true,
+    cameraX: 0,
+    cameraY: 0,
+    cameraZ: 0,
+    cameraRotationX: 0,
+    cameraRotationY: 0,
+    cameraRotationZ: 0,
+    cameraZoom: 1,
+});
+
+const removeWatermark = () => {
+    document.querySelectorAll('a[href*="firecms"], a[href*="neat"]').forEach(el => el.remove());
+};
+new MutationObserver(removeWatermark).observe(document.body, { childList: true, subtree: true });
+setTimeout(removeWatermark, 500);
+</script>
 </body>
 </html>

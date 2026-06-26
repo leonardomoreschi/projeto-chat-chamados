@@ -7,3 +7,7 @@ uploads_backup.tar.gz
 .DS_Store
 .claude/
 .agents/
+
+CLAUDE.md
+opencode.json
+skills-lock.json
