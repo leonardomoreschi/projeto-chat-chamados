@@ -5,3 +5,5 @@ chat_db_backup.sql
 uploads_backup.tar.gz
 *.log
 .DS_Store
+.claude/
+.agents/
