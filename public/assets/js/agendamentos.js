@@ -15,6 +15,7 @@ let diaSelecionado = null;
 let agendamentoAtual = null;
 let editandoServicoId = null;
 let wsAgendamentos = null;
+let tabAtiva = AG_MODO === 'admin' ? 'kanban' : 'calendario';
 
 const HORA_INICIO = 7;
 const HORA_FIM = 21;
@@ -53,9 +54,9 @@ function chaveDia(data) {
 }
 
 function inicioDia(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0); }
-function fimDia(d)   { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
+function fimDia(d)    { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
 function inicioMes(d) { return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0); }
-function fimMes(d)   { return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999); }
+function fimMes(d)    { return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999); }
 
 function inicioDaSemana(d) {
     const r = new Date(d);
@@ -110,6 +111,13 @@ function statusClasses(s) {
 
 // ── Range da API por modo de visão ──────────────────────────────────────────
 function rangeVisivel() {
+    if (tabAtiva === 'kanban' || tabAtiva === 'meus-agendamentos') {
+        const now = new Date();
+        return {
+            inicio: new Date(now.getFullYear(), now.getMonth() - 3, 1, 0, 0, 0),
+            fim:    new Date(now.getFullYear(), now.getMonth() + 6, 0, 23, 59, 59),
+        };
+    }
     if (viewMode === 'week') {
         const ini = inicioDaSemana(dataAtual);
         ini.setDate(ini.getDate() - 7);
@@ -141,6 +149,7 @@ async function carregarAgendamentos() {
     renderizarCalendario();
     renderizarSidebarStatus();
     renderizarAdminQueues();
+    renderizarKanban();
 }
 
 function popularSelectServicos() {
@@ -150,6 +159,35 @@ function popularSelectServicos() {
         .filter(s => AG_EQUIP || Number(s.ativo) === 1)
         .map(s => `<option value="${s.id}">${escapeHtml(s.nome)}${Number(s.ativo) === 0 ? ' (inativo)' : ''}</option>`)
         .join('');
+}
+
+// ── Tabs ────────────────────────────────────────────────────────────────────
+function _aplicarTabUI(id) {
+    document.querySelectorAll('[data-tab]').forEach(btn => {
+        const ativo = btn.dataset.tab === id;
+        if (ativo) {
+            btn.classList.add('tab-btn-ativo');
+            btn.classList.remove('tab-btn-inativo');
+        } else {
+            btn.classList.remove('tab-btn-ativo');
+            btn.classList.add('tab-btn-inativo');
+        }
+    });
+    document.querySelectorAll('[data-tab-content]').forEach(el => {
+        if (el.dataset.tabContent !== id) {
+            el.style.display = 'none';
+        } else {
+            // Kanban tabs need display:flex so columns fill height correctly
+            const isFlex = el.dataset.tabContent === 'kanban' || el.dataset.tabContent === 'meus-agendamentos';
+            el.style.display = isFlex ? 'flex' : '';
+        }
+    });
+}
+
+async function trocarTab(id) {
+    tabAtiva = id;
+    _aplicarTabUI(id);
+    await carregarAgendamentos();
 }
 
 // ── Navegação ───────────────────────────────────────────────────────────────
@@ -260,22 +298,18 @@ function renderizarMensal() {
 }
 
 // ── Layout de eventos sobrepostos ───────────────────────────────────────────
-// Algoritmo de column-packing: eventos que se sobrepõem no horário são
-// distribuídos em sub-colunas com largura proporcional (como Google Calendar).
 function calcularLayoutEventos(eventos) {
     if (!eventos.length) return [];
 
     const sorted = [...eventos].sort((a, b) => {
         const d = parseDataServidorBrasilia(a.data_inicio) - parseDataServidorBrasilia(b.data_inicio);
         if (d !== 0) return d;
-        // Em empate de início: evento mais longo primeiro
         const aD = parseDataServidorBrasilia(a.data_fim) - parseDataServidorBrasilia(a.data_inicio);
         const bD = parseDataServidorBrasilia(b.data_fim) - parseDataServidorBrasilia(b.data_inicio);
         return bD - aD;
     });
 
-    // Atribui cada evento à menor coluna onde não há sobreposição
-    const colEndTimes = []; // colEndTimes[c] = fim do último evento na coluna c
+    const colEndTimes = [];
     const assigned = sorted.map(ag => {
         const ini = parseDataServidorBrasilia(ag.data_inicio);
         const fim = parseDataServidorBrasilia(ag.data_fim || ag.data_inicio);
@@ -285,7 +319,6 @@ function calcularLayoutEventos(eventos) {
         return { ag, col, ini, fim };
     });
 
-    // Para cada evento, totalCols = número de colunas ativas durante seu intervalo
     return assigned.map(entry => {
         let maxCol = entry.col;
         assigned.forEach(other => {
@@ -314,7 +347,6 @@ function renderizarSemanal() {
     const allDayAgs = agsDaSemana.filter(ehMultiDia);
     const timedAgs  = agsDaSemana.filter(ag => !ehMultiDia(ag));
 
-    // ── cabeçalho de dias ──
     const headerCols = dias.map(dia => {
         const chave = chaveDia(dia);
         const isHoje = chave === hoje;
@@ -327,7 +359,6 @@ function renderizarSemanal() {
         </div>`;
     }).join('');
 
-    // ── all-day row ──
     const allDayCols = dias.map((dia, idx) => {
         const evsAqui = allDayAgs.filter(ag => agendamentoCobreDia(ag, dia));
         if (!evsAqui.length) return `<div style="flex:1;border-left:1px solid #1f2937;min-height:28px;padding:3px 2px;" data-date="${chaveDia(dia)}"></div>`;
@@ -342,7 +373,6 @@ function renderizarSemanal() {
         return `<div style="flex:1;border-left:1px solid #1f2937;min-height:28px;padding:3px 2px;" data-date="${chaveDia(dia)}">${html}</div>`;
     }).join('');
 
-    // ── colunas de eventos com hora ──
     const eventCols = dias.map(dia => {
         const evsAqui = timedAgs.filter(ag => agendamentoCobreDia(ag, dia));
         const chave   = chaveDia(dia);
@@ -368,7 +398,6 @@ function renderizarSemanal() {
         return `<div style="flex:1;border-left:1px solid #1f2937;height:${totalH}px;position:relative;background-image:${bgLinhas};cursor:pointer;" data-date="${chave}">${evHtml}</div>`;
     }).join('');
 
-    // ── labels de hora ──
     let horaLabels = '';
     for (let h = HORA_INICIO; h <= HORA_FIM; h++) {
         horaLabels += `<div style="height:${PX_HORA}px;padding-right:8px;text-align:right;font-size:10px;color:#4b5563;line-height:1;padding-top:3px;">${String(h).padStart(2,'0')}:00</div>`;
@@ -490,7 +519,7 @@ function renderizarDiario() {
     );
 }
 
-// ── Sidebar ─────────────────────────────────────────────────────────────────
+// ── Sidebar legado (mantido para compatibilidade) ───────────────────────────
 function renderizarSidebarStatus() {
     const grupos = { solicitado: [], agendado: [], em_avaliacao: [], cancelado: [], encerrado: [] };
     agendamentosCache.forEach(item => { if (grupos[item.status]) grupos[item.status].push(item); });
@@ -530,7 +559,83 @@ function renderizarAdminQueues() {
     });
 }
 
-// ── Cards ───────────────────────────────────────────────────────────────────
+// ── Kanban ───────────────────────────────────────────────────────────────────
+const KANBAN_COLUNAS = [
+    { key: 'solicitado',   label: 'Solicitado',   cor: '#b45309', corBg: '#451a03' },
+    { key: 'agendado',     label: 'Confirmado',   cor: '#15803d', corBg: '#052e16' },
+    { key: 'em_avaliacao', label: 'Em Avaliação', cor: '#6d28d9', corBg: '#2e1065' },
+    { key: 'cancelado',    label: 'Cancelado',    cor: '#b91c1c', corBg: '#450a0a' },
+    { key: 'encerrado',    label: 'Encerrado',    cor: '#334155', corBg: '#0f172a' },
+];
+
+function renderizarKanban() {
+    const board = document.getElementById('kanban-board');
+    if (!board) return;
+
+    board.innerHTML = KANBAN_COLUNAS.map(col => {
+        const itens = agendamentosCache.filter(i => i.status === col.key);
+        const podeAdicionar = col.key === 'solicitado';
+
+        const headerAdd = podeAdicionar
+            ? `<button onclick="abrirModalSolicitacao()" title="Nova solicitação" style="width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,.18);border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">+</button>`
+            : '';
+
+        const cards = itens.length
+            ? itens.map(item => cardKanban(item)).join('')
+            : `<div style="padding:24px 12px;text-align:center;">
+                <p style="font-size:12px;color:#374151;">Nenhum item</p>
+               </div>`;
+
+        return `<div style="flex-shrink:0;width:276px;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06);">
+            <div style="padding:11px 14px;background:${col.cor};display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;">
+                <div style="display:flex;align-items:center;gap:8px;">
+                    <span style="font-size:11px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:.1em;">${col.label}</span>
+                    <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.85);background:rgba(0,0,0,.28);padding:1px 7px;border-radius:999px;">${itens.length}</span>
+                </div>
+                ${headerAdd}
+            </div>
+            <div style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;background:${col.corBg};">
+                ${cards}
+            </div>
+        </div>`;
+    }).join('');
+
+    board.querySelectorAll('[data-agendamento-id]').forEach(el =>
+        el.addEventListener('click', () => abrirDetalhe(Number(el.getAttribute('data-agendamento-id'))))
+    );
+}
+
+function cardKanban(item) {
+    const ini = parseDataServidorBrasilia(item.data_inicio);
+    const fim = parseDataServidorBrasilia(item.data_fim);
+    const dataCurta = ini
+        ? ini.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', timeZone: 'America/Sao_Paulo' })
+        : '';
+    const horaIni = formatarHoraAgendamento(item.data_inicio);
+    const horaFim = fim ? formatarHoraAgendamento(item.data_fim) : '';
+    const temFim  = horaFim && horaFim !== horaIni;
+
+    return `<button type="button" data-agendamento-id="${item.id}"
+        style="background:#111827;border:1px solid #1f2937;border-radius:10px;overflow:hidden;cursor:pointer;text-align:left;width:100%;padding:0;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s;"
+        onmouseover="this.style.borderColor='#4f46e5';this.style.boxShadow='0 0 0 1px #4f46e5';"
+        onmouseout="this.style.borderColor='#1f2937';this.style.boxShadow='none';">
+        <div style="height:3px;background:${escapeHtml(item.cor_hex || '#4f46e5')};width:100%;flex-shrink:0;"></div>
+        <div style="padding:10px 12px;display:flex;flex-direction:column;gap:5px;">
+            <div style="font-size:13px;font-weight:700;color:#f9fafb;line-height:1.35;word-break:break-word;">${escapeHtml(item.servico_nome)}</div>
+            ${AG_EQUIP && item.solicitante_nome ? `
+            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#6b7280;">
+                <svg style="width:11px;height:11px;flex-shrink:0;" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.solicitante_nome)}</span>
+            </div>` : ''}
+            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#4b5563;">
+                <svg style="width:11px;height:11px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                <span>${dataCurta}${horaIni ? ' · ' + horaIni + (temFim ? '–' + horaFim : '') : ''}</span>
+            </div>
+        </div>
+    </button>`;
+}
+
+// ── Cards legados ───────────────────────────────────────────────────────────
 function cardAgendamentoCompacto(item) {
     return `<button type="button" data-agendamento-id="${item.id}" class="w-full text-left bg-gray-800/70 border border-gray-700 rounded-2xl p-3 hover:border-indigo-500 transition">
         <div class="flex items-center justify-between gap-2 mb-1">
@@ -594,11 +699,9 @@ function abrirDia(dataIso) {
         if (rotulo) rotulo.textContent = curto;
     }
 
-    // Popula o painel lateral inline (agendamentos.php)
     const painelInline = document.getElementById('lista-agendamentos-dia');
     if (painelInline) { painelInline.innerHTML = html; _bindItensDoDialListeners(painelInline); }
 
-    // Popula o conteúdo do modal (ambos os templates)
     const modalConteudo = document.getElementById('modal-dia-conteudo');
     if (modalConteudo) { modalConteudo.innerHTML = html; _bindItensDoDialListeners(modalConteudo); }
 
@@ -675,9 +778,9 @@ function abrirModalSolicitacao(dataIso) {
 }
 
 async function enviarSolicitacao() {
-    const servicoId  = Number(document.getElementById('solicitacao-servico')?.value || 0);
-    const dataInicio = document.getElementById('solicitacao-data-inicio')?.value || '';
-    const dataFim    = document.getElementById('solicitacao-data-fim')?.value || '';
+    const servicoId   = Number(document.getElementById('solicitacao-servico')?.value || 0);
+    const dataInicio  = document.getElementById('solicitacao-data-inicio')?.value || '';
+    const dataFim     = document.getElementById('solicitacao-data-fim')?.value || '';
     const observacoes = document.getElementById('solicitacao-observacoes')?.value || '';
 
     const res = await fetch('/api/agendamentos', {
@@ -798,6 +901,10 @@ function prepararAgenda() {
 
     document.getElementById('form-servico')?.addEventListener('submit', async e => { e.preventDefault(); await salvarServico(); });
 
+    document.querySelectorAll('[data-tab]').forEach(btn =>
+        btn.addEventListener('click', () => trocarTab(btn.dataset.tab))
+    );
+
     const detalheAcoes = {
         'btn-detalhe-cancelar': async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'cancelar'),
         'btn-detalhe-aprovar':  async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'aprovar'),
@@ -807,7 +914,7 @@ function prepararAgenda() {
             const observacao_fechamento = document.getElementById('fechamento-observacao')?.value.trim() || '';
             await alterarStatus(agendamentoAtual.id, 'encerrar', { realizado, observacao_fechamento });
         },
-        'btn-detalhe-recusar':  async () => {
+        'btn-detalhe-recusar': async () => {
             if (!agendamentoAtual) return;
             const motivo = prompt('Informe o motivo da recusa:') || '';
             if (!motivo.trim()) return;
@@ -846,7 +953,7 @@ function conectarWSAgendamentos() {
     }
 }
 
-// ── Carrega servicos uma vez só ─────────────────────────────────────────────
+// ── Carrega serviços uma vez só ─────────────────────────────────────────────
 async function _carregarServicosUmaVez() {
     const url = AG_EQUIP ? '/api/servicos-agendamento?incluir_inativos=1' : '/api/servicos-agendamento';
     const res = await fetch(url);
@@ -859,7 +966,22 @@ async function _carregarServicosUmaVez() {
 document.addEventListener('DOMContentLoaded', async () => {
     prepararAgenda();
     conectarWSAgendamentos();
-    mudarView('month');
+
+    // Aplicar tab inicial (sem carregar dados ainda)
+    _aplicarTabUI(tabAtiva);
+
+    // Inicializar botões de view
+    ['month', 'week', 'day'].forEach(m => {
+        const btn = document.getElementById('btn-view-' + m);
+        if (!btn) return;
+        const ativo = m === viewMode;
+        btn.classList.toggle('bg-indigo-600', ativo);
+        btn.classList.toggle('text-white', ativo);
+        btn.classList.toggle('bg-gray-800', !ativo);
+        btn.classList.toggle('text-gray-300', !ativo);
+        btn.classList.toggle('border-gray-700', !ativo);
+    });
+
     await _carregarServicosUmaVez();
     await carregarAgendamentos();
     setInterval(carregarAgendamentos, 30000);
