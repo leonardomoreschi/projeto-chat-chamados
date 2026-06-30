@@ -580,24 +580,24 @@ function renderizarKanban() {
             ? `<button onclick="abrirModalSolicitacao()" title="Nova solicitação" style="width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,.18);border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">+</button>`
             : '';
 
-        const cards = itens.length
+const cards = itens.length
             ? itens.map(item => cardKanban(item)).join('')
-            : `<div style="padding:24px 12px;text-align:center;">
-                <p style="font-size:12px;color:#374151;">Nenhum item</p>
-               </div>`;
+            : `<div style="padding:24px 16px;text-align:center;">
+                 <p style="font-size:14px;color:#374151;min-height:48px;">Nenhum item</p>
+                </div>`;
 
-        return `<div style="flex-shrink:0;width:276px;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06);">
-            <div style="padding:11px 14px;background:${col.cor};display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <span style="font-size:11px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:.1em;">${col.label}</span>
-                    <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.85);background:rgba(0,0,0,.28);padding:1px 7px;border-radius:999px;">${itens.length}</span>
+return `<div style="flex-shrink:0;min-width:200px;flex-grow:1;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06);">
+                <div style="padding:11px 14px;background:${col.cor};display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;">
+                    <div style="display:flex;align-items:center;gap:8px;">
+                        <span style="font-size:11px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:.1em;">${col.label}</span>
+                        <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.85);background:rgba(0,0,0,.28);padding:1px 7px;border-radius:999px;">${itens.length}</span>
+                    </div>
+                    ${headerAdd}
                 </div>
-                ${headerAdd}
-            </div>
-            <div style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;background:${col.corBg};">
-                ${cards}
-            </div>
-        </div>`;
+                <div style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;background:${col.corBg};">
+                    ${cards}
+                </div>
+            </div>`;
     }).join('');
 
     board.querySelectorAll('[data-agendamento-id]').forEach(el =>
@@ -615,24 +615,24 @@ function cardKanban(item) {
     const horaFim = fim ? formatarHoraAgendamento(item.data_fim) : '';
     const temFim  = horaFim && horaFim !== horaIni;
 
-    return `<button type="button" data-agendamento-id="${item.id}"
-        style="background:#111827;border:1px solid #1f2937;border-radius:10px;overflow:hidden;cursor:pointer;text-align:left;width:100%;padding:0;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s;"
-        onmouseover="this.style.borderColor='#4f46e5';this.style.boxShadow='0 0 0 1px #4f46e5';"
-        onmouseout="this.style.borderColor='#1f2937';this.style.boxShadow='none';">
-        <div style="height:3px;background:${escapeHtml(item.cor_hex || '#4f46e5')};width:100%;flex-shrink:0;"></div>
-        <div style="padding:10px 12px;display:flex;flex-direction:column;gap:5px;">
-            <div style="font-size:13px;font-weight:700;color:#f9fafb;line-height:1.35;word-break:break-word;">${escapeHtml(item.servico_nome)}</div>
-            ${AG_EQUIP && item.solicitante_nome ? `
-            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#6b7280;">
-                <svg style="width:11px;height:11px;flex-shrink:0;" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
-                <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.solicitante_nome)}</span>
-            </div>` : ''}
-            <div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#4b5563;">
-                <svg style="width:11px;height:11px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
-                <span>${dataCurta}${horaIni ? ' · ' + horaIni + (temFim ? '–' + horaFim : '') : ''}</span>
+return `<button type="button" data-agendamento-id="${item.id}"
+            style="background:#111827;border:1px solid #1f2937;border-radius:10px;overflow:hidden;cursor:pointer;text-align:left;width:100%;padding:0;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s;min-height:60px;"
+            onmouseover="this.style.borderColor='#4f46e5';this.style.boxShadow='0 0 0 1px #4f46e5';"
+            onmouseout="this.style.borderColor='#1f2937';this.style.boxShadow='none';">
+            <div style="height:3px;background:${escapeHtml(item.cor_hex || '#4f46e5')};width:100%;flex-shrink:0;"></div>
+            <div style="padding:12px 14px;display:flex;flex-direction:column;gap:6px;">
+                <div style="font-size:14px;font-weight:700;color:#f9fafb;line-height:1.35;word-break:break-word;min-height:36px;">${escapeHtml(item.servico_nome)}</div>
+                ${AG_EQUIP && item.solicitante_nome ? `
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;">
+                    <svg style="width:12px;height:12px;flex-shrink:0;" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.solicitante_nome)}</span>
+                </div>` : ''}
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#4b5563;">
+                    <svg style="width:12px;height:12px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+                    <span>${dataCurta}${horaIni ? ' · ' + horaIni + (temFim ? '–' + horaFim : '') : ''}</span>
+                </div>
             </div>
-        </div>
-    </button>`;
+        </button>`;
 }
 
 // ── Cards legados ───────────────────────────────────────────────────────────
