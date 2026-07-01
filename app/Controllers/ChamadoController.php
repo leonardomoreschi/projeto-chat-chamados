@@ -5,6 +5,7 @@ namespace App\Controllers;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use App\Helpers\Response as Json;
+use App\Support\NotificationCenter;
 use App\Support\SchemaInspector;
 
 class ChamadoController
@@ -42,6 +43,22 @@ class ChamadoController
         ");
         $stmt->execute([$userId, $titulo, $descricao, $prioridade]);
         $chamadoId = (int) $pdo->lastInsertId();
+        NotificationCenter::registrar($pdo, [
+            'usuario_id' => $userId,
+            'tipo' => 'chamado',
+            'evento' => 'solicitado',
+            'entidade' => 'chamado',
+            'entidade_id' => $chamadoId,
+            'chave_evento' => 'chamado:solicitado:' . $chamadoId . ':' . $userId,
+            'titulo' => 'Chamado aberto',
+            'mensagem' => 'Seu chamado #' . $chamadoId . ' foi registrado com sucesso.',
+            'url' => '/meus-chamados',
+            'status_destino' => 'aberto',
+            'metadados' => [
+                'chamado_id' => $chamadoId,
+                'titulo' => $titulo,
+            ],
+        ]);
 
         // Processa anexos se existirem
         $anexosSalvos = [];
@@ -265,7 +282,7 @@ class ChamadoController
         $userId = (int) $request->getAttribute('user_id');
         $pdo = getDbConnection();
 
-        $stmt = $pdo->prepare('SELECT id, usuario_id, status FROM chamados WHERE id = ? LIMIT 1');
+        $stmt = $pdo->prepare('SELECT id, usuario_id, titulo, status FROM chamados WHERE id = ? LIMIT 1');
         $stmt->execute([$chamadoId]);
         $chamado = $stmt->fetch(\PDO::FETCH_ASSOC);
 
@@ -284,6 +301,23 @@ class ChamadoController
 
         $stmtUpdate = $pdo->prepare('UPDATE chamados SET status = ? WHERE id = ?');
         $stmtUpdate->execute(['cancelado', $chamadoId]);
+        NotificationCenter::registrar($pdo, [
+            'usuario_id' => $userId,
+            'tipo' => 'chamado',
+            'evento' => 'cancelado',
+            'entidade' => 'chamado',
+            'entidade_id' => $chamadoId,
+            'chave_evento' => 'chamado:cancelado:' . $chamadoId . ':' . $userId,
+            'titulo' => 'Chamado cancelado',
+            'mensagem' => 'Seu chamado #' . $chamadoId . ' foi cancelado.',
+            'url' => '/meus-chamados',
+            'status_origem' => $statusAtual,
+            'status_destino' => 'cancelado',
+            'metadados' => [
+                'chamado_id' => $chamadoId,
+                'titulo' => (string) ($chamado['titulo'] ?? ''),
+            ],
+        ]);
 
         return Json::json($response, ['ok' => true, 'status' => 'cancelado']);
     }
@@ -985,7 +1019,7 @@ class ChamadoController
             $this->garantirColunaResolvidoPor($pdo);
 
             // 1. Pega informações do chamado e do finalizador
-            $stmtBusca = $pdo->prepare("SELECT c.titulo, c.usuario_id FROM chamados c WHERE c.id = ?");
+            $stmtBusca = $pdo->prepare("SELECT c.titulo, c.usuario_id, c.status FROM chamados c WHERE c.id = ?");
             $stmtBusca->execute([$id]);
             $chamado = $stmtBusca->fetch(\PDO::FETCH_ASSOC);
 
@@ -1002,6 +1036,25 @@ class ChamadoController
             if ($this->columnExists($pdo, 'chamados', 'resolvido_por')) {
                 $stmtUp = $pdo->prepare("UPDATE chamados SET status = 'resolvido', resolvido_por = ?, atribuido_a = ? WHERE id = ?");
                 $stmtUp->execute([$finalizadorId, $finalizadorId, $id]);
+                NotificationCenter::registrar($pdo, [
+                    'usuario_id' => (int) $chamado['usuario_id'],
+                    'tipo' => 'chamado',
+                    'evento' => 'resolvido',
+                    'entidade' => 'chamado',
+                    'entidade_id' => $id,
+                    'chave_evento' => 'chamado:resolvido:' . $id . ':' . (int) $chamado['usuario_id'],
+                    'titulo' => 'Chamado resolvido',
+                    'mensagem' => 'Seu chamado #' . $id . ' foi finalizado pela equipe de TI.',
+                    'url' => '/meus-chamados',
+                    'status_origem' => (string) ($chamado['status'] ?? 'em_andamento'),
+                    'status_destino' => 'resolvido',
+                    'metadados' => [
+                        'chamado_id' => $id,
+                        'titulo' => (string) $chamado['titulo'],
+                        'finalizador_id' => $finalizadorId,
+                        'finalizador_nome' => $finalizadorNome,
+                    ],
+                ]);
             } else {
                 $stmtUp = $pdo->prepare("UPDATE chamados SET status = 'resolvido', atribuido_a = ? WHERE id = ?");
                 $stmtUp->execute([$finalizadorId, $id]);

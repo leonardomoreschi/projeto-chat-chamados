@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/assets/css/light-mode.css">
     <script src="/assets/js/utils.js"></script>
     <script src="/assets/js/config.js"></script>
+    <script src="/assets/js/notificacoes.js"></script>
 </head>
 <body class="page-dashboard-ti bg-gray-950 text-white h-screen flex flex-col overflow-hidden">
 <?php $chamadosBootstrap = $chamadosBootstrap ?? []; ?>
@@ -31,6 +32,10 @@
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m8.66-10h-1M4.34 12h-1m15.02 6.36l-.7-.7M6.34 6.34l-.7-.7m12.02 0l-.7.7M6.34 17.66l-.7.7M12 8a4 4 0 100 8 4 4 0 000-8z"/>
                 </svg>
             </button>
+            <a href="/notificacoes" class="relative w-9 h-9 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 flex items-center justify-center transition" title="Central de notificações">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/></svg>
+                <span data-notification-badge class="<?= (($notificationCount ?? 0) > 0) ? '' : 'hidden' ?> absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-indigo-500 border border-gray-900 text-[10px] font-black text-white text-center leading-3"><?= (int) ($notificationCount ?? 0) ?></span>
+            </a>
             <button onclick="abrirModalTaxonomias()" class="bg-gray-800 border border-gray-700 text-xs font-bold text-indigo-300 rounded-xl px-3 py-2 hover:bg-gray-700 transition">
                 Gerenciar Categorias
             </button>

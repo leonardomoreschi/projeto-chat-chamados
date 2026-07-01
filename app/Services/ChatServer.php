@@ -6,6 +6,7 @@ use Ratchet\MessageComponentInterface;
 use Ratchet\ConnectionInterface;
 use SplObjectStorage;
 use React\EventLoop\Loop;
+use App\Support\NotificationCenter;
 use App\Support\SchemaInspector;
 
 class ChatServer implements MessageComponentInterface
@@ -41,6 +42,7 @@ class ChatServer implements MessageComponentInterface
         $conn->lastSeenConversationId = 0;
         $conn->lastSeenDeletionAt = date('Y-m-d H:i:s');
         $conn->lastSeenAgendamentoUpdateAt = date('Y-m-d H:i:s');
+        $conn->lastSeenNotificationId = 0;
         echo "Nova conexão: #{$conn->resourceId} | Total: {$this->clients->count()}\n";
     }
 
@@ -61,6 +63,14 @@ class ChatServer implements MessageComponentInterface
                 $from->lastSeenDeletionAt = date('Y-m-d H:i:s');
                 $from->lastSeenAgendamentoUpdateAt = date('Y-m-d H:i:s');
                 $this->atualizarPresenca($from->userId, true);
+                try {
+                    $pdo = getDbConnection();
+                    $stmtNotif = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM notificacoes WHERE usuario_id = ?');
+                    $stmtNotif->execute([(int) $from->userId]);
+                    $from->lastSeenNotificationId = (int) $stmtNotif->fetchColumn();
+                } catch (\Throwable $e) {
+                    $from->lastSeenNotificationId = 0;
+                }
                 echo "Autenticado: {$from->userName} (#{$from->userId})\n";
                 // Sincronização inicial para pegar mensagens recentes
                 $this->sincronizacaoInicial($from);
@@ -271,6 +281,7 @@ class ChatServer implements MessageComponentInterface
                 $this->sincronizarNovasMensagens($client);
                 $this->sincronizarApagamentos($client);
                 $this->sincronizarAgendamentos($client);
+                $this->sincronizarNotificacoes($client);
             } catch (\Throwable $e) {
                 error_log('Falha na sincronizacao WS: ' . $e->getMessage());
             }
@@ -553,6 +564,42 @@ class ChatServer implements MessageComponentInterface
         $ultimo = end($agendamentos);
         if ($ultimo && !empty($ultimo['atualizado_em'])) {
             $client->lastSeenAgendamentoUpdateAt = (string) $ultimo['atualizado_em'];
+        }
+    }
+
+    private function sincronizarNotificacoes(ConnectionInterface $client): void
+    {
+        $pdo = getDbConnection();
+        $ultimoId = (int) ($client->lastSeenNotificationId ?? 0);
+        $userId = (int) ($client->userId ?? 0);
+
+        if ($userId <= 0) {
+            return;
+        }
+
+        try {
+            $novas = NotificationCenter::listarNovas($pdo, $userId, $ultimoId);
+            if (!$novas) {
+                return;
+            }
+
+            foreach ($novas as $notificacao) {
+                $payload = json_encode([
+                    'type' => 'notification_created',
+                    'notification' => $notificacao,
+                ], JSON_UNESCAPED_UNICODE);
+
+                if ($payload) {
+                    $client->send($payload);
+                }
+
+                $notifId = (int) ($notificacao['id'] ?? 0);
+                if ($notifId > 0) {
+                    $client->lastSeenNotificationId = max((int) $client->lastSeenNotificationId, $notifId);
+                }
+            }
+        } catch (\Throwable $e) {
+            error_log('Falha ao sincronizar notificacoes: ' . $e->getMessage());
         }
     }
 

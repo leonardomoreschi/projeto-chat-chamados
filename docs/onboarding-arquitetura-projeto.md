@@ -203,6 +203,7 @@ Pasta: public/assets/js/
 - meus-chamados.js: dashboard do usuário solicitante
 - relatorio-chamados.js: gráficos, KPIs, CSV/PDF
 - admin.js: CRUD de usuários e setores com paginação/filtros
+- notificacoes.js: badge, toast e ações de leitura da central unificada
 
 Scripts compartilhados:
 
@@ -230,6 +231,7 @@ Pasta: public/assets/css/
 - chamado_taxonomias
 - servicos_agendamento
 - agendamentos
+- notificacoes
 - user_presenca
 
 Relações centrais:
@@ -238,6 +240,14 @@ Relações centrais:
 - conversa -> mensagens
 - usuario -> chamados (solicitante)
 - chamado -> anexos/comentários
+- usuario -> notificacoes por eventos de chamados e agendamentos
+
+### Central de notificações
+
+- Tabela persistente: notificacoes
+- Origem dos eventos: chamados e agendamentos
+- Entrega em tempo real: WebSocket com evento notification_created
+- Frontend compartilhado: notificacoes.js, badge com data-notification-badge e marcação de leitura via API
 - comentário -> anexos
 
 ## 9) Infraestrutura e execução

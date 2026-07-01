@@ -110,6 +110,29 @@ CREATE TABLE IF NOT EXISTS chamado_comentario_anexos (
     FOREIGN KEY (comentario_id) REFERENCES chamado_comentarios(id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS notificacoes (
+    id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    usuario_id     INT UNSIGNED NOT NULL,
+    tipo           ENUM('chamado','agendamento','sistema') NOT NULL DEFAULT 'sistema',
+    evento         VARCHAR(80) NOT NULL,
+    chave_evento   VARCHAR(190) NOT NULL,
+    entidade       VARCHAR(60) NOT NULL,
+    entidade_id    INT UNSIGNED NOT NULL,
+    titulo         VARCHAR(255) NOT NULL,
+    mensagem       TEXT NOT NULL,
+    url            VARCHAR(255) NULL,
+    status_origem  VARCHAR(50) NULL,
+    status_destino VARCHAR(50) NULL,
+    metadados      JSON NULL,
+    lida_em        TIMESTAMP NULL DEFAULT NULL,
+    criado_em      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_notificacoes_chave (usuario_id, chave_evento),
+    INDEX idx_notificacoes_usuario_lida_criado (usuario_id, lida_em, criado_em),
+    INDEX idx_notificacoes_usuario_id (usuario_id, id),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 ALTER TABLE chamados 

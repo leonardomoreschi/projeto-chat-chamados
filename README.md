@@ -10,6 +10,7 @@ Plataforma interna com chat corporativo em tempo real e gestão de chamados de T
 - Fluxo de triagem, classificação, resolução e histórico.
 - Painel administrativo para usuários e setores.
 - Relatórios de chamados com exportação CSV.
+- Central de notificações em tempo real para chamados e agendamentos.
 
 ## Stack
 
@@ -185,6 +186,14 @@ Todas as rotas de API exigem sessão autenticada.
 - PATCH /api/servicos-agendamento/{id}
 - DELETE /api/servicos-agendamento/{id}
 
+### Notificações
+
+- GET /notificacoes
+- GET /api/notificacoes
+- GET /api/notificacoes/resumo
+- PATCH /api/notificacoes/{id}/lida
+- PATCH /api/notificacoes/lida
+
 ### Admin
 
 - GET /api/admin/usuarios
@@ -212,6 +221,7 @@ Eventos usados no canal:
 - join
 - send_message
 - new_message
+- notification_created
 - typing
 - message_deleted
 
@@ -231,6 +241,7 @@ Tabelas principais:
 - chamado_taxonomias
 - servicos_agendamento
 - agendamentos
+- notificacoes
 - user_presenca
 
 ## Execução sem Docker

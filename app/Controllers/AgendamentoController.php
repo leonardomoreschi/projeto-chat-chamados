@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Controllers;
 
 use App\Helpers\Response as Json;
+use App\Support\NotificationCenter;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 
@@ -113,7 +114,6 @@ class AgendamentoController
                 return Json::erro($response, 'Data de fim deve ser posterior à data de início');
             }
         } else {
-            // por compatibilidade, quando não informado assume 1 hora de duração
             $fim = $inicio->modify('+1 hour');
         }
 
@@ -135,7 +135,26 @@ class AgendamentoController
 
             $id = (int) $pdo->lastInsertId();
             $pdo->commit();
-            return Json::json($response, $this->buscarAgendamentoPorId($pdo, $id), 201);
+
+            $agendamento = $this->buscarAgendamentoPorId($pdo, $id);
+            if ($agendamento) {
+                $this->registrarNotificacaoAgendamento(
+                    $pdo,
+                    $agendamento,
+                    'solicitado',
+                    'Solicitação de agendamento enviada',
+                    'Sua solicitação para o serviço "' . (string) $agendamento['servico_nome'] . '" foi registrada.',
+                    'solicitado',
+                    null,
+                    [
+                        'servico_nome' => (string) $agendamento['servico_nome'],
+                        'data_inicio' => (string) $agendamento['data_inicio'],
+                        'data_fim' => (string) $agendamento['data_fim'],
+                    ]
+                );
+            }
+
+            return Json::json($response, $agendamento, 201);
         } catch (\Throwable $e) {
             if ($pdo->inTransaction()) {
                 $pdo->rollBack();
@@ -166,6 +185,7 @@ class AgendamentoController
             return Json::erro($response, 'Agendamento não encontrado', 404);
         }
 
+        $statusAnterior = (string) ($agendamento['status'] ?? '');
         $this->atualizarAgendamento((int) $agendamento['id'], [
             'status' => 'cancelado',
             'motivo_recusa' => $motivo,
@@ -173,7 +193,24 @@ class AgendamentoController
             'cancelado_em' => date('Y-m-d H:i:s'),
         ]);
 
-        return Json::json($response, $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']));
+        $agendamentoAtualizado = $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']);
+        if ($agendamentoAtualizado) {
+            $this->registrarNotificacaoAgendamento(
+                getDbConnection(),
+                $agendamentoAtualizado,
+                'cancelado',
+                'Agendamento cancelado',
+                'Sua solicitação para "' . (string) $agendamentoAtualizado['servico_nome'] . '" foi recusada.',
+                'cancelado',
+                $statusAnterior,
+                [
+                    'motivo_recusa' => $motivo,
+                    'servico_nome' => (string) $agendamentoAtualizado['servico_nome'],
+                ]
+            );
+        }
+
+        return Json::json($response, $agendamentoAtualizado ?: $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']));
     }
 
     public function cancelar(Request $request, Response $response, array $args): Response
@@ -191,6 +228,7 @@ class AgendamentoController
 
         $data = (array) $request->getParsedBody();
         $motivo = trim((string) ($data['motivo'] ?? ''));
+        $statusAnterior = (string) ($agendamento['status'] ?? '');
 
         $this->atualizarAgendamento((int) $agendamento['id'], [
             'status' => 'cancelado',
@@ -199,7 +237,24 @@ class AgendamentoController
             'cancelado_em' => date('Y-m-d H:i:s'),
         ]);
 
-        return Json::json($response, $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']));
+        $agendamentoAtualizado = $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']);
+        if ($agendamentoAtualizado) {
+            $this->registrarNotificacaoAgendamento(
+                getDbConnection(),
+                $agendamentoAtualizado,
+                'cancelado',
+                'Agendamento cancelado',
+                'O agendamento "' . (string) $agendamentoAtualizado['servico_nome'] . '" foi cancelado.',
+                'cancelado',
+                $statusAnterior,
+                [
+                    'motivo_cancelamento' => $motivo !== '' ? $motivo : null,
+                    'servico_nome' => (string) $agendamentoAtualizado['servico_nome'],
+                ]
+            );
+        }
+
+        return Json::json($response, $agendamentoAtualizado ?: $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']));
     }
 
     public function encerrar(Request $request, Response $response, array $args): Response
@@ -220,6 +275,7 @@ class AgendamentoController
             ? null
             : (int) filter_var($realizadoBruto, FILTER_VALIDATE_BOOLEAN);
 
+        $statusAnterior = (string) ($agendamento['status'] ?? '');
         $this->atualizarAgendamento((int) $agendamento['id'], [
             'status' => 'encerrado',
             'encerrado_por_id' => (int) $request->getAttribute('user_id'),
@@ -228,7 +284,25 @@ class AgendamentoController
             'observacao_fechamento' => $observacaoFechamento !== '' ? $observacaoFechamento : null,
         ]);
 
-        return Json::json($response, $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']));
+        $agendamentoAtualizado = $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']);
+        if ($agendamentoAtualizado) {
+            $this->registrarNotificacaoAgendamento(
+                getDbConnection(),
+                $agendamentoAtualizado,
+                'encerrado',
+                'Agendamento encerrado',
+                'O agendamento "' . (string) $agendamentoAtualizado['servico_nome'] . '" foi encerrado pela equipe.',
+                'encerrado',
+                $statusAnterior,
+                [
+                    'realizado' => $realizado,
+                    'observacao_fechamento' => $observacaoFechamento !== '' ? $observacaoFechamento : null,
+                    'servico_nome' => (string) $agendamentoAtualizado['servico_nome'],
+                ]
+            );
+        }
+
+        return Json::json($response, $agendamentoAtualizado ?: $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']));
     }
 
     public function listarServicos(Request $request, Response $response): Response
@@ -259,7 +333,6 @@ class AgendamentoController
         $nome = trim((string) ($data['nome'] ?? ''));
         $descricao = trim((string) ($data['descricao'] ?? ''));
         $cor = trim((string) ($data['cor_hex'] ?? '#4f46e5'));
-        $cor = trim((string) ($data['cor_hex'] ?? '#4f46e5'));
 
         if ($nome === '') {
             return Json::erro($response, 'Nome do serviço é obrigatório');
@@ -272,10 +345,7 @@ class AgendamentoController
             return Json::erro($response, 'Já existe um serviço com esse nome');
         }
 
-        $stmt = $pdo->prepare(
-            'INSERT INTO servicos_agendamento (nome, descricao, cor_hex, criado_por)
-             VALUES (?, ?, ?, ?)'
-        );
+        $stmt = $pdo->prepare('INSERT INTO servicos_agendamento (nome, descricao, cor_hex, criado_por) VALUES (?, ?, ?, ?)');
         $stmt->execute([
             $nome,
             $descricao !== '' ? $descricao : null,
@@ -357,6 +427,7 @@ class AgendamentoController
             return Json::erro($response, 'Agendamento não encontrado', 404);
         }
 
+        $statusAnterior = (string) ($agendamento['status'] ?? '');
         $campos = ['status' => $status];
         if ($aprovar) {
             $campos['aprovado_por_id'] = (int) $request->getAttribute('user_id');
@@ -364,7 +435,27 @@ class AgendamentoController
         }
 
         $this->atualizarAgendamento($id, $campos);
-        return Json::json($response, $this->buscarAgendamentoPorId(getDbConnection(), $id));
+        $agendamentoAtualizado = $this->buscarAgendamentoPorId(getDbConnection(), $id);
+        if ($agendamentoAtualizado) {
+            $this->registrarNotificacaoAgendamento(
+                getDbConnection(),
+                $agendamentoAtualizado,
+                $aprovar ? 'aprovado' : 'atualizado',
+                $aprovar ? 'Agendamento aprovado' : 'Agendamento atualizado',
+                $aprovar
+                    ? 'Sua solicitação para o serviço "' . (string) $agendamentoAtualizado['servico_nome'] . '" foi aprovada.'
+                    : 'O agendamento "' . (string) $agendamentoAtualizado['servico_nome'] . '" foi atualizado pela equipe.',
+                $status,
+                $statusAnterior,
+                [
+                    'servico_nome' => (string) $agendamentoAtualizado['servico_nome'],
+                    'data_inicio' => (string) $agendamentoAtualizado['data_inicio'],
+                    'data_fim' => (string) $agendamentoAtualizado['data_fim'],
+                ]
+            );
+        }
+
+        return Json::json($response, $agendamentoAtualizado ?: $this->buscarAgendamentoPorId(getDbConnection(), $id));
     }
 
     private function atualizarAgendamento(int $id, array $campos): void
@@ -479,5 +570,41 @@ class AgendamentoController
         }
 
         return $cor[0] === '#' ? $cor : ('#' . $cor);
+    }
+
+    private function registrarNotificacaoAgendamento(
+        \PDO $pdo,
+        array $agendamento,
+        string $evento,
+        string $titulo,
+        string $mensagem,
+        string $statusDestino,
+        ?string $statusOrigem = null,
+        array $metadados = []
+    ): void {
+        $solicitanteId = (int) ($agendamento['solicitante_id'] ?? 0);
+        if ($solicitanteId <= 0) {
+            return;
+        }
+
+        NotificationCenter::registrar($pdo, [
+            'usuario_id' => $solicitanteId,
+            'tipo' => 'agendamento',
+            'evento' => $evento,
+            'entidade' => 'agendamento',
+            'entidade_id' => (int) ($agendamento['id'] ?? 0),
+            'chave_evento' => 'agendamento:' . $evento . ':' . (int) ($agendamento['id'] ?? 0) . ':' . $solicitanteId,
+            'titulo' => $titulo,
+            'mensagem' => $mensagem,
+            'url' => '/agendamentos',
+            'status_origem' => $statusOrigem,
+            'status_destino' => $statusDestino,
+            'metadados' => array_merge([
+                'agendamento_id' => (int) ($agendamento['id'] ?? 0),
+                'servico_nome' => (string) ($agendamento['servico_nome'] ?? ''),
+                'data_inicio' => (string) ($agendamento['data_inicio'] ?? ''),
+                'data_fim' => (string) ($agendamento['data_fim'] ?? ''),
+            ], $metadados),
+        ]);
     }
 }

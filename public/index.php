@@ -21,14 +21,17 @@ use App\Controllers\ChatController;
 use App\Controllers\ChamadoController;
 use App\Controllers\AdminController;
 use App\Controllers\AgendamentoController;
+use App\Controllers\NotificacaoController;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\AdminMiddleware;
+use App\Support\NotificationCenter;
 use App\Support\TemplateRenderer;
 
 $app = AppFactory::create();
 $app->addBodyParsingMiddleware();
 $app->addRoutingMiddleware();
 $app->addErrorMiddleware($_ENV['APP_ENV'] === 'development', true, true);
+//$app->addErrorMiddleware(true, true, true);
 
 // ── Rotas públicas ────────────────────────────
 $app->get('/login',  [AuthController::class, 'exibirLogin']);
@@ -38,8 +41,10 @@ $app->get('/logout', [AuthController::class, 'logout']);
 // ── Rotas protegidas — Frontend ───────────────
 $app->get('/admin', function ($request, $response) {
     $userName = $request->getAttribute('user_nome');
+    $userId = (int) $request->getAttribute('user_id');
     return TemplateRenderer::render($response, __DIR__ . '/../templates/admin.php', [
         'userName' => $userName,
+        'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), $userId),
     ]);
 })->add(new AdminMiddleware())->add(new AuthMiddleware());
 
@@ -51,6 +56,7 @@ $app->get('/chat', function ($request, $response) {
         'userName' => $userName,
         'userId' => $userId,
         'userPapel' => $userPapel,
+        'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $userId),
     ]);
 })->add(new AuthMiddleware());
 
@@ -63,6 +69,7 @@ $app->get('/agendamentos', function ($request, $response) {
         'userName' => $userName,
         'userId' => $userId,
         'userPapel' => $userPapel,
+        'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $userId),
     ]);
 })->add(new AuthMiddleware());
 
@@ -77,6 +84,7 @@ $app->get('/painel-agendamentos', function ($request, $response) {
     return TemplateRenderer::render($response, __DIR__ . '/../templates/painel_agendamentos.php', [
         'userName' => $userName,
         'userPapel' => $userPapel,
+        'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $request->getAttribute('user_id')),
     ]);
 })->add(new AuthMiddleware());
 
@@ -105,6 +113,7 @@ $app->get('/meus-chamados', function ($request, $response) {
         'userId' => $userId,
         'userPapel' => $userPapel,
         'chamadosUsuario' => $chamadosUsuario,
+        'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $userId),
     ]);
 })->add(new AuthMiddleware());
 
@@ -133,6 +142,21 @@ $app->get('/dashboard-ti', function ($request, $response) {
         'userName' => $userName,
         'userPapel' => $userPapel,
         'chamadosBootstrap' => $chamadosBootstrap,
+        'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $request->getAttribute('user_id')),
+    ]);
+})->add(new AuthMiddleware());
+
+$app->get('/notificacoes', function ($request, $response) {
+    $userName = $request->getAttribute('user_nome');
+    $userId = (int) $request->getAttribute('user_id');
+    $notificationCount = NotificationCenter::contarNaoLidas(getDbConnection(), $userId);
+    $notificacoes = NotificationCenter::listar(getDbConnection(), $userId, 100);
+
+    return TemplateRenderer::render($response, __DIR__ . '/../templates/notificacoes.php', [
+        'userName' => $userName,
+        'userId' => $userId,
+        'notificationCount' => $notificationCount,
+        'notificacoes' => $notificacoes,
     ]);
 })->add(new AuthMiddleware());
 
@@ -157,6 +181,12 @@ $app->group('/api', function ($group) {
     $group->post('/mensagens',       [ChatController::class, 'enviarMensagem']);
     $group->delete('/mensagens/{id}',[ChatController::class, 'apagarMensagem']);
     $group->get('/usuarios/online',  [ChatController::class, 'listarUsuarios']);
+
+    // Notificações
+    $group->get('/notificacoes', [NotificacaoController::class, 'listar']);
+    $group->get('/notificacoes/resumo', [NotificacaoController::class, 'resumo']);
+    $group->patch('/notificacoes/{id}/lida', [NotificacaoController::class, 'marcarComoLida']);
+    $group->patch('/notificacoes/lida', [NotificacaoController::class, 'marcarTodasComoLidas']);
 
     // Conversas
     $group->post('/conversas',                              [ChatController::class, 'criarConversa']);

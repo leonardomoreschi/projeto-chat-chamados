@@ -54,9 +54,9 @@ function chaveDia(data) {
 }
 
 function inicioDia(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0); }
-function fimDia(d)    { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
+function fimDia(d) { return new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999); }
 function inicioMes(d) { return new Date(d.getFullYear(), d.getMonth(), 1, 0, 0, 0, 0); }
-function fimMes(d)    { return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999); }
+function fimMes(d) { return new Date(d.getFullYear(), d.getMonth() + 1, 0, 23, 59, 59, 999); }
 
 function inicioDaSemana(d) {
     const r = new Date(d);
@@ -88,12 +88,12 @@ function ehMultiDia(item) {
 
 function dataParaBanco(data) {
     const p = n => String(n).padStart(2, '0');
-    return `${data.getFullYear()}-${p(data.getMonth()+1)}-${p(data.getDate())} ${p(data.getHours())}:${p(data.getMinutes())}:00`;
+    return `${data.getFullYear()}-${p(data.getMonth() + 1)}-${p(data.getDate())} ${p(data.getHours())}:${p(data.getMinutes())}:00`;
 }
 
 function dataToLocalValue(d) {
     const p = n => String(n).padStart(2, '0');
-    return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+    return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 function statusLabel(s) {
@@ -102,10 +102,10 @@ function statusLabel(s) {
 
 function statusClasses(s) {
     const b = 'text-xs font-black uppercase tracking-widest px-2 py-0.5 rounded agenda-pill';
-    if (s === 'solicitado')   return b + ' bg-amber-600';
-    if (s === 'agendado')     return b + ' bg-green-600';
+    if (s === 'solicitado') return b + ' bg-amber-600';
+    if (s === 'agendado') return b + ' bg-green-600';
     if (s === 'em_avaliacao') return b + ' bg-purple-600';
-    if (s === 'cancelado')    return b + ' bg-red-600';
+    if (s === 'cancelado') return b + ' bg-red-600';
     return b + ' bg-indigo-600';
 }
 
@@ -115,7 +115,7 @@ function rangeVisivel() {
         const now = new Date();
         return {
             inicio: new Date(now.getFullYear(), now.getMonth() - 3, 1, 0, 0, 0),
-            fim:    new Date(now.getFullYear(), now.getMonth() + 6, 0, 23, 59, 59),
+            fim: new Date(now.getFullYear(), now.getMonth() + 6, 0, 23, 59, 59),
         };
     }
     if (viewMode === 'week') {
@@ -242,7 +242,7 @@ async function mudarView(modo) {
 function renderizarCalendario() {
     atualizarRotulo();
     if (viewMode === 'week') { renderizarSemanal(); return; }
-    if (viewMode === 'day')  { renderizarDiario(); return; }
+    if (viewMode === 'day') { renderizarDiario(); return; }
     renderizarMensal();
 }
 
@@ -345,7 +345,7 @@ function renderizarSemanal() {
 
     const agsDaSemana = agendamentosCache.filter(ag => !['encerrado', 'em_avaliacao'].includes(ag.status) && dias.some(d => agendamentoCobreDia(ag, d)));
     const allDayAgs = agsDaSemana.filter(ehMultiDia);
-    const timedAgs  = agsDaSemana.filter(ag => !ehMultiDia(ag));
+    const timedAgs = agsDaSemana.filter(ag => !ehMultiDia(ag));
 
     const headerCols = dias.map(dia => {
         const chave = chaveDia(dia);
@@ -366,7 +366,7 @@ function renderizarSemanal() {
             const iniChave = chaveDia(parseDataServidorBrasilia(ag.data_inicio));
             const fimChave = chaveDia(parseDataServidorBrasilia(ag.data_fim || ag.data_inicio));
             const isFirst = iniChave === chaveDia(dia) || idx === 0;
-            const isLast  = fimChave === chaveDia(dia) || idx === 6;
+            const isLast = fimChave === chaveDia(dia) || idx === 6;
             const br = `${isFirst ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isFirst ? '9999px' : '0'}`;
             return `<button data-agendamento-id="${ag.id}" style="display:block;width:100%;height:18px;border-radius:${br};background:${ag.cor_hex || '#4f46e5'};border:none;padding:0 ${isFirst ? 6 : 0}px;color:#fff;font-size:9px;font-weight:700;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;cursor:pointer;">${isFirst ? escapeHtml(ag.servico_nome) : ''}</button>`;
         }).join('');
@@ -375,19 +375,19 @@ function renderizarSemanal() {
 
     const eventCols = dias.map(dia => {
         const evsAqui = timedAgs.filter(ag => agendamentoCobreDia(ag, dia));
-        const chave   = chaveDia(dia);
-        const layout  = calcularLayoutEventos(evsAqui);
-        const evHtml  = layout.map(({ ag, col, totalCols }) => {
+        const chave = chaveDia(dia);
+        const layout = calcularLayoutEventos(evsAqui);
+        const evHtml = layout.map(({ ag, col, totalCols }) => {
             const ini = parseDataServidorBrasilia(ag.data_inicio);
             const fim = parseDataServidorBrasilia(ag.data_fim || ag.data_inicio);
             if (!ini || !fim) return '';
-            const iniH   = ini.getHours() + ini.getMinutes() / 60;
-            const fimH   = fim.getHours() + fim.getMinutes() / 60;
-            const top    = Math.max(0, (iniH - HORA_INICIO) * PX_HORA);
+            const iniH = ini.getHours() + ini.getMinutes() / 60;
+            const fimH = fim.getHours() + fim.getMinutes() / 60;
+            const top = Math.max(0, (iniH - HORA_INICIO) * PX_HORA);
             const height = Math.max(18, (fimH - iniH) * PX_HORA);
-            const small  = height < 34;
-            const lPct   = (col / totalCols * 100).toFixed(2);
-            const wPct   = (100 / totalCols).toFixed(2);
+            const small = height < 34;
+            const lPct = (col / totalCols * 100).toFixed(2);
+            const wPct = (100 / totalCols).toFixed(2);
             return `<button data-agendamento-id="${ag.id}" style="position:absolute;top:${top}px;height:${height}px;left:calc(${lPct}% + 2px);width:calc(${wPct}% - 4px);background:${ag.cor_hex || '#4f46e5'};border-radius:5px;overflow:hidden;z-index:2;cursor:pointer;border:none;text-align:left;box-shadow:0 1px 4px rgba(0,0,0,.3);">
                 <div style="padding:${small ? '1px' : '3px'} 5px;color:#fff;height:100%;display:flex;flex-direction:column;justify-content:flex-start;gap:1px;overflow:hidden;">
                     <div style="font-size:${small ? 9 : 10}px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;">${escapeHtml(ag.servico_nome)}</div>
@@ -400,7 +400,7 @@ function renderizarSemanal() {
 
     let horaLabels = '';
     for (let h = HORA_INICIO; h <= HORA_FIM; h++) {
-        horaLabels += `<div style="height:${PX_HORA}px;padding-right:8px;text-align:right;font-size:10px;color:#4b5563;line-height:1;padding-top:3px;">${String(h).padStart(2,'0')}:00</div>`;
+        horaLabels += `<div style="height:${PX_HORA}px;padding-right:8px;text-align:right;font-size:10px;color:#4b5563;line-height:1;padding-top:3px;">${String(h).padStart(2, '0')}:00</div>`;
     }
 
     container.innerHTML = `
@@ -432,7 +432,7 @@ function renderizarSemanal() {
             const lblEl = document.getElementById('dia-selecionado-rotulo');
             if (lblEl) {
                 const d = parseDataServidorBrasilia(chave + 'T12:00:00');
-                if (d) lblEl.textContent = d.toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric' });
+                if (d) lblEl.textContent = d.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' });
             }
         })
     );
@@ -445,15 +445,15 @@ function renderizarDiario() {
     container.style.cssText = '';
 
     const chave = chaveDia(dataAtual);
-    const agsDia  = agendamentosCache.filter(ag => !['encerrado', 'em_avaliacao'].includes(ag.status) && agendamentoCobreDia(ag, dataAtual));
-    const timedAgs   = agsDia.filter(ag => !ehMultiDia(ag));
-    const allDayAgs  = agsDia.filter(ehMultiDia);
-    const totalH  = (HORA_FIM - HORA_INICIO) * PX_HORA;
+    const agsDia = agendamentosCache.filter(ag => !['encerrado', 'em_avaliacao'].includes(ag.status) && agendamentoCobreDia(ag, dataAtual));
+    const timedAgs = agsDia.filter(ag => !ehMultiDia(ag));
+    const allDayAgs = agsDia.filter(ehMultiDia);
+    const totalH = (HORA_FIM - HORA_INICIO) * PX_HORA;
     const bgLinhas = `repeating-linear-gradient(to bottom,transparent 0px,transparent ${PX_HORA - 1}px,#1f2937 ${PX_HORA - 1}px,#1f2937 ${PX_HORA}px)`;
 
     let horaLabels = '';
     for (let h = HORA_INICIO; h <= HORA_FIM; h++) {
-        horaLabels += `<div style="height:${PX_HORA}px;padding-right:8px;text-align:right;font-size:10px;color:#4b5563;line-height:1;padding-top:3px;">${String(h).padStart(2,'0')}:00</div>`;
+        horaLabels += `<div style="height:${PX_HORA}px;padding-right:8px;text-align:right;font-size:10px;color:#4b5563;line-height:1;padding-top:3px;">${String(h).padStart(2, '0')}:00</div>`;
     }
 
     const layoutDia = calcularLayoutEventos(timedAgs);
@@ -461,12 +461,12 @@ function renderizarDiario() {
         const ini = parseDataServidorBrasilia(ag.data_inicio);
         const fim = parseDataServidorBrasilia(ag.data_fim || ag.data_inicio);
         if (!ini || !fim) return '';
-        const iniH   = ini.getHours() + ini.getMinutes() / 60;
-        const fimH   = fim.getHours() + fim.getMinutes() / 60;
-        const top    = Math.max(0, (iniH - HORA_INICIO) * PX_HORA);
+        const iniH = ini.getHours() + ini.getMinutes() / 60;
+        const fimH = fim.getHours() + fim.getMinutes() / 60;
+        const top = Math.max(0, (iniH - HORA_INICIO) * PX_HORA);
         const height = Math.max(24, (fimH - iniH) * PX_HORA);
-        const lPct   = (col / totalCols * 100).toFixed(2);
-        const wPct   = (100 / totalCols).toFixed(2);
+        const lPct = (col / totalCols * 100).toFixed(2);
+        const wPct = (100 / totalCols).toFixed(2);
         return `<button data-agendamento-id="${ag.id}" style="position:absolute;top:${top}px;height:${height}px;left:calc(${lPct}% + 4px);width:calc(${wPct}% - 8px);background:${ag.cor_hex || '#4f46e5'};border-radius:8px;overflow:hidden;z-index:2;cursor:pointer;border:none;text-align:left;box-shadow:0 2px 8px rgba(0,0,0,.3);">
             <div style="padding:6px 10px;color:#fff;height:100%;display:flex;flex-direction:column;gap:2px;overflow:hidden;">
                 <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ag.servico_nome)}</div>
@@ -526,7 +526,7 @@ function renderizarSidebarStatus() {
 
     Object.keys(grupos).forEach(status => {
         const countEl = document.getElementById('count-status-' + status);
-        const listEl  = document.getElementById('lista-status-' + status);
+        const listEl = document.getElementById('lista-status-' + status);
         if (countEl) countEl.textContent = String(grupos[status].length);
         if (!listEl) return;
         if (!grupos[status].length) { listEl.innerHTML = '<p class="text-xs text-gray-600">Nenhum.</p>'; return; }
@@ -540,14 +540,14 @@ function renderizarSidebarStatus() {
 function renderizarAdminQueues() {
     if (!AG_EQUIP) return;
     const filas = [
-        ['pendentes',  agendamentosCache.filter(i => i.status === 'solicitado')],
-        ['abertos',    agendamentosCache.filter(i => i.status === 'agendado')],
-        ['avaliacao',  agendamentosCache.filter(i => i.status === 'em_avaliacao')],
-        ['arquivo',    agendamentosCache.filter(i => i.status === 'encerrado')],
+        ['pendentes', agendamentosCache.filter(i => i.status === 'solicitado')],
+        ['abertos', agendamentosCache.filter(i => i.status === 'agendado')],
+        ['avaliacao', agendamentosCache.filter(i => i.status === 'em_avaliacao')],
+        ['arquivo', agendamentosCache.filter(i => i.status === 'encerrado')],
     ];
     filas.forEach(([key, items]) => {
         const countEl = document.getElementById('count-' + key);
-        const listEl  = document.getElementById('lista-' + key);
+        const listEl = document.getElementById('lista-' + key);
         if (countEl) countEl.textContent = String(items.length);
         if (!listEl) return;
         listEl.innerHTML = items.length
@@ -561,11 +561,11 @@ function renderizarAdminQueues() {
 
 // ── Kanban ───────────────────────────────────────────────────────────────────
 const KANBAN_COLUNAS = [
-    { key: 'solicitado',   label: 'Solicitado',   cor: '#b45309', corBg: '#451a03' },
-    { key: 'agendado',     label: 'Confirmado',   cor: '#15803d', corBg: '#052e16' },
+    { key: 'solicitado', label: 'Solicitado', cor: '#b45309', corBg: '#451a03' },
+    { key: 'agendado', label: 'Confirmado', cor: '#15803d', corBg: '#052e16' },
     { key: 'em_avaliacao', label: 'Em Avaliação', cor: '#6d28d9', corBg: '#2e1065' },
-    { key: 'cancelado',    label: 'Cancelado',    cor: '#b91c1c', corBg: '#450a0a' },
-    { key: 'encerrado',    label: 'Encerrado',    cor: '#334155', corBg: '#0f172a' },
+    { key: 'cancelado', label: 'Cancelado', cor: '#b91c1c', corBg: '#450a0a' },
+    { key: 'encerrado', label: 'Encerrado', cor: '#334155', corBg: '#0f172a' },
 ];
 
 function renderizarKanban() {
@@ -580,13 +580,13 @@ function renderizarKanban() {
             ? `<button onclick="abrirModalSolicitacao()" title="Nova solicitação" style="width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,.18);border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">+</button>`
             : '';
 
-const cards = itens.length
+        const cards = itens.length
             ? itens.map(item => cardKanban(item)).join('')
             : `<div style="padding:24px 16px;text-align:center;">
                  <p style="font-size:14px;color:#374151;min-height:48px;">Nenhum item</p>
                 </div>`;
 
-return `<div style="flex-shrink:0;min-width:200px;flex-grow:1;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06);">
+        return `<div style="flex-shrink:0;min-width:200px;flex-grow:1;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06);">
                 <div style="padding:11px 14px;background:${col.cor};display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;">
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span style="font-size:11px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:.1em;">${col.label}</span>
@@ -613,9 +613,9 @@ function cardKanban(item) {
         : '';
     const horaIni = formatarHoraAgendamento(item.data_inicio);
     const horaFim = fim ? formatarHoraAgendamento(item.data_fim) : '';
-    const temFim  = horaFim && horaFim !== horaIni;
+    const temFim = horaFim && horaFim !== horaIni;
 
-return `<button type="button" data-agendamento-id="${item.id}"
+    return `<button type="button" data-agendamento-id="${item.id}"
             style="background:#111827;border:1px solid #1f2937;border-radius:10px;overflow:hidden;cursor:pointer;text-align:left;width:100%;padding:0;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s;min-height:60px;"
             onmouseover="this.style.borderColor='#4f46e5';this.style.boxShadow='0 0 0 1px #4f46e5';"
             onmouseout="this.style.borderColor='#1f2937';this.style.boxShadow='none';">
@@ -688,11 +688,11 @@ function abrirDia(dataIso) {
     diaSelecionado = dataIso;
     const data = parseDataServidorBrasilia(dataIso + 'T12:00:00');
     const itens = agendamentosCache.filter(item => agendamentoCobreDia(item, data || new Date()));
-    const html  = _buildItensDoDialHtml(itens);
+    const html = _buildItensDoDialHtml(itens);
 
     if (data) {
-        const longo  = data.toLocaleDateString('pt-BR', { weekday:'long', day:'2-digit', month:'long', year:'numeric', timeZone:'America/Sao_Paulo' });
-        const curto  = data.toLocaleDateString('pt-BR', { day:'2-digit', month:'long', year:'numeric', timeZone:'America/Sao_Paulo' });
+        const longo = data.toLocaleDateString('pt-BR', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
+        const curto = data.toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric', timeZone: 'America/Sao_Paulo' });
         const titulo = document.getElementById('modal-dia-titulo');
         const rotulo = document.getElementById('dia-selecionado-rotulo');
         if (titulo) titulo.textContent = longo;
@@ -744,14 +744,14 @@ async function abrirDetalhe(id) {
 }
 
 function configurarAcoesDetalhe(data) {
-    const btns = ['cancelar','aprovar','recusar','encerrar'].reduce((acc, k) => {
+    const btns = ['cancelar', 'aprovar', 'recusar', 'encerrar'].reduce((acc, k) => {
         acc[k] = document.getElementById('btn-detalhe-' + k);
         return acc;
     }, {});
     Object.values(btns).forEach(b => b?.classList.add('hidden'));
     document.getElementById('bloco-fechamento-form')?.classList.add('hidden');
 
-    if (btns.cancelar && (Number(data.solicitante_id) === AG_USER_ID || AG_EQUIP) && !['encerrado','cancelado'].includes(data.status))
+    if (btns.cancelar && (Number(data.solicitante_id) === AG_USER_ID || AG_EQUIP) && !['encerrado', 'cancelado'].includes(data.status))
         btns.cancelar.classList.remove('hidden');
 
     if (!AG_EQUIP) return;
@@ -778,9 +778,9 @@ function abrirModalSolicitacao(dataIso) {
 }
 
 async function enviarSolicitacao() {
-    const servicoId   = Number(document.getElementById('solicitacao-servico')?.value || 0);
-    const dataInicio  = document.getElementById('solicitacao-data-inicio')?.value || '';
-    const dataFim     = document.getElementById('solicitacao-data-fim')?.value || '';
+    const servicoId = Number(document.getElementById('solicitacao-servico')?.value || 0);
+    const dataInicio = document.getElementById('solicitacao-data-inicio')?.value || '';
+    const dataFim = document.getElementById('solicitacao-data-fim')?.value || '';
     const observacoes = document.getElementById('solicitacao-observacoes')?.value || '';
 
     const res = await fetch('/api/agendamentos', {
@@ -810,13 +810,13 @@ async function alterarStatus(id, acao, payload = {}) {
 }
 
 // ── Modais ──────────────────────────────────────────────────────────────────
-function abrirModal(id)  { document.getElementById(id)?.classList.remove('hidden'); }
+function abrirModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
 function fecharModal(id) { document.getElementById(id)?.classList.add('hidden'); }
 
 // ── Serviços (CRUD) ─────────────────────────────────────────────────────────
 function renderizarServicosAdmin() {
-    const lista  = document.getElementById('lista-servicos');
-    const count  = document.getElementById('count-servicos');
+    const lista = document.getElementById('lista-servicos');
+    const count = document.getElementById('count-servicos');
     if (!lista) return;
     if (count) count.textContent = String(servicosCache.length);
     if (!servicosCache.length) { lista.innerHTML = '<p class="text-xs text-gray-600">Nenhum serviço cadastrado.</p>'; return; }
@@ -852,19 +852,19 @@ async function editarServico(id) {
 
 function limparFormularioServico() {
     editandoServicoId = null;
-    ['servico-id','servico-nome','servico-descricao'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+    ['servico-id', 'servico-nome', 'servico-descricao'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
     const cor = document.getElementById('servico-cor'); if (cor) cor.value = '#4f46e5';
     const ativo = document.getElementById('servico-ativo'); if (ativo) ativo.checked = true;
 }
 
 async function salvarServico() {
     const payload = {
-        nome:      document.getElementById('servico-nome')?.value.trim() || '',
+        nome: document.getElementById('servico-nome')?.value.trim() || '',
         descricao: document.getElementById('servico-descricao')?.value.trim() || '',
-        cor_hex:   document.getElementById('servico-cor')?.value.trim() || '#4f46e5',
-        ativo:     document.getElementById('servico-ativo')?.checked ? 1 : 0,
+        cor_hex: document.getElementById('servico-cor')?.value.trim() || '#4f46e5',
+        ativo: document.getElementById('servico-ativo')?.checked ? 1 : 0,
     };
-    const url    = editandoServicoId ? '/api/servicos-agendamento/' + editandoServicoId : '/api/servicos-agendamento';
+    const url = editandoServicoId ? '/api/servicos-agendamento/' + editandoServicoId : '/api/servicos-agendamento';
     const method = editandoServicoId ? 'PATCH' : 'POST';
     const res = await fetch(url, { method, headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams(payload) });
     const data = await res.json();
@@ -894,8 +894,8 @@ function prepararAgenda() {
     document.getElementById('btn-mes-hoje')?.addEventListener('click', navHoje);
 
     document.getElementById('btn-view-month')?.addEventListener('click', () => mudarView('month'));
-    document.getElementById('btn-view-week')?.addEventListener('click',  () => mudarView('week'));
-    document.getElementById('btn-view-day')?.addEventListener('click',   () => mudarView('day'));
+    document.getElementById('btn-view-week')?.addEventListener('click', () => mudarView('week'));
+    document.getElementById('btn-view-day')?.addEventListener('click', () => mudarView('day'));
 
     document.getElementById('btn-abrir-solicitacao-dia')?.addEventListener('click', () => abrirModalSolicitacao(diaSelecionado));
 
@@ -907,7 +907,7 @@ function prepararAgenda() {
 
     const detalheAcoes = {
         'btn-detalhe-cancelar': async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'cancelar'),
-        'btn-detalhe-aprovar':  async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'aprovar'),
+        'btn-detalhe-aprovar': async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'aprovar'),
         'btn-detalhe-encerrar': async () => {
             if (!agendamentoAtual) return;
             const realizado = document.getElementById('fechamento-realizado')?.checked ? '1' : '0';
@@ -940,12 +940,14 @@ function conectarWSAgendamentos() {
             try {
                 const msg = JSON.parse(e.data);
                 if (msg.type === 'schedule_updated') {
-                    carregarServicos().catch(() => {});
-                    carregarAgendamentos().catch(() => {});
+                    carregarServicos().catch(() => { });
+                    carregarAgendamentos().catch(() => { });
                     if (agendamentoAtual && Number(msg.agendamento?.id) === Number(agendamentoAtual.id))
                         abrirDetalhe(Number(agendamentoAtual.id));
+                } else if (msg.type === 'notification_created' && window.NotificationCenterUI) {
+                    window.NotificationCenterUI.handleRealtimeNotification(msg.notification);
                 }
-            } catch (_) {}
+            } catch (_) { }
         };
         wsAgendamentos.onclose = () => setTimeout(conectarWSAgendamentos, 3000);
     } catch (e) {

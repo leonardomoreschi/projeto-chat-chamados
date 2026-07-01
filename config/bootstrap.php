@@ -12,6 +12,7 @@ function bootstrapDefaultData(): void
 
     try {
         ensureUniqueSectorNames($pdo);
+        ensureNotificationsSchema($pdo);
         ensureAgendamentoSchema($pdo);
         seedDefaultServices($pdo);
         seedDefaultSectors($pdo);
@@ -238,4 +239,9 @@ function ensureAgendamentosEmAvaliacaoColumns(PDO $pdo): void
             error_log("Nao foi possivel adicionar coluna {$coluna} em agendamentos: " . $e->getMessage());
         }
     }
+}
+
+function ensureNotificationsSchema(PDO $pdo): void
+{
+    $pdo->exec("\n        CREATE TABLE IF NOT EXISTS notificacoes (\n            id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n            usuario_id     INT UNSIGNED NOT NULL,\n            tipo           ENUM('chamado','agendamento','sistema') NOT NULL DEFAULT 'sistema',\n            evento         VARCHAR(80) NOT NULL,\n            chave_evento   VARCHAR(190) NOT NULL,\n            entidade       VARCHAR(60) NOT NULL,\n            entidade_id    INT UNSIGNED NOT NULL,\n            titulo         VARCHAR(255) NOT NULL,\n            mensagem       TEXT NOT NULL,\n            url            VARCHAR(255) NULL,\n            status_origem  VARCHAR(50) NULL,\n            status_destino VARCHAR(50) NULL,\n            metadados      JSON NULL,\n            lida_em        TIMESTAMP NULL DEFAULT NULL,\n            criado_em      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n            atualizado_em  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n            UNIQUE KEY uniq_notificacoes_chave (usuario_id, chave_evento),\n            INDEX idx_notificacoes_usuario_lida_criado (usuario_id, lida_em, criado_em),\n            INDEX idx_notificacoes_usuario_id (usuario_id, id),\n            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE\n        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci\n    ");
 }

@@ -79,6 +79,11 @@ function conectarWS() {
                     atualizarPreviewSidebar({ conversa_id: data.conversa_id, conteudo: 'Mensagem apagada' });
                 }
                 break;
+            case 'notification_created':
+                if (window.NotificationCenterUI) {
+                    window.NotificationCenterUI.handleRealtimeNotification(data.notification);
+                }
+                break;
             case 'typing':
                 if (data.conversa_id == conversaAtualId) {
                     mostrarTyping(data.user_nome);
