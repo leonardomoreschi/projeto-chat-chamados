@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Interno</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.min.js"></script>
+    <script type="module" src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.min.js"></script>
     <link rel="stylesheet" href="/assets/css/light-mode.css">
     <script src="/assets/js/utils.js"></script>
     <script src="/assets/js/config.js"></script>
@@ -502,7 +502,7 @@ window.CHAT_BOOTSTRAP = <?= json_encode([
 </script>
 <script src="/assets/js/theme.js"></script>
 <script src="/assets/js/notificacoes.js"></script>
-<script src="/assets/js/chat.js"></script>
+<script type="module" src="/assets/js/chat.js"></script>
 
 </body>
 </html>
