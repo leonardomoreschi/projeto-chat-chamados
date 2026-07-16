@@ -502,7 +502,7 @@ window.CHAT_BOOTSTRAP = <?= json_encode([
 </script>
 <script src="/assets/js/theme.js"></script>
 <script src="/assets/js/notificacoes.js"></script>
-<script type="module" src="/assets/js/chat.js"></script>
+<script src="/assets/js/chat.js"></script>
 
 </body>
 </html>
