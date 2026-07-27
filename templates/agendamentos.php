@@ -131,7 +131,7 @@ $agendamentosBootstrap = [
     </div>
 
     <!-- Tab: Meus Agendamentos (kanban) -->
-    <div data-tab-content="meus-agendamentos" style="position:absolute;inset:0;flex-direction:column;">
+    <div data-tab-content="meus-agendamentos" style="position:absolute;inset:0;flex-direction:column;min-height:0;overflow:hidden;">
         <div class="flex items-center justify-between gap-3 px-5 py-3 border-b border-gray-800 bg-gray-900 flex-shrink-0">
             <div>
                 <h2 class="text-sm font-black text-white">Meus Agendamentos</h2>
@@ -141,8 +141,8 @@ $agendamentosBootstrap = [
                 Solicitar Serviço
             </button>
         </div>
-        <div id="kanban-board"
-             style="flex:1;overflow-x:auto;overflow-y:hidden;display:flex;align-items:stretch;gap:10px;padding:14px 16px;background:#030712;min-height:0;">
+           <div id="kanban-board"
+               style="flex:1;overflow-x:auto;overflow-y:hidden;display:flex;align-items:stretch;gap:10px;padding:14px 16px;background:#030712;min-height:0;">
         </div>
     </div>
 

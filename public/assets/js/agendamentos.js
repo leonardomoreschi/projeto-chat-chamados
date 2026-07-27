@@ -586,7 +586,7 @@ function renderizarKanban() {
                  <p style="font-size:14px;color:#374151;min-height:48px;">Nenhum item</p>
                 </div>`;
 
-        return `<div style="flex-shrink:0;min-width:200px;flex-grow:1;display:flex;flex-direction:column;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06);">
+        return `<div class="kanban-col" style="flex-shrink:0;min-width:260px;max-width:340px;flex:1 1 280px;display:flex;flex-direction:column;min-height:0;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06);">
                 <div style="padding:11px 14px;background:${col.cor};display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;">
                     <div style="display:flex;align-items:center;gap:8px;">
                         <span style="font-size:11px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:.1em;">${col.label}</span>
@@ -594,7 +594,7 @@ function renderizarKanban() {
                     </div>
                     ${headerAdd}
                 </div>
-                <div style="flex:1;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;background:${col.corBg};">
+                <div class="kanban-col-body" style="flex:1;min-height:0;overflow-y:auto;padding:8px;display:flex;flex-direction:column;gap:6px;background:${col.corBg};">
                     ${cards}
                 </div>
             </div>`;
@@ -615,8 +615,8 @@ function cardKanban(item) {
     const horaFim = fim ? formatarHoraAgendamento(item.data_fim) : '';
     const temFim = horaFim && horaFim !== horaIni;
 
-    return `<button type="button" data-agendamento-id="${item.id}"
-            style="background:#111827;border:1px solid #1f2937;border-radius:10px;overflow:hidden;cursor:pointer;text-align:left;width:100%;padding:0;display:flex;flex-direction:column;transition:border-color .15s,box-shadow .15s;min-height:60px;"
+        return `<button type="button" data-agendamento-id="${item.id}"
+            style="background:#111827;border:1px solid #1f2937;border-radius:10px;overflow:hidden;cursor:pointer;text-align:left;width:100%;padding:0;display:flex;flex-direction:column;flex:0 0 auto;transition:border-color .15s,box-shadow .15s;min-height:60px;"
             onmouseover="this.style.borderColor='#4f46e5';this.style.boxShadow='0 0 0 1px #4f46e5';"
             onmouseout="this.style.borderColor='#1f2937';this.style.boxShadow='none';">
             <div style="height:3px;background:${escapeHtml(item.cor_hex || '#4f46e5')};width:100%;flex-shrink:0;"></div>

@@ -91,7 +91,7 @@ $agendamentosBootstrap = [
 <main class="flex-1 relative overflow-hidden">
 
     <!-- Tab: Kanban (padrão admin) -->
-    <div data-tab-content="kanban" style="position:absolute;inset:0;flex-direction:column;">
+    <div data-tab-content="kanban" style="position:absolute;inset:0;flex-direction:column;min-height:0;overflow:hidden;">
         <div id="kanban-board"
              style="flex:1;overflow-x:auto;overflow-y:hidden;display:flex;align-items:stretch;gap:10px;padding:14px 16px;background:#030712;min-height:0;">
         </div>
