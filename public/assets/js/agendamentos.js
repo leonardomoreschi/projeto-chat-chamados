@@ -615,7 +615,7 @@ function cardKanban(item) {
     const horaFim = fim ? formatarHoraAgendamento(item.data_fim) : '';
     const temFim = horaFim && horaFim !== horaIni;
 
-        return `<button type="button" data-agendamento-id="${item.id}"
+    return `<button type="button" data-agendamento-id="${item.id}"
             style="background:#111827;border:1px solid #1f2937;border-radius:10px;overflow:hidden;cursor:pointer;text-align:left;width:100%;padding:0;display:flex;flex-direction:column;flex:0 0 auto;transition:border-color .15s,box-shadow .15s;min-height:60px;"
             onmouseover="this.style.borderColor='#4f46e5';this.style.boxShadow='0 0 0 1px #4f46e5';"
             onmouseout="this.style.borderColor='#1f2937';this.style.boxShadow='none';">
