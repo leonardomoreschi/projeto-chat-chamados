@@ -43,6 +43,7 @@ CREATE TABLE participantes (
     conversa_id INT UNSIGNED NOT NULL,
     usuario_id  INT UNSIGNED NOT NULL,
     entrou_em   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ultima_leitura TIMESTAMP NULL DEFAULT NULL,
     PRIMARY KEY (conversa_id, usuario_id),
     FOREIGN KEY (conversa_id) REFERENCES conversas(id) ON DELETE CASCADE,
     FOREIGN KEY (usuario_id)  REFERENCES usuarios(id)  ON DELETE CASCADE
