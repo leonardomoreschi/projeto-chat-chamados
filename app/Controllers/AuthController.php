@@ -38,7 +38,7 @@ class AuthController
         $_SESSION['user_papel'] = $usuario['papel'];
         session_write_close(); // grava antes de redirecionar
 
-        return $response->withHeader('Location', '/chat')->withStatus(302);
+        return $response->withHeader('Location', '/notificacoes')->withStatus(302);
     }
 
     public function logout(Request $request, Response $response): Response
