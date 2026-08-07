@@ -198,7 +198,7 @@ async function carregarConversas() {
     lista.forEach(function (c) {
         idsAtuais.add(Number(c.id));
         const isGrupo = c.tipo === 'grupo' || c.tipo === 'setor';
-        const icone = isGrupo ? '#' : c.nome.charAt(0).toUpperCase();
+        const icone = isGrupo ? '#' : (c.nome ? c.nome.charAt(0).toUpperCase() : '?');
         const cor = isGrupo ? 'bg-indigo-700' : 'bg-emerald-700';
         const badge = c.nao_lidas > 0 ? c.nao_lidas : '';
         const badgeHidden = c.nao_lidas > 0 ? '' : 'hidden';
