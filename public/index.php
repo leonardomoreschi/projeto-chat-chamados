@@ -149,14 +149,12 @@ $app->get('/dashboard-ti', function ($request, $response) {
 $app->get('/notificacoes', function ($request, $response) {
     $userName = $request->getAttribute('user_nome');
     $userId = (int) $request->getAttribute('user_id');
-    $userPapel = $request->getAttribute('user_papel');
     $notificationCount = NotificationCenter::contarNaoLidas(getDbConnection(), $userId);
     $notificacoes = NotificationCenter::listar(getDbConnection(), $userId, 100);
 
     return TemplateRenderer::render($response, __DIR__ . '/../templates/notificacoes.php', [
         'userName' => $userName,
         'userId' => $userId,
-        'userPapel' => $userPapel,
         'notificationCount' => $notificationCount,
         'notificacoes' => $notificacoes,
     ]);
