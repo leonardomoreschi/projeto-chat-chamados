@@ -16,10 +16,16 @@ RUN apk add --no-cache \
     && apk del $PHPIZE_DEPS \
     && rm -rf /var/cache/apk/*
 
+# 1. Copiar o executável do Composer da imagem oficial
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
+
 WORKDIR /var/www/html
 
-# Copiar código (será montado via volume em dev, copiado em prod)
+# Copiar código do projeto
 COPY --chown=www-data:www-data . .
+
+# 2. Instalar as dependências do Composer dentro da imagem
+RUN composer install --no-dev --optimize-autoloader --no-interaction
 
 # Copiar configuração do Supervisor
 COPY docker/php/supervisor.conf /etc/supervisor/conf.d/websocket.conf
