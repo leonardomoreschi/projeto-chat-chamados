@@ -8,6 +8,15 @@
     <link rel="stylesheet" href="/assets/css/light-mode.css">
     <script src="/assets/js/utils.js"></script>
     <script src="/assets/js/config.js"></script>
+    <script>
+        window.APP_USER = <?= json_encode([
+            'id' => (int) ($userId ?? 0),
+            'nome' => (string) ($userName ?? ''),
+            'papel' => (string) ($userPapel ?? 'usuario'),
+            'socketProprio' => true,
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    </script>
+    <script src="/assets/js/som-notificacoes.js"></script>
     <script src="/assets/js/notificacoes.js"></script>
     <style>
         html, body { height: 100%; overflow: hidden; }
@@ -28,6 +37,7 @@
 </head>
 <?php
 $agendamentosBootstrap = [
+    'currentUserId'   => (int) ($userId ?? 0),
     'currentUserName' => (string) ($userName ?? ''),
     'userPapel'       => (string) ($userPapel ?? 'usuario'),
     'mode'            => 'admin',

@@ -80,6 +80,48 @@ class NotificationCenter
         return self::buscarPorChave($pdo, $usuarioId, $chaveEvento);
     }
 
+    /**
+     * Registra a mesma notificação para todos os usuários dos papéis informados.
+     * A chave de evento recebe o id do destinatário, então o upsert continua
+     * idempotente por usuário. Retorna as notificações efetivamente criadas.
+     *
+     * @param string[] $papeis
+     * @param int[]    $excluirUsuarios destinatários que já receberam outro aviso do mesmo fato
+     */
+    public static function registrarParaPapeis(PDO $pdo, array $papeis, array $dados, array $excluirUsuarios = []): array
+    {
+        $papeis = array_values(array_unique(array_filter(array_map('strval', $papeis))));
+        if (!$papeis) {
+            return [];
+        }
+
+        $placeholders = implode(',', array_fill(0, count($papeis), '?'));
+        $stmt = $pdo->prepare("SELECT id FROM usuarios WHERE papel IN ({$placeholders})");
+        $stmt->execute($papeis);
+        $destinatarios = array_map('intval', array_column($stmt->fetchAll(PDO::FETCH_ASSOC), 'id'));
+
+        $excluir = array_map('intval', $excluirUsuarios);
+        $chaveBase = trim((string) ($dados['chave_evento'] ?? ''));
+        $criadas = [];
+
+        foreach ($destinatarios as $destinatarioId) {
+            if (in_array($destinatarioId, $excluir, true)) {
+                continue;
+            }
+
+            $notificacao = self::registrar($pdo, array_merge($dados, [
+                'usuario_id' => $destinatarioId,
+                'chave_evento' => $chaveBase !== '' ? ($chaveBase . ':' . $destinatarioId) : '',
+            ]));
+
+            if ($notificacao) {
+                $criadas[] = $notificacao;
+            }
+        }
+
+        return $criadas;
+    }
+
     public static function listar(PDO $pdo, int $usuarioId, int $limite = 50): array
     {
         if ($usuarioId <= 0) {

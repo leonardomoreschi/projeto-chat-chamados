@@ -500,9 +500,16 @@ window.CHAT_BOOTSTRAP = <?= json_encode([
     'userPapel' => (string) $userPapel,
     'isAdmin' => $userPapel === 'admin',
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+window.APP_USER = <?= json_encode([
+    'id' => (int) $userId,
+    'nome' => (string) $userName,
+    'papel' => (string) $userPapel,
+    'socketProprio' => true,
+], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
 <script src="/assets/js/theme.js"></script>
 <script src="/assets/js/anexos.js"></script>
+<script src="/assets/js/som-notificacoes.js"></script>
 <script src="/assets/js/notificacoes.js"></script>
 <script src="/assets/js/chat.js"></script>
 

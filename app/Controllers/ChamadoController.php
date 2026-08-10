@@ -14,6 +14,15 @@ class ChamadoController
 
     private const PRIORIDADES_VALIDAS = ['baixa', 'media', 'alta', 'critica'];
 
+    // Espelha os rótulos de status em public/assets/js/config.js
+    private const ROTULOS_STATUS_CHAMADO = [
+        'aberto' => 'aberto',
+        'classificado' => 'classificado',
+        'em_andamento' => 'em andamento',
+        'resolvido' => 'resolvido',
+        'cancelado' => 'cancelado',
+    ];
+
     // POST /api/chamados
     public function criar(Request $request, Response $response): Response
     {
@@ -59,6 +68,26 @@ class ChamadoController
                 'titulo' => $titulo,
             ],
         ]);
+
+        // Alerta em tempo real para quem atende: o WS entrega como
+        // notification_created no ciclo seguinte (<= 0,8s).
+        NotificationCenter::registrarParaPapeis($pdo, ['ti', 'admin'], [
+            'tipo' => 'chamado',
+            'evento' => 'novo_chamado',
+            'entidade' => 'chamado',
+            'entidade_id' => $chamadoId,
+            'chave_evento' => 'chamado:novo:' . $chamadoId,
+            'titulo' => 'Novo chamado de emergência',
+            'mensagem' => '#' . $chamadoId . ' — ' . $titulo,
+            'url' => '/dashboard-ti',
+            'status_destino' => 'aberto',
+            'metadados' => [
+                'chamado_id' => $chamadoId,
+                'titulo' => $titulo,
+                'prioridade' => $prioridade,
+                'solicitante_id' => (int) $userId,
+            ],
+        ], [(int) $userId]);
 
         // Processa anexos se existirem
         $anexosSalvos = [];
@@ -116,6 +145,65 @@ class ChamadoController
             'anexos'  => $anexosSalvos,
             'anexo_erros' => $anexosErros,
         ], 201);
+    }
+
+    /**
+     * Notifica uma movimentação do chamado para os dois lados: o dono (em
+     * /meus-chamados) e a equipe (em /dashboard-ti). Quem executou a ação nunca
+     * é notificado dela, e o dono nunca recebe a via da equipe em duplicidade.
+     *
+     * Chaves aceitas em $dados: evento, titulo, mensagem_dono, mensagem_gestor,
+     * autor_id, status_origem, status_destino, metadados, chave_base.
+     */
+    private function notificarMovimentacaoChamado(\PDO $pdo, int $chamadoId, array $dados): void
+    {
+        try {
+            $stmt = $pdo->prepare('SELECT usuario_id, titulo FROM chamados WHERE id = ? LIMIT 1');
+            $stmt->execute([$chamadoId]);
+            $chamado = $stmt->fetch(\PDO::FETCH_ASSOC);
+            if (!$chamado) {
+                return;
+            }
+
+            $donoId = (int) ($chamado['usuario_id'] ?? 0);
+            $autorId = (int) ($dados['autor_id'] ?? 0);
+            $evento = (string) ($dados['evento'] ?? '');
+            $chaveBase = (string) ($dados['chave_base'] ?? ('chamado:' . $evento . ':' . $chamadoId));
+
+            $base = [
+                'tipo' => 'chamado',
+                'evento' => $evento,
+                'entidade' => 'chamado',
+                'entidade_id' => $chamadoId,
+                'titulo' => (string) ($dados['titulo'] ?? ''),
+                'status_origem' => $dados['status_origem'] ?? null,
+                'status_destino' => $dados['status_destino'] ?? null,
+                'metadados' => array_merge([
+                    'chamado_id' => $chamadoId,
+                    'titulo' => (string) ($chamado['titulo'] ?? ''),
+                    'autor_id' => $autorId,
+                ], $dados['metadados'] ?? []),
+            ];
+
+            if ($donoId > 0 && $donoId !== $autorId && !empty($dados['mensagem_dono'])) {
+                NotificationCenter::registrar($pdo, array_merge($base, [
+                    'usuario_id' => $donoId,
+                    'chave_evento' => $chaveBase . ':' . $donoId,
+                    'mensagem' => (string) $dados['mensagem_dono'],
+                    'url' => '/meus-chamados',
+                ]));
+            }
+
+            if (!empty($dados['mensagem_gestor'])) {
+                NotificationCenter::registrarParaPapeis($pdo, ['ti', 'admin'], array_merge($base, [
+                    'chave_evento' => $chaveBase . ':gestor',
+                    'mensagem' => (string) $dados['mensagem_gestor'],
+                    'url' => '/dashboard-ti',
+                ]), [$autorId, $donoId]);
+            }
+        } catch (\Throwable $e) {
+            error_log('Falha ao notificar movimentacao de chamado: ' . $e->getMessage());
+        }
     }
 
     private function normalizarArquivosAnexos(array $files): array
@@ -255,6 +343,11 @@ class ChamadoController
 
         $pdo  = getDbConnection();
         $this->garantirColunaResolvidoPor($pdo);
+
+        $stmtAtual = $pdo->prepare('SELECT status FROM chamados WHERE id = ? LIMIT 1');
+        $stmtAtual->execute([$chamadoId]);
+        $statusAnterior = (string) ($stmtAtual->fetchColumn() ?: '');
+
         if ($novoStatus === 'resolvido' && $this->columnExists($pdo, 'chamados', 'resolvido_por')) {
             $stmt = $pdo->prepare("UPDATE chamados SET status = ?, resolvido_por = ?, atribuido_a = ? WHERE id = ?");
             $stmt->execute([$novoStatus, $userId, $userId, $chamadoId]);
@@ -266,6 +359,20 @@ class ChamadoController
                 $stmt = $pdo->prepare("UPDATE chamados SET status = ? WHERE id = ?");
                 $stmt->execute([$novoStatus, $chamadoId]);
             }
+        }
+
+        if ($novoStatus !== $statusAnterior) {
+            $rotulo = self::ROTULOS_STATUS_CHAMADO[$novoStatus] ?? $novoStatus;
+            $this->notificarMovimentacaoChamado($pdo, $chamadoId, [
+                'evento' => $novoStatus,
+                'chave_base' => 'chamado:' . $novoStatus . ':' . $chamadoId,
+                'titulo' => 'Chamado ' . $rotulo,
+                'mensagem_dono' => 'Seu chamado #' . $chamadoId . ' agora está ' . $rotulo . '.',
+                'mensagem_gestor' => 'Chamado #' . $chamadoId . ' agora está ' . $rotulo . '.',
+                'autor_id' => $userId,
+                'status_origem' => $statusAnterior !== '' ? $statusAnterior : null,
+                'status_destino' => $novoStatus,
+            ]);
         }
 
         return Json::json($response, ['ok' => true, 'status' => $novoStatus]);
@@ -317,6 +424,17 @@ class ChamadoController
                 'chamado_id' => $chamadoId,
                 'titulo' => (string) ($chamado['titulo'] ?? ''),
             ],
+        ]);
+
+        // O dono já recebeu o comprovante acima; aqui vai o aviso para a equipe.
+        $this->notificarMovimentacaoChamado($pdo, $chamadoId, [
+            'evento' => 'cancelado',
+            'chave_base' => 'chamado:cancelado:' . $chamadoId,
+            'titulo' => 'Chamado cancelado',
+            'mensagem_gestor' => 'Chamado #' . $chamadoId . ' foi cancelado pelo solicitante.',
+            'autor_id' => $userId,
+            'status_origem' => $statusAtual,
+            'status_destino' => 'cancelado',
         ]);
 
         return Json::json($response, ['ok' => true, 'status' => 'cancelado']);
@@ -458,6 +576,24 @@ class ChamadoController
         }
 
         $resultado = $this->salvarComentarioComAnexos($pdo, $chamadoId, $userId, $conteudo, $tipo, $anexos);
+
+        $resumo = $conteudo !== ''
+            ? mb_substr($conteudo, 0, 120) . (mb_strlen($conteudo) > 120 ? '…' : '')
+            : count($anexos) . ' anexo(s)';
+
+        // A chave usa o id do comentário: cada comentário novo notifica.
+        $this->notificarMovimentacaoChamado($pdo, $chamadoId, [
+            'evento' => $tipo === 'resolucao' ? 'comentario_resolucao' : 'comentario',
+            'chave_base' => 'chamado:comentario:' . (int) $resultado['comentario_id'],
+            'titulo' => 'Novo comentário no chamado',
+            'mensagem_dono' => 'A equipe comentou no seu chamado #' . $chamadoId . ': ' . $resumo,
+            'mensagem_gestor' => 'Novo comentário no chamado #' . $chamadoId . ': ' . $resumo,
+            'autor_id' => $userId,
+            'metadados' => [
+                'comentario_id' => (int) $resultado['comentario_id'],
+                'tipo_comentario' => $tipo,
+            ],
+        ]);
 
         return Json::json($response, [
             'ok' => true,
@@ -848,6 +984,23 @@ class ChamadoController
 
             $this->upsertTaxonomia($pdo, $categoria, $subcategoria);
 
+            $this->notificarMovimentacaoChamado($pdo, $id, [
+                'evento' => 'classificado',
+                'chave_base' => 'chamado:classificado:' . $id,
+                'titulo' => 'Chamado classificado',
+                'mensagem_dono' => 'Seu chamado #' . $id . ' foi classificado como ' . $categoria
+                    . ' / ' . $subcategoria . ' (prioridade ' . $prioridade . ').',
+                'mensagem_gestor' => 'Chamado #' . $id . ' classificado como ' . $categoria
+                    . ' / ' . $subcategoria . ' (prioridade ' . $prioridade . ').',
+                'autor_id' => (int) $request->getAttribute('user_id'),
+                'status_destino' => 'classificado',
+                'metadados' => [
+                    'prioridade' => $prioridade,
+                    'categoria' => $categoria,
+                    'subcategoria' => $subcategoria,
+                ],
+            ]);
+
             return Json::json($response, ['status' => 'success', 'message' => 'Classificado com sucesso']);
             
         } catch (\Exception $e) {
@@ -891,6 +1044,23 @@ class ChamadoController
                 $stmt = $pdo->prepare('UPDATE chamados SET prioridade = ? WHERE id = ?');
                 $stmt->execute([$prioridade, $id]);
             }
+
+            // A chave inclui a classificação: cada alteração distinta notifica de novo.
+            $this->notificarMovimentacaoChamado($pdo, $id, [
+                'evento' => 'classificacao_atualizada',
+                'chave_base' => 'chamado:classificacao:' . $id . ':' . $prioridade . ':' . $categoria . ':' . $subcategoria,
+                'titulo' => 'Classificação atualizada',
+                'mensagem_dono' => 'A classificação do seu chamado #' . $id . ' mudou para ' . $categoria
+                    . ' / ' . $subcategoria . ' (prioridade ' . $prioridade . ').',
+                'mensagem_gestor' => 'Chamado #' . $id . ' reclassificado para ' . $categoria
+                    . ' / ' . $subcategoria . ' (prioridade ' . $prioridade . ').',
+                'autor_id' => (int) $request->getAttribute('user_id'),
+                'metadados' => [
+                    'prioridade' => $prioridade,
+                    'categoria' => $categoria,
+                    'subcategoria' => $subcategoria,
+                ],
+            ]);
 
             return Json::json($response, ['status' => 'success', 'message' => 'Classificacao atualizada']);
         } catch (\Exception $e) {
@@ -1036,29 +1206,26 @@ class ChamadoController
             if ($this->columnExists($pdo, 'chamados', 'resolvido_por')) {
                 $stmtUp = $pdo->prepare("UPDATE chamados SET status = 'resolvido', resolvido_por = ?, atribuido_a = ? WHERE id = ?");
                 $stmtUp->execute([$finalizadorId, $finalizadorId, $id]);
-                NotificationCenter::registrar($pdo, [
-                    'usuario_id' => (int) $chamado['usuario_id'],
-                    'tipo' => 'chamado',
-                    'evento' => 'resolvido',
-                    'entidade' => 'chamado',
-                    'entidade_id' => $id,
-                    'chave_evento' => 'chamado:resolvido:' . $id . ':' . (int) $chamado['usuario_id'],
-                    'titulo' => 'Chamado resolvido',
-                    'mensagem' => 'Seu chamado #' . $id . ' foi finalizado pela equipe de TI.',
-                    'url' => '/meus-chamados',
-                    'status_origem' => (string) ($chamado['status'] ?? 'em_andamento'),
-                    'status_destino' => 'resolvido',
-                    'metadados' => [
-                        'chamado_id' => $id,
-                        'titulo' => (string) $chamado['titulo'],
-                        'finalizador_id' => $finalizadorId,
-                        'finalizador_nome' => $finalizadorNome,
-                    ],
-                ]);
             } else {
                 $stmtUp = $pdo->prepare("UPDATE chamados SET status = 'resolvido', atribuido_a = ? WHERE id = ?");
                 $stmtUp->execute([$finalizadorId, $id]);
             }
+
+            // Fora do if: antes, quem não tinha a coluna resolvido_por ficava sem aviso.
+            $this->notificarMovimentacaoChamado($pdo, $id, [
+                'evento' => 'resolvido',
+                'chave_base' => 'chamado:resolvido:' . $id,
+                'titulo' => 'Chamado resolvido',
+                'mensagem_dono' => 'Seu chamado #' . $id . ' foi finalizado por ' . $finalizadorNome . '.',
+                'mensagem_gestor' => 'Chamado #' . $id . ' foi finalizado por ' . $finalizadorNome . '.',
+                'autor_id' => $finalizadorId,
+                'status_origem' => (string) ($chamado['status'] ?? 'em_andamento'),
+                'status_destino' => 'resolvido',
+                'metadados' => [
+                    'finalizador_id' => $finalizadorId,
+                    'finalizador_nome' => $finalizadorNome,
+                ],
+            ]);
 
             if ($comentarioResolucao !== '' || !empty($anexosResolucao)) {
                 try {

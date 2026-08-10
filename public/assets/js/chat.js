@@ -73,6 +73,14 @@ function conectarWS() {
                 if (!data.message || !data.message.id) break;
                 if (document.querySelector('[data-msg-id="' + data.message.id + '"]')) break;
 
+                // Som só para mensagem de outro usuário e fora do replay que o
+                // servidor faz no auth (últimas 100 mensagens viram new_message).
+                if (wsSincronizacaoInicialConcluida
+                    && Number(data.message.usuario_id) !== CURRENT_USER_ID
+                    && window.SomNotificacoes) {
+                    window.SomNotificacoes.tocar('mensagem', 'msg:' + data.message.id);
+                }
+
                 // Se a mensagem é de uma conversa desconhecida, recarrega a lista
                 if (!document.querySelector('[data-conversa-id="' + data.message.conversa_id + '"]')) {
                     carregarConversas().catch(function () { });

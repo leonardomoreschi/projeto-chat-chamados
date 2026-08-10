@@ -83,6 +83,7 @@ $app->get('/painel-agendamentos', function ($request, $response) {
 
     return TemplateRenderer::render($response, __DIR__ . '/../templates/painel_agendamentos.php', [
         'userName' => $userName,
+        'userId' => $request->getAttribute('user_id'),
         'userPapel' => $userPapel,
         'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $request->getAttribute('user_id')),
     ]);
@@ -140,6 +141,7 @@ $app->get('/dashboard-ti', function ($request, $response) {
 
     return TemplateRenderer::render($response, __DIR__ . '/../templates/dashboard_ti.php', [
         'userName' => $userName,
+        'userId' => $request->getAttribute('user_id'),
         'userPapel' => $userPapel,
         'chamadosBootstrap' => $chamadosBootstrap,
         'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $request->getAttribute('user_id')),
@@ -155,6 +157,7 @@ $app->get('/notificacoes', function ($request, $response) {
     return TemplateRenderer::render($response, __DIR__ . '/../templates/notificacoes.php', [
         'userName' => $userName,
         'userId' => $userId,
+        'userPapel' => $request->getAttribute('user_papel'),
         'notificationCount' => $notificationCount,
         'notificacoes' => $notificacoes,
     ]);

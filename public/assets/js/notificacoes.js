@@ -6,7 +6,61 @@
     const state = {
         count: null,
         refreshTimer: null,
+        socket: null,
+        reconectarTimer: null,
+        idsProcessados: new Set(),
     };
+
+    function usuarioAtual() {
+        return window.APP_USER || {};
+    }
+
+    function papelAtual() {
+        return String(usuarioAtual().papel || '');
+    }
+
+    // Eventos que encerram algo sem sucesso ganham o timbre descendente.
+    const EVENTOS_CANCELAMENTO = ['cancelado', 'recusado'];
+
+    // Timbre por evento. O gate de papel é defesa em profundidade: o backend já
+    // só cria as notificações de novo_agendamento/novo_chamado para ti e admin.
+    function tipoSomDaNotificacao(notificacao) {
+        const evento = String(notificacao.evento || '');
+        const tipo = String(notificacao.tipo || '');
+        const gestor = papelAtual() === 'admin' || papelAtual() === 'ti';
+
+        // Item novo entrando na fila: timbre próprio, mais chamativo.
+        if (evento === 'novo_agendamento') {
+            return gestor ? 'agendamento' : null;
+        }
+        if (evento === 'novo_chamado') {
+            return gestor ? 'chamado' : null;
+        }
+        if (EVENTOS_CANCELAMENTO.indexOf(evento) !== -1) {
+            return 'cancelamento';
+        }
+
+        // Qualquer outra movimentação de chamado ou agendamento.
+        if (tipo === 'chamado' || tipo === 'agendamento') {
+            return 'atualizacao';
+        }
+
+        return 'geral';
+    }
+
+    function tocarSom(notificacao) {
+        if (!window.SomNotificacoes) return;
+
+        const tipoSom = tipoSomDaNotificacao(notificacao);
+        if (!tipoSom) return;
+
+        const id = Number(notificacao.id || 0);
+        const chave = id > 0
+            ? 'notif:' + id
+            : 'notif:' + String(notificacao.chave_evento || notificacao.titulo || '');
+
+        window.SomNotificacoes.tocar(tipoSom, chave);
+    }
 
     function badgeElements() {
         return Array.from(document.querySelectorAll('[data-notification-badge]'));
@@ -65,6 +119,16 @@
 
     function notificar(notificacao) {
         if (!notificacao) return;
+
+        // Uma notificação só é processada uma vez por aba, mesmo que chegue de
+        // dois caminhos (socket da página + socket deste módulo) ou reentrega.
+        const id = Number(notificacao.id || 0);
+        if (id > 0) {
+            if (state.idsProcessados.has(id)) return;
+            state.idsProcessados.add(id);
+        }
+
+        tocarSom(notificacao);
         updateBadgeDelta(1);
 
         if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
@@ -99,6 +163,51 @@
         }
     }
 
+    // Páginas com socket próprio (chat.js, agendamentos.js) marcam
+    // APP_USER.socketProprio e encaminham o evento por handleRealtimeNotification;
+    // as demais ganham aqui uma conexão mínima (auth + notification_created).
+    function conectarSocket() {
+        const usuario = usuarioAtual();
+        if (usuario.socketProprio || !usuario.id || !('WebSocket' in window)) {
+            return;
+        }
+        if (state.socket && (state.socket.readyState === WebSocket.OPEN || state.socket.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+
+        try {
+            state.socket = new WebSocket('ws://' + window.location.hostname + ':8080');
+        } catch (_) {
+            return;
+        }
+
+        state.socket.onopen = function () {
+            state.socket.send(JSON.stringify({
+                type: 'auth',
+                user_id: usuario.id,
+                user_nome: usuario.nome || '',
+                user_papel: usuario.papel || 'usuario',
+                conversa_id: 0,
+            }));
+        };
+
+        state.socket.onmessage = function (event) {
+            try {
+                const msg = JSON.parse(event.data);
+                if (msg.type === 'notification_created') {
+                    notificar(msg.notification);
+                }
+            } catch (_) {
+                // payload inesperado: ignora
+            }
+        };
+
+        state.socket.onclose = function () {
+            if (state.reconectarTimer) clearTimeout(state.reconectarTimer);
+            state.reconectarTimer = window.setTimeout(conectarSocket, 3000);
+        };
+    }
+
     function iniciar() {
         if (!badgeElements().length) {
             return;
@@ -108,7 +217,9 @@
         if (state.refreshTimer) {
             clearInterval(state.refreshTimer);
         }
+        // Rede de segurança: o socket é a via principal, o poll reconcilia o badge.
         state.refreshTimer = window.setInterval(fetchResumo, 30000);
+        conectarSocket();
     }
 
     document.addEventListener('DOMContentLoaded', iniciar);
@@ -121,5 +232,6 @@
         marcarComoLida: marcarComoLida,
         marcarTodasComoLidas: marcarTodasComoLidas,
         handleRealtimeNotification: notificar,
+        conectarSocket: conectarSocket,
     };
 })();

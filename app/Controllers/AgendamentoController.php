@@ -152,6 +152,29 @@ class AgendamentoController
                         'data_fim' => (string) $agendamento['data_fim'],
                     ]
                 );
+
+                // Aviso para quem administra a agenda — schedule_updated não
+                // serve como gatilho porque dispara em qualquer atualização.
+                NotificationCenter::registrarParaPapeis($pdo, ['ti', 'admin'], [
+                    'tipo' => 'agendamento',
+                    'evento' => 'novo_agendamento',
+                    'entidade' => 'agendamento',
+                    'entidade_id' => $id,
+                    'chave_evento' => 'agendamento:novo:' . $id,
+                    'titulo' => 'Novo agendamento solicitado',
+                    'mensagem' => (string) $agendamento['solicitante_nome'] . ' solicitou "'
+                        . (string) $agendamento['servico_nome'] . '".',
+                    'url' => '/painel-agendamentos',
+                    'status_destino' => 'solicitado',
+                    'metadados' => [
+                        'agendamento_id' => $id,
+                        'servico_nome' => (string) $agendamento['servico_nome'],
+                        'solicitante_id' => (int) $userId,
+                        'solicitante_nome' => (string) $agendamento['solicitante_nome'],
+                        'data_inicio' => (string) $agendamento['data_inicio'],
+                        'data_fim' => (string) $agendamento['data_fim'],
+                    ],
+                ], [(int) $userId]);
             }
 
             return Json::json($response, $agendamento, 201);
@@ -206,7 +229,8 @@ class AgendamentoController
                 [
                     'motivo_recusa' => $motivo,
                     'servico_nome' => (string) $agendamentoAtualizado['servico_nome'],
-                ]
+                ],
+                (int) $request->getAttribute('user_id')
             );
         }
 
@@ -250,7 +274,8 @@ class AgendamentoController
                 [
                     'motivo_cancelamento' => $motivo !== '' ? $motivo : null,
                     'servico_nome' => (string) $agendamentoAtualizado['servico_nome'],
-                ]
+                ],
+                $userId
             );
         }
 
@@ -298,7 +323,8 @@ class AgendamentoController
                     'realizado' => $realizado,
                     'observacao_fechamento' => $observacaoFechamento !== '' ? $observacaoFechamento : null,
                     'servico_nome' => (string) $agendamentoAtualizado['servico_nome'],
-                ]
+                ],
+                (int) $request->getAttribute('user_id')
             );
         }
 
@@ -451,7 +477,8 @@ class AgendamentoController
                     'servico_nome' => (string) $agendamentoAtualizado['servico_nome'],
                     'data_inicio' => (string) $agendamentoAtualizado['data_inicio'],
                     'data_fim' => (string) $agendamentoAtualizado['data_fim'],
-                ]
+                ],
+                (int) $request->getAttribute('user_id')
             );
         }
 
@@ -572,6 +599,15 @@ class AgendamentoController
         return $cor[0] === '#' ? $cor : ('#' . $cor);
     }
 
+    // Rótulo curto de cada movimentação, usado no aviso da equipe.
+    private const ROTULOS_EVENTO_AGENDAMENTO = [
+        'aprovado' => 'aprovado',
+        'cancelado' => 'cancelado',
+        'encerrado' => 'encerrado',
+        'atualizado' => 'atualizado',
+        'solicitado' => 'solicitado',
+    ];
+
     private function registrarNotificacaoAgendamento(
         \PDO $pdo,
         array $agendamento,
@@ -580,12 +616,15 @@ class AgendamentoController
         string $mensagem,
         string $statusDestino,
         ?string $statusOrigem = null,
-        array $metadados = []
+        array $metadados = [],
+        ?int $autorId = null
     ): void {
         $solicitanteId = (int) ($agendamento['solicitante_id'] ?? 0);
         if ($solicitanteId <= 0) {
             return;
         }
+
+        $this->notificarEquipeAgendamento($pdo, $agendamento, $evento, $titulo, $statusDestino, $statusOrigem, $metadados, $autorId);
 
         NotificationCenter::registrar($pdo, [
             'usuario_id' => $solicitanteId,
@@ -606,5 +645,59 @@ class AgendamentoController
                 'data_fim' => (string) ($agendamento['data_fim'] ?? ''),
             ], $metadados),
         ]);
+    }
+
+    /**
+     * Espelha a movimentação para ti/admin em /painel-agendamentos. Quem executou
+     * a ação e o próprio solicitante ficam de fora (este já recebe a via dele).
+     * O evento 'solicitado' é ignorado aqui: solicitar() já dispara o aviso
+     * dedicado de novo_agendamento para a equipe.
+     */
+    private function notificarEquipeAgendamento(
+        \PDO $pdo,
+        array $agendamento,
+        string $evento,
+        string $titulo,
+        string $statusDestino,
+        ?string $statusOrigem,
+        array $metadados,
+        ?int $autorId
+    ): void {
+        if ($evento === 'solicitado') {
+            return;
+        }
+
+        $agendamentoId = (int) ($agendamento['id'] ?? 0);
+        $solicitanteId = (int) ($agendamento['solicitante_id'] ?? 0);
+        if ($agendamentoId <= 0) {
+            return;
+        }
+
+        $rotulo = self::ROTULOS_EVENTO_AGENDAMENTO[$evento] ?? $evento;
+        $mensagem = 'Agendamento #' . $agendamentoId . ' de '
+            . (string) ($agendamento['solicitante_nome'] ?? 'solicitante')
+            . ' — "' . (string) ($agendamento['servico_nome'] ?? '') . '" foi ' . $rotulo . '.';
+
+        NotificationCenter::registrarParaPapeis($pdo, ['ti', 'admin'], [
+            'tipo' => 'agendamento',
+            'evento' => $evento,
+            'entidade' => 'agendamento',
+            'entidade_id' => $agendamentoId,
+            'chave_evento' => 'agendamento:' . $evento . ':' . $agendamentoId . ':gestor',
+            'titulo' => $titulo,
+            'mensagem' => $mensagem,
+            'url' => '/painel-agendamentos',
+            'status_origem' => $statusOrigem,
+            'status_destino' => $statusDestino,
+            'metadados' => array_merge([
+                'agendamento_id' => $agendamentoId,
+                'servico_nome' => (string) ($agendamento['servico_nome'] ?? ''),
+                'solicitante_id' => $solicitanteId,
+                'solicitante_nome' => (string) ($agendamento['solicitante_nome'] ?? ''),
+                'data_inicio' => (string) ($agendamento['data_inicio'] ?? ''),
+                'data_fim' => (string) ($agendamento['data_fim'] ?? ''),
+                'autor_id' => (int) ($autorId ?? 0),
+            ], $metadados),
+        ], [(int) ($autorId ?? 0), $solicitanteId]);
     }
 }
