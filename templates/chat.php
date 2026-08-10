@@ -210,7 +210,7 @@
                           d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13"/>
                 </svg>
             </button>
-            <input id="msg-file-input" type="file" multiple class="hidden" accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z,.mp3,.wav,.ogg,.m4a,.mp4,.mov,.webm" onchange="atualizarPreviewAnexoMensagem()">
+            <input id="msg-file-input" type="file" multiple class="hidden" accept=".jpg,.jpeg,.png,.gif,.webp,.bmp,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.csv,.zip,.rar,.7z,.mp3,.wav,.ogg,.m4a,.mp4,.mov,.webm">
             <button onclick="aplicarFormatacaoTexto('bold')" class="text-gray-400 hover:text-indigo-400 transition shrink-0 p-1 text-xs font-bold" title="Negrito">B</button>
             <button onclick="aplicarFormatacaoTexto('italic')" class="text-gray-400 hover:text-indigo-400 transition shrink-0 p-1 text-xs italic font-semibold" title="Itálico">I</button>
             <textarea id="msg-input" rows="1"
@@ -251,7 +251,7 @@
                 <button type="button" class="emoji-fallback-item hover:bg-gray-800 rounded p-1" data-emoji="❤️">❤️</button>
             </div>
         </div>
-        <div id="msg-file-preview" class="hidden mt-2 ml-1 px-3 py-2 bg-gray-800 border border-gray-700 rounded-xl text-xs text-gray-300"></div>
+        <div id="msg-anexos-lista" class="hidden mt-2 ml-1 space-y-2"></div>
         <p class="text-xs text-gray-600 mt-2 ml-1">Enter para enviar · Shift+Enter para nova linha</p>
     </div>
 </main>
@@ -300,8 +300,9 @@
                               d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
                     </svg>
                     <span id="label-anexo-chamado" class="text-sm text-gray-400">Clique para selecionar arquivos</span>
-                    <input id="input-anexo-chamado" type="file" multiple class="hidden" accept=".jpg,.jpeg,.png,.webp,.gif,.pdf,.doc,.docx,.txt,.step,.stp,.exe">
+                    <input id="input-anexo-chamado" type="file" multiple class="hidden" accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.heif,.pdf,.doc,.docx,.txt,.step,.stp,.exe">
                 </label>
+                <div id="chamado-anexos-lista" class="hidden mt-3 space-y-2"></div>
             </div>
         </div>
         <div class="flex gap-3 px-6 pb-6">
@@ -501,6 +502,7 @@ window.CHAT_BOOTSTRAP = <?= json_encode([
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
 <script src="/assets/js/theme.js"></script>
+<script src="/assets/js/anexos.js"></script>
 <script src="/assets/js/notificacoes.js"></script>
 <script src="/assets/js/chat.js"></script>
 

@@ -22,6 +22,24 @@ let wsSincronizacaoInicialConcluida = false;
 let emojiPicker = null;
 let emojiPickerVisivel = false;
 let emojiFallbackVisivel = false;
+let anexosMensagem = null;
+let anexosChamado = null;
+
+// Espelham as allowlists de ChatController::salvarArquivoMensagem e
+// ChamadoController::salvarAnexo — manter os três em sincronia.
+const EXTENSOES_ANEXO_MENSAGEM = [
+    'jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp',
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+    'txt', 'csv', 'zip', 'rar', '7z',
+    'mp3', 'wav', 'ogg', 'm4a', 'mp4', 'mov', 'webm',
+];
+const EXTENSOES_ANEXO_CHAMADO = [
+    'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif',
+    'pdf', 'doc', 'docx', 'txt',
+    'step', 'stp', 'exe',
+];
+const MAX_ANEXOS_MENSAGEM = 10; // limite validado em ChatController::enviarMensagem
+
 // ── WebSocket ─────────────────────────────────
 function conectarWS() {
     const host = window.location.hostname;
@@ -119,6 +137,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         configurarBusca();
         configurarNotificacoes();
         configurarAnexoChamado();
+        configurarAnexosMensagem();
         atualizarBadgePainelChamados();
         setInterval(atualizarBadgePainelChamados, 5000);
         document.addEventListener('visibilitychange', function () {
@@ -601,23 +620,25 @@ function parseDataServidorBrasilia(valorData) {
     return isNaN(fallback.getTime()) ? null : fallback;
 }
 
+function formatarErrosAnexo(lista) {
+    return lista.map(function (item) {
+        return '- ' + (item.arquivo || 'arquivo') + ': ' + (item.erro || 'erro desconhecido');
+    }).join('\n');
+}
+
 // ── Enviar mensagem ───────────────────────────
 function enviarMensagem() {
     if (!conversaAtualId) return;
     const input = document.getElementById('msg-input');
-    const fileInput = document.getElementById('msg-file-input');
-    const preview = document.getElementById('msg-file-preview');
     const texto = input.value.trim();
-    const arquivos = fileInput && fileInput.files ? Array.from(fileInput.files) : [];
-    if (!texto && arquivos.length === 0) return;
+    const temAnexos = anexosMensagem && !anexosMensagem.vazio();
+    if (!texto && !temAnexos) return;
 
-    if (arquivos.length > 0) {
+    if (temAnexos) {
         const formData = new FormData();
         formData.append('conversa_id', String(conversaAtualId));
         formData.append('conteudo', texto);
-        arquivos.forEach(function (arquivo) {
-            formData.append('arquivos[]', arquivo);
-        });
+        anexosMensagem.anexarEm(formData, 'arquivos[]');
 
         fetch('/api/mensagens', {
             method: 'POST',
@@ -632,13 +653,18 @@ function enviarMensagem() {
                 document.getElementById('messages').scrollTop = 99999;
                 input.value = '';
                 input.style.height = 'auto';
-                fileInput.value = '';
-                if (preview) {
-                    preview.textContent = '';
-                    preview.classList.add('hidden');
+                // Zera estado, DOM do input e as URLs de preview.
+                anexosMensagem.limpar();
+
+                if (Array.isArray(m.anexo_erros) && m.anexo_erros.length > 0) {
+                    alert('Mensagem enviada, mas alguns anexos falharam:\n' + formatarErrosAnexo(m.anexo_erros));
                 }
             } else {
-                alert(m.erro || 'Erro ao enviar arquivo');
+                // Falhou: os anexos continuam na lista para o usuário corrigir e reenviar.
+                const detalhes = Array.isArray(m.anexo_erros) && m.anexo_erros.length > 0
+                    ? '\n' + formatarErrosAnexo(m.anexo_erros)
+                    : '';
+                alert((m.erro || 'Erro ao enviar arquivo') + detalhes);
             }
         }).catch(function (e) {
             alert('Erro ao enviar arquivo: ' + e.message);
@@ -660,37 +686,6 @@ function enviarMensagem() {
     }
     input.value = '';
     input.style.height = 'auto';
-}
-
-function atualizarPreviewAnexoMensagem() {
-    const fileInput = document.getElementById('msg-file-input');
-    const preview = document.getElementById('msg-file-preview');
-    const msgInput = document.getElementById('msg-input');
-
-    if (!fileInput || !preview) return;
-
-    const arquivos = fileInput.files ? Array.from(fileInput.files) : [];
-    if (arquivos.length === 0) {
-        preview.textContent = '';
-        preview.classList.add('hidden');
-        return;
-    }
-
-    if (arquivos.length === 1) {
-        preview.textContent = 'Anexo selecionado: ' + arquivos[0].name;
-    } else {
-        const nomes = arquivos.slice(0, 3).map(function (arquivo) { return arquivo.name; }).join(', ');
-        const restante = arquivos.length > 3 ? ' e mais ' + (arquivos.length - 3) : '';
-        preview.textContent = arquivos.length + ' anexos: ' + nomes + restante;
-    }
-    preview.classList.remove('hidden');
-
-    // Garantir que o foco retorna para o textarea após selecionar arquivos
-    if (msgInput) {
-        setTimeout(function () {
-            msgInput.focus();
-        }, 50);
-    }
 }
 
 async function apagarMensagem(id) {
@@ -734,9 +729,6 @@ function mostrarTyping(nome) {
 }
 
 function handleEnter(e) {
-    // Se o arquivo está selecionado, não deixar que arquivo seja reenviado
-    const fileInput = document.getElementById('msg-file-input');
-
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         // Garantir que o foco está no textarea
@@ -914,12 +906,16 @@ function aplicarFormatacaoTexto(tipo) {
 
 // ── Emergência ────────────────────────────────
 function abrirEmergencia() { document.getElementById('modal-emergencia').classList.remove('hidden'); }
-function fecharEmergencia() { document.getElementById('modal-emergencia').classList.add('hidden'); }
+
+function fecharEmergencia() {
+    document.getElementById('modal-emergencia').classList.add('hidden');
+    // Fechar o modal descarta os anexos pendentes (estado, input e previews).
+    if (anexosChamado) anexosChamado.limpar();
+}
 
 async function enviarChamado() {
     const titulo = document.getElementById('chamado-titulo').value.trim();
     const descricao = document.getElementById('chamado-descricao').value.trim();
-    const fileInput = document.querySelector('#modal-emergencia input[type=file]');
     if (!titulo) { alert('Informe o título do problema.'); return; }
 
     const btnEnviar = document.getElementById('btn-enviar-chamado');
@@ -930,9 +926,7 @@ async function enviarChamado() {
         const formData = new FormData();
         formData.append('titulo', titulo);
         formData.append('descricao', descricao);
-        if (fileInput && fileInput.files.length > 0) {
-            Array.from(fileInput.files).forEach(function (f) { formData.append('anexos[]', f); });
-        }
+        if (anexosChamado) anexosChamado.anexarEm(formData, 'anexos[]');
 
         const res = await fetch('/api/chamados', { method: 'POST', body: formData });
         const data = await res.json();
@@ -940,7 +934,7 @@ async function enviarChamado() {
 
         document.getElementById('chamado-titulo').value = '';
         document.getElementById('chamado-descricao').value = '';
-        if (fileInput) fileInput.value = '';
+        // fecharEmergencia() limpa estado, input[type=file] e as URLs de preview.
         fecharEmergencia();
 
         const toast = document.createElement('div');
@@ -954,10 +948,7 @@ async function enviarChamado() {
         setTimeout(function () { toast.remove(); }, 8000);
 
         if (Array.isArray(data.anexo_erros) && data.anexo_erros.length > 0) {
-            const detalhes = data.anexo_erros.map(function (item) {
-                return '- ' + (item.arquivo || 'arquivo') + ': ' + (item.erro || 'erro desconhecido');
-            }).join('\n');
-            alert('Chamado aberto, mas alguns anexos falharam:\n' + detalhes);
+            alert('Chamado aberto, mas alguns anexos falharam:\n' + formatarErrosAnexo(data.anexo_erros));
         }
 
         atualizarBadgePainelChamados();
@@ -1299,26 +1290,42 @@ function configurarBusca() {
 }
 
 function configurarAnexoChamado() {
-    const input = document.getElementById('input-anexo-chamado');
     const label = document.getElementById('label-anexo-chamado');
-    if (!input || !label) return;
 
-    input.addEventListener('change', function () {
-        if (!input.files || input.files.length === 0) {
-            label.textContent = 'Clique para selecionar arquivos';
-            label.classList.remove('text-indigo-300', 'font-semibold');
-            label.classList.add('text-gray-400');
-            return;
-        }
+    anexosChamado = window.criarGerenciadorAnexos({
+        input: 'input-anexo-chamado',
+        lista: 'chamado-anexos-lista',
+        extensoes: EXTENSOES_ANEXO_CHAMADO,
+        aoMudar: function (estado) {
+            if (!label) return;
 
-        if (input.files.length === 1) {
-            label.textContent = 'Arquivo: ' + input.files[0].name;
-        } else {
-            label.textContent = input.files.length + ' arquivos selecionados';
-        }
+            if (estado.quantidade === 0) {
+                label.textContent = 'Clique para selecionar arquivos';
+                label.classList.remove('text-indigo-300', 'font-semibold');
+                label.classList.add('text-gray-400');
+                return;
+            }
 
-        label.classList.remove('text-gray-400');
-        label.classList.add('text-indigo-300', 'font-semibold');
+            label.textContent = estado.quantidade === 1
+                ? '1 arquivo selecionado'
+                : estado.quantidade + ' arquivos selecionados';
+            label.classList.remove('text-gray-400');
+            label.classList.add('text-indigo-300', 'font-semibold');
+        },
+    });
+}
+
+function configurarAnexosMensagem() {
+    anexosMensagem = window.criarGerenciadorAnexos({
+        input: 'msg-file-input',
+        lista: 'msg-anexos-lista',
+        extensoes: EXTENSOES_ANEXO_MENSAGEM,
+        maxArquivos: MAX_ANEXOS_MENSAGEM,
+        aoMudar: function () {
+            // Devolve o foco ao textarea depois de mexer nos anexos.
+            const msgInput = document.getElementById('msg-input');
+            if (msgInput) msgInput.focus();
+        },
     });
 }
 

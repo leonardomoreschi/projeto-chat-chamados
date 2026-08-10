@@ -135,6 +135,7 @@ class ChatController
         }
 
         $mensagensCriadas = [];
+        $anexoErros = [];
         $textoFoiUsado = false;
 
         foreach ($arquivos as $arquivo) {
@@ -142,11 +143,22 @@ class ChatController
                 continue;
             }
 
+            $nomeOriginal = (string) $arquivo->getClientFilename();
+
+            // Um anexo inválido não invalida os que já foram gravados: acumula
+            // o erro e devolve tudo junto (mesmo contrato de /api/chamados).
             if ($arquivo->getError() !== UPLOAD_ERR_OK) {
-                return Json::erro($response, 'Falha no upload do arquivo: ' . $arquivo->getClientFilename());
+                $anexoErros[] = ['arquivo' => $nomeOriginal, 'erro' => 'Falha no upload'];
+                continue;
             }
 
-            [$arquivoPath, $arquivoNome] = $this->salvarArquivoMensagem($arquivo, $conversaId);
+            try {
+                [$arquivoPath, $arquivoNome] = $this->salvarArquivoMensagem($arquivo, $conversaId);
+            } catch (\Throwable $e) {
+                $anexoErros[] = ['arquivo' => $nomeOriginal, 'erro' => $e->getMessage()];
+                continue;
+            }
+
             $conteudoMensagem = (!$textoFoiUsado && $conteudo !== '') ? $conteudo : '';
 
             $stmt = $pdo->prepare("INSERT INTO mensagens (conversa_id, usuario_id, conteudo, arquivo_path, arquivo_nome) VALUES (?, ?, ?, ?, ?)");
@@ -158,6 +170,14 @@ class ChatController
             }
         }
 
+        // Todos os anexos falharam e não havia texto: nada a gravar.
+        if (count($mensagensCriadas) === 0 && $conteudo === '') {
+            return Json::json($response, [
+                'erro' => 'Nenhum anexo pôde ser enviado',
+                'anexo_erros' => $anexoErros,
+            ], 400);
+        }
+
         if (count($mensagensCriadas) === 0 || ($conteudo !== '' && !$textoFoiUsado)) {
             $stmt = $pdo->prepare("INSERT INTO mensagens (conversa_id, usuario_id, conteudo, arquivo_path, arquivo_nome) VALUES (?, ?, ?, NULL, NULL)");
             $stmt->execute([$conversaId, $userId, $conteudo]);
@@ -165,11 +185,14 @@ class ChatController
             $mensagensCriadas[] = $this->buscarMensagemPorId($pdo, $msgId);
         }
 
-        if (count($mensagensCriadas) === 1) {
+        if (count($mensagensCriadas) === 1 && count($anexoErros) === 0) {
             return Json::json($response, $mensagensCriadas[0], 201);
         }
 
-        return Json::json($response, ['mensagens' => $mensagensCriadas], 201);
+        return Json::json($response, [
+            'mensagens' => $mensagensCriadas,
+            'anexo_erros' => $anexoErros,
+        ], 201);
     }
 
     // DELETE /api/mensagens/{id}
