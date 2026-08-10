@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login — Chat Interno</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/assets/css/light-mode.css">
+    <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
     <style>
         #neat-gradient {
             position: fixed;
@@ -81,7 +81,7 @@
     <p class="text-center text-gray-600 text-xs mt-6">Chat Interno &copy; <?= date('Y') ?></p>
 </div>
 
-<script src="/assets/js/theme.js"></script>
+<script src="<?= asset('/assets/js/theme.js') ?>"></script>
 <script type="module">
 import { NeatGradient } from "https://esm.sh/@firecms/neat@latest";
 

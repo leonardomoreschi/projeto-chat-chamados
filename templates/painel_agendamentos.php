@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Painel de Agendamentos — Chat Interno</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/assets/css/light-mode.css">
-    <script src="/assets/js/utils.js"></script>
-    <script src="/assets/js/config.js"></script>
+    <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
+    <script src="<?= asset('/assets/js/utils.js') ?>"></script>
+    <script src="<?= asset('/assets/js/config.js') ?>"></script>
     <script>
         window.APP_USER = <?= json_encode([
             'id' => (int) ($userId ?? 0),
@@ -16,8 +16,8 @@
             'socketProprio' => true,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
-    <script src="/assets/js/som-notificacoes.js"></script>
-    <script src="/assets/js/notificacoes.js"></script>
+    <script src="<?= asset('/assets/js/som-notificacoes.js') ?>"></script>
+    <script src="<?= asset('/assets/js/notificacoes.js') ?>"></script>
     <style>
         html, body { height: 100%; overflow: hidden; }
         body { display: flex; flex-direction: column; }
@@ -323,7 +323,7 @@ $agendamentosBootstrap = [
 <script>
     window.AGENDAMENTO_BOOTSTRAP = <?= json_encode($agendamentosBootstrap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
-<script src="/assets/js/theme.js"></script>
-<script src="/assets/js/agendamentos.js"></script>
+<script src="<?= asset('/assets/js/theme.js') ?>"></script>
+<script src="<?= asset('/assets/js/agendamentos.js') ?>"></script>
 </body>
 </html>

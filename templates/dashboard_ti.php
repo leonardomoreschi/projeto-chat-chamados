@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard TI - Gestão de Chamados</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/assets/css/light-mode.css">
-    <script src="/assets/js/utils.js"></script>
-    <script src="/assets/js/config.js"></script>
+    <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
+    <script src="<?= asset('/assets/js/utils.js') ?>"></script>
+    <script src="<?= asset('/assets/js/config.js') ?>"></script>
     <script>
         window.APP_USER = <?= json_encode([
             'id' => (int) ($userId ?? 0),
@@ -16,8 +16,8 @@
             'socketProprio' => false,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
-    <script src="/assets/js/som-notificacoes.js"></script>
-    <script src="/assets/js/notificacoes.js"></script>
+    <script src="<?= asset('/assets/js/som-notificacoes.js') ?>"></script>
+    <script src="<?= asset('/assets/js/notificacoes.js') ?>"></script>
 </head>
 <body class="page-dashboard-ti bg-gray-950 text-white h-screen flex flex-col overflow-hidden">
 <?php $chamadosBootstrap = $chamadosBootstrap ?? []; ?>
@@ -339,10 +339,10 @@
             <div id="lista-taxonomias" class="max-h-80 overflow-y-auto space-y-2"></div>
         </div>
     </div>
-    <script src="/assets/js/theme.js"></script>
+    <script src="<?= asset('/assets/js/theme.js') ?>"></script>
     <script>
         window.DASHBOARD_TI_BOOTSTRAP = <?= json_encode($chamadosBootstrap ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
-    <script src="/assets/js/dashboard-ti.js"></script>
+    <script src="<?= asset('/assets/js/dashboard-ti.js') ?>"></script>
 </body>
 </html>

@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Admin — Chat Interno</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="stylesheet" href="/assets/css/light-mode.css">
+    <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
     <style>
     </style>
 </head>
@@ -237,7 +237,7 @@
     </div>
 </div>
 
-<script src="/assets/js/admin.js"></script>
-<script src="/assets/js/theme.js"></script>
+<script src="<?= asset('/assets/js/admin.js') ?>"></script>
+<script src="<?= asset('/assets/js/theme.js') ?>"></script>
 </body>
 </html>

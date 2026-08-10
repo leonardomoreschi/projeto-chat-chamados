@@ -6,9 +6,9 @@
     <title>Relatório de Chamados</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <link rel="stylesheet" href="/assets/css/light-mode.css">
-    <script src="/assets/js/utils.js"></script>
-    <script src="/assets/js/config.js"></script>
+    <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
+    <script src="<?= asset('/assets/js/utils.js') ?>"></script>
+    <script src="<?= asset('/assets/js/config.js') ?>"></script>
 </head>
 <body class="page-relatorio-chamados bg-gray-950 text-white min-h-screen">
     <header class="sticky top-0 z-30 bg-gray-900/70 backdrop-blur border-b border-gray-800">
@@ -155,9 +155,9 @@
         </section>
     </main>
 
-    <script src="/assets/js/theme.js"></script>
+    <script src="<?= asset('/assets/js/theme.js') ?>"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
-    <script src="/assets/js/relatorio-chamados.js"></script>
+    <script src="<?= asset('/assets/js/relatorio-chamados.js') ?>"></script>
 </body>
 </html>

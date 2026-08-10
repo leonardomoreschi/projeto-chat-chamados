@@ -6,9 +6,9 @@
     <title>Chat Interno</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script type="module" src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.min.js"></script>
-    <link rel="stylesheet" href="/assets/css/light-mode.css">
-    <script src="/assets/js/utils.js"></script>
-    <script src="/assets/js/config.js"></script>
+    <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
+    <script src="<?= asset('/assets/js/utils.js') ?>"></script>
+    <script src="<?= asset('/assets/js/config.js') ?>"></script>
     <script>
         document.documentElement.classList.add('chat-loading');
     </script>
@@ -507,11 +507,11 @@ window.APP_USER = <?= json_encode([
     'socketProprio' => true,
 ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
-<script src="/assets/js/theme.js"></script>
-<script src="/assets/js/anexos.js"></script>
-<script src="/assets/js/som-notificacoes.js"></script>
-<script src="/assets/js/notificacoes.js"></script>
-<script src="/assets/js/chat.js"></script>
+<script src="<?= asset('/assets/js/theme.js') ?>"></script>
+<script src="<?= asset('/assets/js/anexos.js') ?>"></script>
+<script src="<?= asset('/assets/js/som-notificacoes.js') ?>"></script>
+<script src="<?= asset('/assets/js/notificacoes.js') ?>"></script>
+<script src="<?= asset('/assets/js/chat.js') ?>"></script>
 
 </body>
 </html>
