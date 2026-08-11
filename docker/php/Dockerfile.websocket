@@ -3,16 +3,23 @@ FROM php:8.3-cli-alpine
 LABEL description="Ratchet WebSocket Server com auto-restart"
 
 # Instalar extensões necessárias + Supervisor
+# mbstring e gmp entram por causa do minishlink/web-push: o primeiro é
+# requisito da lib (e do composer install), o segundo acelera a matemática
+# ECDH da criptografia do payload. curl e openssl já vêm na imagem oficial.
 RUN apk add --no-cache \
     supervisor \
     mysql-client \
     netcat-openbsd \
     linux-headers \
+    oniguruma-dev \
+    gmp-dev \
     $PHPIZE_DEPS \
     && docker-php-ext-install -j$(nproc) \
         pdo_mysql \
         sockets \
         pcntl \
+        mbstring \
+        gmp \
     && apk del $PHPIZE_DEPS \
     && rm -rf /var/cache/apk/*
 

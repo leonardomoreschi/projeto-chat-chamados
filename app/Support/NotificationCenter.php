@@ -77,7 +77,21 @@ class NotificationCenter
             $jsonMetadados,
         ]);
 
-        return self::buscarPorChave($pdo, $usuarioId, $chaveEvento);
+        $linha = self::buscarPorChave($pdo, $usuarioId, $chaveEvento);
+
+        // Ponto único de saída para o Web Push: cobre os oito call sites de
+        // registrar()/registrarParaPapeis() sem repetir regra. O enqueue é
+        // idempotente pela chave 'notif:{id}', então o upsert acima (que devolve
+        // sempre o mesmo id) não gera um segundo push.
+        if ($linha) {
+            try {
+                PushCenter::enfileirarDeNotificacao($pdo, $linha);
+            } catch (\Throwable $e) {
+                error_log('Falha ao enfileirar push da notificação: ' . $e->getMessage());
+            }
+        }
+
+        return $linha;
     }
 
     /**

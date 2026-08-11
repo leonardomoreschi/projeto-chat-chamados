@@ -23,6 +23,7 @@ use App\Controllers\ChamadoController;
 use App\Controllers\AdminController;
 use App\Controllers\AgendamentoController;
 use App\Controllers\NotificacaoController;
+use App\Controllers\PushController;
 use App\Middleware\AuthMiddleware;
 use App\Middleware\AdminMiddleware;
 use App\Support\NotificationCenter;
@@ -191,6 +192,12 @@ $app->group('/api', function ($group) {
     $group->get('/notificacoes/resumo', [NotificacaoController::class, 'resumo']);
     $group->patch('/notificacoes/{id}/lida', [NotificacaoController::class, 'marcarComoLida']);
     $group->patch('/notificacoes/lida', [NotificacaoController::class, 'marcarTodasComoLidas']);
+
+    // Web Push (Service Worker + VAPID)
+    $group->get('/push/chave-publica', [PushController::class, 'chavePublica']);
+    $group->get('/push/status', [PushController::class, 'status']);
+    $group->post('/push/inscrever', [PushController::class, 'inscrever']);
+    $group->delete('/push/inscrever', [PushController::class, 'desinscrever']);
 
     // Conversas
     $group->post('/conversas',                              [ChatController::class, 'criarConversa']);

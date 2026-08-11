@@ -241,3 +241,50 @@ ALTER TABLE mensagens
 ADD COLUMN IF NOT EXISTS excluida_em TIMESTAMP NULL DEFAULT NULL AFTER arquivo_nome,
 ADD COLUMN IF NOT EXISTS excluida_por INT UNSIGNED NULL AFTER excluida_em,
 ADD CONSTRAINT fk_mensagens_excluida_por FOREIGN KEY (excluida_por) REFERENCES usuarios(id) ON DELETE SET NULL;
+
+-- ============================================
+-- Web Push (Service Worker + VAPID)
+-- ============================================
+
+-- Um endpoint por navegador/perfil. O UNIQUE em endpoint permite que a mesma
+-- máquina troque de dono (login de outro usuário) sem duplicar a linha.
+CREATE TABLE IF NOT EXISTS push_subscriptions (
+    id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    usuario_id    INT UNSIGNED NOT NULL,
+    endpoint      VARCHAR(512) NOT NULL,
+    p256dh        VARCHAR(255) NOT NULL,
+    auth          VARCHAR(255) NOT NULL,
+    user_agent    VARCHAR(255) NULL,
+    falhas        TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    criado_em     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ultimo_uso_em TIMESTAMP NULL DEFAULT NULL,
+    UNIQUE KEY uniq_push_subscriptions_endpoint (endpoint),
+    INDEX idx_push_subscriptions_usuario (usuario_id),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Outbox. Produtores (FPM e ChatServer) só fazem INSERT; o bin/push-worker.php
+-- é o único que fala com FCM/Mozilla. chave_dedupe UNIQUE torna o enqueue
+-- idempotente, inclusive quando NotificationCenter::registrar faz upsert.
+CREATE TABLE IF NOT EXISTS push_fila (
+    id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    usuario_id     INT UNSIGNED NOT NULL,
+    origem         ENUM('notificacao','mensagem','sistema') NOT NULL DEFAULT 'sistema',
+    notificacao_id INT UNSIGNED NULL,
+    chave_dedupe   VARCHAR(190) NOT NULL,
+    titulo         VARCHAR(255) NOT NULL,
+    corpo          VARCHAR(500) NOT NULL,
+    url            VARCHAR(255) NULL,
+    tag            VARCHAR(120) NULL,
+    status         ENUM('pendente','processando','enviado','descartado','falha') NOT NULL DEFAULT 'pendente',
+    tentativas     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+    ultimo_erro    VARCHAR(255) NULL,
+    disponivel_em  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    criado_em      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    processado_em  TIMESTAMP NULL DEFAULT NULL,
+    UNIQUE KEY uniq_push_fila_dedupe (chave_dedupe),
+    INDEX idx_push_fila_status_disponivel (status, disponivel_em, id),
+    INDEX idx_push_fila_criado (criado_em),
+    FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+    FOREIGN KEY (notificacao_id) REFERENCES notificacoes(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

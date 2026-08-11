@@ -8,7 +8,8 @@
         "slim/slim": "4.*",
         "slim/psr7": "^1.8",
         "vlucas/phpdotenv": "^5.6",
-        "cboden/ratchet": "^0.4.4"
+        "cboden/ratchet": "^0.4.4",
+        "minishlink/web-push": "^9.0"
     },
     "autoload": {
         "psr-4": {
@@ -18,7 +19,8 @@
     "config": {
         "optimize-autoloader": true,
         "platform": {
-            "php": "8.1.34"
+            "php": "8.1.34",
+            "ext-curl": "8.1.34"
         }
     }
 }

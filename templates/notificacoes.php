@@ -6,6 +6,8 @@
     <title>Notificações</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#4f46e5">
     <script src="<?= asset('/assets/js/utils.js') ?>"></script>
     <script src="<?= asset('/assets/js/config.js') ?>"></script>
     <script>
@@ -18,6 +20,7 @@
     </script>
     <script src="<?= asset('/assets/js/som-notificacoes.js') ?>"></script>
     <script src="<?= asset('/assets/js/notificacoes.js') ?>"></script>
+    <script src="<?= asset('/assets/js/push.js') ?>"></script>
 </head>
 <?php
 $notificacoes = $notificacoes ?? [];
@@ -35,6 +38,27 @@ $naoLidas = (int) ($notificationCount ?? 0);
                         </div>
                         <h1 class="text-2xl md:text-4xl font-black text-white">Notificações</h1>
                         <p class="text-sm text-gray-400 mt-2 max-w-2xl">Suas notificações recentes</p>
+                    </div>
+                </div>
+
+                <div class="rounded-2xl border border-gray-800 bg-gray-900/70 p-5">
+                    <h2 class="text-sm font-black uppercase tracking-widest text-indigo-300">Notificações no dispositivo</h2>
+                    <p class="mt-2 text-sm text-gray-400 max-w-2xl">
+                        Receba um aviso do sistema operacional quando chegar uma mensagem ou uma atualização de chamado,
+                        mesmo com a aba do chat fechada.
+                    </p>
+                    <div class="mt-4 flex flex-wrap items-center gap-3">
+                        <button
+                            type="button"
+                            data-push-toggle
+                            class="hidden px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold border border-indigo-500 hover:bg-indigo-500 transition disabled:opacity-50 disabled:cursor-not-allowed">
+                            <span data-push-texto>Ativar notificações</span>
+                        </button>
+                        <!-- push.js revela este aviso quando a origem não é segura (HTTP na LAN). -->
+                        <p data-push-inseguro class="hidden text-xs text-amber-300 max-w-xl">
+                            Disponível apenas em <strong>localhost</strong> ou HTTPS. Ao acessar o sistema pelo IP da rede,
+                            o navegador desativa notificações em segundo plano — ver <code>docs/push-web-producao-tls.md</code>.
+                        </p>
                     </div>
                 </div>
             </div>

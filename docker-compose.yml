@@ -75,6 +75,12 @@ services:
       DB_PASS: ${DB_PASS}
       UPLOAD_MAX_SIZE: ${UPLOAD_MAX_SIZE}
       UPLOAD_ALLOWED: ${UPLOAD_ALLOWED}
+      # Atenção: o PHP-FPM roda com clear_env=yes, então estas variáveis NÃO
+      # chegam ao $_ENV da aplicação — as chaves precisam estar no arquivo .env.
+      # Ficam aqui como documentação e para o entrypoint.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       TZ: America/Sao_Paulo
     volumes:
       - ./:/var/www/html:delegated
@@ -129,6 +135,12 @@ services:
       DB_NAME: ${DB_NAME}
       DB_USER: ${DB_USER}
       DB_PASS: ${DB_PASS}
+      # Usadas pelo bin/push-worker.php, que roda neste container ao lado do
+      # Ratchet. Como o worker é CLI, aqui elas chegam de fato ao processo —
+      # ainda assim o .env é a fonte canônica (Dotenv::createImmutable).
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
       TZ: America/Sao_Paulo
     volumes:
       - ./:/var/www/html:delegated

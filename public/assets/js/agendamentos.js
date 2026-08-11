@@ -932,7 +932,7 @@ function prepararAgenda() {
 // ── WebSocket ───────────────────────────────────────────────────────────────
 function conectarWSAgendamentos() {
     try {
-        wsAgendamentos = new WebSocket(`ws://${location.hostname}:8080`);
+        wsAgendamentos = new WebSocket(window.urlWebSocket());
         wsAgendamentos.onopen = () => wsAgendamentos.send(JSON.stringify({
             type: 'auth', user_id: AG_USER_ID, user_nome: AG_USER_NAME, user_papel: AG_USER_PAPEL, conversa_id: 0,
         }));

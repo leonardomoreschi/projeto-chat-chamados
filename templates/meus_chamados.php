@@ -6,6 +6,8 @@
     <title>Meus Chamados</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#4f46e5">
     <script src="<?= asset('/assets/js/utils.js') ?>"></script>
     <script src="<?= asset('/assets/js/config.js') ?>"></script>
     <script>
@@ -18,6 +20,7 @@
     </script>
     <script src="<?= asset('/assets/js/som-notificacoes.js') ?>"></script>
     <script src="<?= asset('/assets/js/notificacoes.js') ?>"></script>
+    <script src="<?= asset('/assets/js/push.js') ?>"></script>
 </head>
 <body class="page-meus-chamados bg-gray-950 text-white min-h-screen">
 <?php $chamadosUsuario = $chamadosUsuario ?? []; ?>
@@ -37,6 +40,13 @@
                     <a href="/notificacoes" class="relative px-4 py-2 rounded-xl bg-gray-800 text-gray-300 text-sm font-bold border border-gray-700 hover:bg-gray-700 transition">Notificações
                         <span data-notification-badge class="<?= (($notificationCount ?? 0) > 0) ? '' : 'hidden' ?> absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-indigo-500 border border-gray-900 text-[10px] font-black text-white text-center leading-4"><?= (int) ($notificationCount ?? 0) ?></span>
                     </a>
+                    <button type="button" data-push-toggle title="Ativar notificações"
+                        class="hidden relative w-9 h-9 rounded-xl bg-gray-800 border border-gray-700 text-gray-400 hover:text-white hover:bg-gray-700 transition items-center justify-center flex disabled:opacity-40 disabled:cursor-not-allowed data-[push-estado=ativo]:text-indigo-300 data-[push-estado=ativo]:border-indigo-500/40">
+                        <span data-push-texto class="sr-only">Ativar notificações</span>
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" aria-hidden="true">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.4-1.4A2 2 0 0 1 18 14.2V11a6 6 0 1 0-12 0v3.2a2 2 0 0 1-.6 1.4L4 17h5m6 0a3 3 0 1 1-6 0"/>
+                        </svg>
+                    </button>
                     <button data-tab="abertos" class="tab-btn px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold">Abertos</button>
                     <button data-tab="resolvidos" class="tab-btn px-4 py-2 rounded-xl bg-gray-800 text-gray-300 text-sm font-bold border border-gray-700">Resolvidos</button>
                     <button data-tab="cancelados" class="tab-btn px-4 py-2 rounded-xl bg-gray-800 text-gray-300 text-sm font-bold border border-gray-700">Cancelados</button>

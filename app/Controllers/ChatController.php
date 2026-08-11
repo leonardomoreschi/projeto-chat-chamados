@@ -5,6 +5,7 @@ namespace App\Controllers;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use App\Helpers\Response as Json;
+use App\Support\PushCenter;
 use App\Support\SchemaInspector;
 
 class ChatController
@@ -185,6 +186,18 @@ class ChatController
             $mensagensCriadas[] = $this->buscarMensagemPorId($pdo, $msgId);
         }
 
+        // Uma notificação só para o envio inteiro, mesmo com vários anexos.
+        // O caminho WS (ChatServer::send_message) faz o equivalente para texto.
+        $this->enfileirarPushMensagem(
+            $pdo,
+            $conversaId,
+            (int) $userId,
+            (string) $request->getAttribute('user_nome'),
+            (int) ($mensagensCriadas[count($mensagensCriadas) - 1]['id'] ?? 0),
+            $conteudo,
+            count($mensagensCriadas)
+        );
+
         if (count($mensagensCriadas) === 1 && count($anexoErros) === 0) {
             return Json::json($response, $mensagensCriadas[0], 201);
         }
@@ -193,6 +206,51 @@ class ChatController
             'mensagens' => $mensagensCriadas,
             'anexo_erros' => $anexoErros,
         ], 201);
+    }
+
+    /**
+     * Push para os participantes ausentes de uma conversa.
+     *
+     * Não cria linha em `notificacoes` de propósito: mensagem de chat aparece
+     * como popup do SO, mas não entra na central nem no contador do sino.
+     */
+    private function enfileirarPushMensagem(
+        \PDO $pdo,
+        int $conversaId,
+        int $autorId,
+        string $autorNome,
+        int $mensagemId,
+        string $conteudo,
+        int $quantidade
+    ): void {
+        if ($mensagemId <= 0) {
+            return;
+        }
+
+        try {
+            $stmt = $pdo->prepare('SELECT usuario_id FROM participantes WHERE conversa_id = ? AND usuario_id <> ?');
+            $stmt->execute([$conversaId, $autorId]);
+            $destinatarios = array_map('intval', array_column($stmt->fetchAll(\PDO::FETCH_ASSOC), 'usuario_id'));
+
+            if (!$destinatarios) {
+                return;
+            }
+
+            $corpo = $conteudo !== ''
+                ? mb_substr($conteudo, 0, 140)
+                : ($quantidade > 1 ? "Enviou {$quantidade} anexos" : 'Enviou um anexo');
+
+            PushCenter::enfileirarParaUsuarios($pdo, $destinatarios, [
+                'origem'     => 'mensagem',
+                'chave_base' => 'msg:' . $mensagemId,
+                'titulo'     => 'Nova mensagem de ' . ($autorNome !== '' ? $autorNome : 'Contato'),
+                'corpo'      => $corpo,
+                'url'        => '/chat?conversa=' . $conversaId,
+                'tag'        => 'conversa:' . $conversaId,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('Falha ao enfileirar push de mensagem: ' . $e->getMessage());
+        }
     }
 
     // DELETE /api/mensagens/{id}

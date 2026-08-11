@@ -42,8 +42,9 @@ const MAX_ANEXOS_MENSAGEM = 10; // limite validado em ChatController::enviarMens
 
 // ── WebSocket ─────────────────────────────────
 function conectarWS() {
-    const host = window.location.hostname;
-    ws = new WebSocket('ws://' + host + ':8080');
+    // urlWebSocket (utils.js) resolve ws:// hoje e wss:// quando a página for
+    // servida por HTTPS, sem mexer aqui.
+    ws = new WebSocket(window.urlWebSocket());
 
     ws.onopen = function () {
         console.log('WebSocket conectado!');
@@ -143,7 +144,6 @@ document.addEventListener('DOMContentLoaded', async function () {
         await abrirConversaViaUrl();
         carregarUsuarios();
         configurarBusca();
-        configurarNotificacoes();
         configurarAnexoChamado();
         configurarAnexosMensagem();
         atualizarBadgePainelChamados();
@@ -1337,13 +1337,6 @@ function configurarAnexosMensagem() {
     });
 }
 
-function configurarNotificacoes() {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-        Notification.requestPermission().catch(() => { });
-    }
-}
-
 function notificarMensagem(titulo, corpo) {
     if (!('Notification' in window)) return;
     if (document.hasFocus()) {
@@ -1359,8 +1352,10 @@ function notificarMensagem(titulo, corpo) {
 function mostrarToastNotificacao(titulo, corpo) {
     const toast = document.createElement('div');
     toast.className = 'fixed bottom-6 right-6 bg-gray-800 border border-indigo-500/30 text-white rounded-2xl p-4 shadow-2xl z-50 max-w-sm';
-    toast.innerHTML = '<p class="font-semibold text-indigo-300 text-sm">' + titulo + '</p>'
-        + '<p class="text-gray-300 text-xs mt-1">' + corpo + '</p>';
+    // titulo e corpo carregam texto de outro usuário (nome e conteúdo da
+    // mensagem): sem escapar, uma mensagem com HTML executaria aqui.
+    toast.innerHTML = '<p class="font-semibold text-indigo-300 text-sm">' + window.escapeHtml(titulo) + '</p>'
+        + '<p class="text-gray-300 text-xs mt-1">' + window.escapeHtml(corpo) + '</p>';
     document.body.appendChild(toast);
     setTimeout(function () { toast.remove(); }, 4500);
 }

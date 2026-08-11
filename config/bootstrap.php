@@ -13,6 +13,7 @@ function bootstrapDefaultData(): void
     try {
         ensureUniqueSectorNames($pdo);
         ensureNotificationsSchema($pdo);
+        ensurePushSchema($pdo);
         ensureParticipantsSchema($pdo);
         ensureAgendamentoSchema($pdo);
         seedDefaultServices($pdo);
@@ -245,6 +246,73 @@ function ensureAgendamentosEmAvaliacaoColumns(PDO $pdo): void
 function ensureNotificationsSchema(PDO $pdo): void
 {
     $pdo->exec("\n        CREATE TABLE IF NOT EXISTS notificacoes (\n            id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n            usuario_id     INT UNSIGNED NOT NULL,\n            tipo           ENUM('chamado','agendamento','sistema') NOT NULL DEFAULT 'sistema',\n            evento         VARCHAR(80) NOT NULL,\n            chave_evento   VARCHAR(190) NOT NULL,\n            entidade       VARCHAR(60) NOT NULL,\n            entidade_id    INT UNSIGNED NOT NULL,\n            titulo         VARCHAR(255) NOT NULL,\n            mensagem       TEXT NOT NULL,\n            url            VARCHAR(255) NULL,\n            status_origem  VARCHAR(50) NULL,\n            status_destino VARCHAR(50) NULL,\n            metadados      JSON NULL,\n            lida_em        TIMESTAMP NULL DEFAULT NULL,\n            criado_em      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n            atualizado_em  TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n            UNIQUE KEY uniq_notificacoes_chave (usuario_id, chave_evento),\n            INDEX idx_notificacoes_usuario_lida_criado (usuario_id, lida_em, criado_em),\n            INDEX idx_notificacoes_usuario_id (usuario_id, id),\n            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE\n        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci\n    ");
+}
+
+/**
+ * Tabelas do Web Push.
+ *
+ * push_subscriptions guarda o endpoint do navegador (um por dispositivo/perfil).
+ * push_fila é uma outbox: quem produz o aviso (FPM ou o ChatServer) só faz INSERT
+ * e segue; o bin/push-worker.php é o único que fala com FCM/Mozilla, para que a
+ * chamada HTTP bloqueante nunca entre no caminho de uma request nem no loop do
+ * Ratchet.
+ *
+ * user_presenca também é garantida aqui: o worker precisa dela para saber quem
+ * está com WebSocket vivo, e até agora ela só nascia dentro do ChatServer.
+ */
+function ensurePushSchema(PDO $pdo): void
+{
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS push_subscriptions (
+            id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            usuario_id    INT UNSIGNED NOT NULL,
+            endpoint      VARCHAR(512) NOT NULL,
+            p256dh        VARCHAR(255) NOT NULL,
+            auth          VARCHAR(255) NOT NULL,
+            user_agent    VARCHAR(255) NULL,
+            falhas        TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            criado_em     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            ultimo_uso_em TIMESTAMP NULL DEFAULT NULL,
+            UNIQUE KEY uniq_push_subscriptions_endpoint (endpoint),
+            INDEX idx_push_subscriptions_usuario (usuario_id),
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS push_fila (
+            id             BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+            usuario_id     INT UNSIGNED NOT NULL,
+            origem         ENUM('notificacao','mensagem','sistema') NOT NULL DEFAULT 'sistema',
+            notificacao_id INT UNSIGNED NULL,
+            chave_dedupe   VARCHAR(190) NOT NULL,
+            titulo         VARCHAR(255) NOT NULL,
+            corpo          VARCHAR(500) NOT NULL,
+            url            VARCHAR(255) NULL,
+            tag            VARCHAR(120) NULL,
+            status         ENUM('pendente','processando','enviado','descartado','falha') NOT NULL DEFAULT 'pendente',
+            tentativas     TINYINT UNSIGNED NOT NULL DEFAULT 0,
+            ultimo_erro    VARCHAR(255) NULL,
+            disponivel_em  TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            criado_em      TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            processado_em  TIMESTAMP NULL DEFAULT NULL,
+            UNIQUE KEY uniq_push_fila_dedupe (chave_dedupe),
+            INDEX idx_push_fila_status_disponivel (status, disponivel_em, id),
+            INDEX idx_push_fila_criado (criado_em),
+            FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+            FOREIGN KEY (notificacao_id) REFERENCES notificacoes(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
+
+    $pdo->exec("
+        CREATE TABLE IF NOT EXISTS user_presenca (
+            usuario_id    INT UNSIGNED PRIMARY KEY,
+            online        TINYINT(1) NOT NULL DEFAULT 0,
+            last_seen     TIMESTAMP NULL DEFAULT NULL,
+            atualizado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            CONSTRAINT fk_user_presenca_usuario FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+    ");
 }
 
 function ensureParticipantsSchema(PDO $pdo): void

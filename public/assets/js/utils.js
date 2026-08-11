@@ -3,6 +3,22 @@
         return;
     }
 
+    /**
+     * URL do WebSocket derivada do protocolo da página.
+     *
+     * Hoje (HTTP na LAN) o resultado é o mesmo ws://<host>:8080 de sempre. Sob
+     * HTTPS o navegador recusa ws:// por mixed content e a porta 8080 nem
+     * existe atrás do proxy TLS, então o caminho passa a ser wss://<host>/ws —
+     * ver docs/push-web-producao-tls.md.
+     */
+    window.urlWebSocket = function urlWebSocket() {
+        if (window.location.protocol === 'https:') {
+            return 'wss://' + window.location.host + '/ws';
+        }
+
+        return 'ws://' + window.location.hostname + ':8080';
+    };
+
     window.escapeHtml = function escapeHtml(valor) {
         return String(valor || '')
             .replace(/&/g, '&amp;')

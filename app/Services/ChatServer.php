@@ -7,6 +7,7 @@ use Ratchet\ConnectionInterface;
 use SplObjectStorage;
 use React\EventLoop\Loop;
 use App\Support\NotificationCenter;
+use App\Support\PushCenter;
 use App\Support\SchemaInspector;
 
 class ChatServer implements MessageComponentInterface
@@ -20,9 +21,21 @@ class ChatServer implements MessageComponentInterface
         $this->clients = new SplObjectStorage();
         echo "Servidor de chat iniciado!\n";
 
+        // Este processo e o unico que escreve user_presenca: se ele caiu com
+        // gente conectada, sobraram linhas online=1 mentindo para sempre - e o
+        // push worker deixaria de notificar esses usuarios.
+        $this->zerarPresencaResidual();
+
         // Busca mudancas geradas fora do WS (ex.: mensagens automaticas de chamado)
         Loop::addPeriodicTimer(0.8, function (): void {
             $this->sincronizarAtualizacoes();
+        });
+
+        // Sem esta renovacao o last_seen so seria escrito no connect/disconnect,
+        // e quem estivesse conectado ha mais de 90s pareceria ausente para o
+        // push worker - resultando em popup do SO duplicando o toast da aba.
+        Loop::addPeriodicTimer(30, function (): void {
+            $this->renovarPresencaConectados();
         });
 
         // Move agendamentos vencidos para avaliacao mesmo sem requisicoes HTTP ativas
@@ -127,6 +140,25 @@ class ChatServer implements MessageComponentInterface
                             $client->lastSeenMessageId = max((int) ($client->lastSeenMessageId ?? 0), $msgId);
                         }
                     }
+
+                    // Push para os participantes ausentes. De proposito NAO passa
+                    // por NotificationCenter: mensagem de chat nao entra na
+                    // central nem no contador do sino, so vira popup do SO.
+                    // Quem estiver com o WS vivo e descartado pelo worker.
+                    $destinatarios = array_values(array_filter(
+                        $participanteIds,
+                        static fn (int $id): bool => $id !== (int) $from->userId
+                    ));
+
+                    PushCenter::enfileirarParaUsuarios($pdo, $destinatarios, [
+                        'origem'     => 'mensagem',
+                        'chave_base' => 'msg:' . $msgId,
+                        'titulo'     => 'Nova mensagem de ' . (string) $from->userName,
+                        'corpo'      => mb_substr($conteudo, 0, 140),
+                        'url'        => '/chat?conversa=' . $conversaId,
+                        // Mensagens da mesma conversa colapsam num popup so.
+                        'tag'        => 'conversa:' . $conversaId,
+                    ]);
 
                     echo "Mensagem de {$from->userName} na conversa #{$conversaId}\n";
 
@@ -266,6 +298,48 @@ class ChatServer implements MessageComponentInterface
             $stmt->execute([$userId, $online ? 1 : 0]);
         } catch (\Throwable $e) {
             error_log('Falha ao atualizar presenca: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Renova o last_seen de todos os usuarios com conexao viva.
+     *
+     * O push worker usa essa marca para decidir quem esta ausente; sem a
+     * renovacao periodica ele acharia que todo mundo saiu depois de 90s.
+     */
+    private function renovarPresencaConectados(): void
+    {
+        $ids = [];
+        foreach ($this->clients as $client) {
+            $userId = (int) ($client->userId ?? 0);
+            if ($userId > 0) {
+                $ids[$userId] = true;
+            }
+        }
+
+        if (!$ids) {
+            return;
+        }
+
+        $ids = array_keys($ids);
+
+        try {
+            $marcadores = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = getDbConnection()->prepare(
+                "UPDATE user_presenca SET online = 1, last_seen = NOW() WHERE usuario_id IN ({$marcadores})"
+            );
+            $stmt->execute($ids);
+        } catch (\Throwable $e) {
+            error_log('Falha ao renovar presenca: ' . $e->getMessage());
+        }
+    }
+
+    private function zerarPresencaResidual(): void
+    {
+        try {
+            getDbConnection()->exec('UPDATE user_presenca SET online = 0 WHERE online = 1');
+        } catch (\Throwable $e) {
+            error_log('Falha ao zerar presenca residual: ' . $e->getMessage());
         }
     }
 

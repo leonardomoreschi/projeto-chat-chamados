@@ -176,7 +176,7 @@
         }
 
         try {
-            state.socket = new WebSocket('ws://' + window.location.hostname + ':8080');
+            state.socket = new WebSocket(window.urlWebSocket());
         } catch (_) {
             return;
         }
