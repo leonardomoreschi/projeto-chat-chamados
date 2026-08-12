@@ -330,6 +330,10 @@ function atualizarUrlConversa(conversaId) {
         url.searchParams.delete('conversa');
     }
     url.searchParams.delete('conversa_com');
+    // Parâmetros de origem do chamado são de uso único: sem removê-los, um F5
+    // repreencheria a barra de digitação.
+    url.searchParams.delete('chamado');
+    url.searchParams.delete('chamado_titulo');
     window.history.replaceState({}, document.title, url.pathname + (url.search ? url.search : ''));
 }
 
@@ -1064,10 +1068,17 @@ async function abrirConversaViaUrl() {
     const conversaId = parseInt(urlParams.get('conversa') || '0', 10);
     const usuarioAlvoId = parseInt(urlParams.get('conversa_com') || '0', 10);
 
+    // Quem chega pelo botão "Chamar setor" do dashboard traz o chamado de
+    // origem; a leitura é feita antes de abrir a conversa porque
+    // selecionarConversa() já limpa esses parâmetros da URL.
+    const chamadoOrigemId = parseInt(urlParams.get('chamado') || '0', 10);
+    const chamadoOrigemTitulo = urlParams.get('chamado_titulo') || '';
+
     if (conversaId) {
         const btn = document.querySelector('.conversa-item[data-id="' + conversaId + '"]');
         if (btn) {
             selecionarConversa(conversaId, btn.dataset.nome || 'Conversa', btn);
+            preencherMensagemChamado(chamadoOrigemId, chamadoOrigemTitulo);
         } else {
             mostrarEstadoVazioChat();
         }
@@ -1098,9 +1109,39 @@ async function abrirConversaViaUrl() {
         } else {
             selecionarConversa(data.id, nomeConversa);
         }
+
+        preencherMensagemChamado(chamadoOrigemId, chamadoOrigemTitulo);
     } catch (err) {
         console.error('Erro ao abrir conversa via URL:', err);
     }
+}
+
+/**
+ * Deixa a identificação do chamado pronta na barra de digitação — sem enviar.
+ *
+ * Chamado ao abrir o chat pelo botão "Chamar setor" do dashboard de TI, para
+ * que o setor saiba de qual chamado se trata sem o atendente ter que digitar.
+ */
+function preencherMensagemChamado(chamadoId, titulo) {
+    if (!chamadoId) return;
+
+    const input = document.getElementById('msg-input');
+    if (!input) return;
+
+    // Nunca sobrescreve rascunho: se já havia texto, o usuário é quem manda.
+    if (input.value.trim() !== '') return;
+
+    // Mesmo formato das mensagens automáticas de chamado
+    // (ChamadoController::finalizar): Chamado #12 ("Título").
+    const tituloLimpo = String(titulo || '').trim();
+    input.value = 'Referente ao chamado #' + chamadoId
+        + (tituloLimpo ? ' ("' + tituloLimpo + '")' : '')
+        + ': ';
+
+    autoResize(input);
+    input.focus();
+    // Cursor no fim, para o atendente continuar escrevendo direto.
+    input.setSelectionRange(input.value.length, input.value.length);
 }
 
 async function criarGrupo() {

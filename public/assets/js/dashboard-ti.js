@@ -282,7 +282,10 @@ function cardDocumentado(c) {
     const p = CONFIG.prioridades[c.prioridade] || CONFIG.prioridades['media'];
     const nome = c.usuario_nome || 'Usuário';
     const inicial = nome.charAt(0).toUpperCase();
-    const tituloEscapado = JSON.stringify(c.titulo || '');
+    // Literal JS dentro de um atributo onclick='...': o JSON.stringify escapa as
+    // aspas duplas, e a aspa simples vira entidade — senão um título com
+    // apóstrofo (D'Ávila) fecharia o atributo e quebraria o botão.
+    const tituloEscapado = JSON.stringify(c.titulo || '').replace(/'/g, '&#39;');
 
     return `
             <div onclick="abrirModalDetalhes(${c.id})" class="bg-gray-900 border-l-4 ${p.border} p-5 rounded-r-2xl shadow-xl card-anim cursor-pointer hover:bg-gray-800/80 transition flex flex-col h-full relative group">
@@ -303,7 +306,7 @@ function cardDocumentado(c) {
 
                 <div class="flex gap-2" onclick="event.stopPropagation()">
                     <button onclick='abrirModalComentarios(${c.id}, ${tituloEscapado}, true)' class="flex-1 bg-gray-800 hover:bg-indigo-600 text-gray-300 hover:text-white text-[10px] font-bold py-2 rounded-lg transition">COMENTÁRIOS</button>
-                    <button onclick="chamarSetor(${c.usuario_id})" class="flex-1 bg-gray-800 hover:bg-indigo-600 text-gray-300 hover:text-white text-[10px] font-bold py-2 rounded-lg transition">CHAMAR SETOR</button>
+                    <button onclick='chamarSetor(${c.usuario_id}, ${c.id}, ${tituloEscapado})' class="flex-1 bg-gray-800 hover:bg-indigo-600 text-gray-300 hover:text-white text-[10px] font-bold py-2 rounded-lg transition">CHAMAR SETOR</button>
                     <button onclick='finalizarChamado(${c.id}, ${tituloEscapado})' class="flex-1 bg-gray-800 hover:bg-green-600 text-gray-300 hover:text-white text-[10px] font-bold py-2 rounded-lg transition">FINALIZAR</button>
                 </div>
             </div>`;
@@ -540,7 +543,7 @@ async function abrirModalDetalhes(id) {
     }
 
     if (btnChamar) {
-        btnChamar.onclick = () => chamarSetor(c.usuario_id);
+        btnChamar.onclick = () => chamarSetor(c.usuario_id, c.id, tituloEscapado);
     }
 
     if (btnFinalizar) {
@@ -566,8 +569,20 @@ function fecharModal(modalId) {
     document.getElementById(modalId).classList.add('hidden');
 }
 
-function chamarSetor(usuarioId) {
-    window.location.href = `/chat?conversa_com=${usuarioId}`;
+/**
+ * Abre o chat com o solicitante já identificando o chamado de origem.
+ *
+ * O chat monta a frase e a deixa na barra de digitação sem enviar
+ * (`preencherMensagemChamado` em chat.js); aqui só se transporta o contexto.
+ */
+function chamarSetor(usuarioId, chamadoId = 0, titulo = '') {
+    let url = `/chat?conversa_com=${usuarioId}`;
+
+    if (chamadoId) {
+        url += `&chamado=${chamadoId}&chamado_titulo=${encodeURIComponent(titulo || '')}`;
+    }
+
+    window.location.href = url;
 }
 
 async function finalizarChamado(id, titulo) {
