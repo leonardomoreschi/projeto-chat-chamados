@@ -163,6 +163,15 @@ document.addEventListener('DOMContentLoaded', async function () {
         if (!conversaAtualId) {
             mostrarEstadoVazioChat();
         }
+
+        // O botão de emergência do menu lateral das outras telas manda para cá
+        // com ?emergencia=1, já que o modal só existe no chat.
+        if (new URLSearchParams(window.location.search).get('emergencia') === '1') {
+            abrirEmergencia();
+            const url = new URL(window.location.href);
+            url.searchParams.delete('emergencia');
+            window.history.replaceState({}, document.title, url.pathname + url.search);
+        }
         carregarUsuarios();
         configurarBusca();
         configurarNotificacoes();

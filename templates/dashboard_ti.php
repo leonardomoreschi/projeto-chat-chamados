@@ -13,14 +13,18 @@
             'id' => (int) ($userId ?? 0),
             'nome' => (string) ($userName ?? ''),
             'papel' => (string) ($userPapel ?? 'usuario'),
-            'socketProprio' => false,
+            // O menu lateral abre o próprio socket e repassa as notificações.
+            'socketProprio' => true,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
     <script src="<?= asset('/assets/js/som-notificacoes.js') ?>"></script>
     <script src="<?= asset('/assets/js/notificacoes.js') ?>"></script>
 </head>
-<body class="page-dashboard-ti bg-gray-950 text-white h-screen flex flex-col overflow-hidden">
+<body class="page-dashboard-ti bg-gray-950 text-white h-screen flex overflow-hidden">
 <?php $chamadosBootstrap = $chamadosBootstrap ?? []; ?>
+<?php $paginaAtual = 'dashboard-ti'; include __DIR__ . '/partials/menu-lateral.php'; ?>
+
+<div class="flex-1 min-w-0 flex flex-col overflow-hidden">
 
     <header class="h-16 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4 md:px-8 shrink-0">
         <div class="flex items-center gap-4">
@@ -339,10 +343,13 @@
             <div id="lista-taxonomias" class="max-h-80 overflow-y-auto space-y-2"></div>
         </div>
     </div>
+</div>
+
     <script src="<?= asset('/assets/js/theme.js') ?>"></script>
     <script>
         window.DASHBOARD_TI_BOOTSTRAP = <?= json_encode($chamadosBootstrap ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
     <script src="<?= asset('/assets/js/dashboard-ti.js') ?>"></script>
+    <script src="<?= asset('/assets/js/menu-lateral.js') ?>"></script>
 </body>
 </html>

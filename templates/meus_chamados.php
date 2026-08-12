@@ -13,23 +13,24 @@
             'id' => (int) ($userId ?? 0),
             'nome' => (string) ($userName ?? ''),
             'papel' => (string) ($userPapel ?? 'usuario'),
-            'socketProprio' => false,
+            // O menu lateral abre o próprio socket e repassa as notificações.
+            'socketProprio' => true,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
     <script src="<?= asset('/assets/js/som-notificacoes.js') ?>"></script>
     <script src="<?= asset('/assets/js/notificacoes.js') ?>"></script>
 </head>
-<body class="page-meus-chamados bg-gray-950 text-white min-h-screen">
+<body class="page-meus-chamados bg-gray-950 text-white h-screen flex overflow-hidden">
 <?php $chamadosUsuario = $chamadosUsuario ?? []; ?>
+<?php $paginaAtual = 'meus-chamados'; include __DIR__ . '/partials/menu-lateral.php'; ?>
+
+<div class="flex-1 min-w-0 overflow-y-auto">
 <div class="max-w-7xl mx-auto p-4 md:p-6 lg:p-8">
     <div class="relative overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950 shadow-2xl">
         <div class="absolute inset-0 opacity-30 hero-gradient-meus"></div>
         <div class="relative p-6 md:p-8 flex flex-col gap-6">
             <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
                 <div>
-                    <div class="flex items-center gap-3 mb-2">
-                        <a href="/chat" class="text-xs font-bold uppercase tracking-widest text-indigo-300 hover:text-indigo-200 transition">← Voltar ao chat</a>
-                    </div>
                     <h1 class="text-2xl md:text-4xl font-black text-white">Meus Chamados</h1>
                     <p class="text-sm text-gray-400 mt-2 max-w-2xl">Acompanhe seus chamados abertos, em andamento e resolvidos.</p>
                 </div>
@@ -121,10 +122,13 @@
     </div>
 </div>
 
+</div>
+
 <script>
     window.MEUS_CHAMADOS_BOOTSTRAP = <?= json_encode($chamadosUsuario ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
 <script src="<?= asset('/assets/js/theme.js') ?>"></script>
 <script src="<?= asset('/assets/js/meus-chamados.js') ?>"></script>
+<script src="<?= asset('/assets/js/menu-lateral.js') ?>"></script>
 </body>
 </html>

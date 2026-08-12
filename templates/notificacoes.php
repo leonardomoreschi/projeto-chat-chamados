@@ -13,7 +13,8 @@
             'id' => (int) ($userId ?? 0),
             'nome' => (string) ($userName ?? ''),
             'papel' => (string) ($userPapel ?? 'usuario'),
-            'socketProprio' => false,
+            // O menu lateral abre o próprio socket e repassa as notificações.
+            'socketProprio' => true,
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
     <script src="<?= asset('/assets/js/som-notificacoes.js') ?>"></script>
@@ -23,16 +24,16 @@
 $notificacoes = $notificacoes ?? [];
 $naoLidas = (int) ($notificationCount ?? 0);
 ?>
-<body class="page-notificacoes bg-gray-950 text-white min-h-screen">
+<body class="page-notificacoes bg-gray-950 text-white h-screen flex overflow-hidden">
+<?php $paginaAtual = 'notificacoes'; include __DIR__ . '/partials/menu-lateral.php'; ?>
+
+<div class="flex-1 min-w-0 overflow-y-auto">
 <div class="max-w-6xl mx-auto px-4 py-6 md:px-6 lg:px-8">
     <div class="relative overflow-hidden rounded-3xl border border-gray-800 bg-gradient-to-br from-gray-900 via-gray-900 to-indigo-950 shadow-2xl">
         <div class="absolute inset-0 opacity-30 pointer-events-none" style="background: radial-gradient(circle at top right, rgba(99,102,241,.22), transparent 35%), radial-gradient(circle at bottom left, rgba(16,185,129,.12), transparent 30%);"></div>
 <div class="relative p-6 md:p-8 flex flex-col gap-6">
                 <div class="flex flex-col lg:flex-row lg:items-end lg:justify-between gap-4">
                     <div>
-                        <div class="flex items-center gap-3 mb-2">
-                            <a href="/chat" class="text-xs font-bold uppercase tracking-widest text-indigo-300 hover:text-indigo-200 transition">← Voltar ao chat</a>
-                        </div>
                         <h1 class="text-2xl md:text-4xl font-black text-white">Notificações</h1>
                         <p class="text-sm text-gray-400 mt-2 max-w-2xl">Suas notificações recentes</p>
                     </div>
@@ -120,6 +121,7 @@ $naoLidas = (int) ($notificationCount ?? 0);
         <?php endif; ?>
     </section>
 </div>
+</div>
 
 <script>
     window.NOTIFICACOES_BOOTSTRAP = {
@@ -144,5 +146,6 @@ $naoLidas = (int) ($notificationCount ?? 0);
         }
     });
 </script>
+<script src="<?= asset('/assets/js/menu-lateral.js') ?>"></script>
 </body>
 </html>

@@ -20,7 +20,9 @@
     <script src="<?= asset('/assets/js/notificacoes.js') ?>"></script>
     <style>
         html, body { height: 100%; overflow: hidden; }
-        body { display: flex; flex-direction: column; }
+        /* O body é linha (menu lateral + conteúdo) pelas classes do próprio
+           <body>; a coluna interna é o wrapper com flex-col. Forçar
+           flex-direction aqui empilhava o menu sobre a página. */
         .tab-btn-ativo   { background: #4f46e5; color: #fff; border-color: #4f46e5; }
         .tab-btn-inativo { background: transparent; color: #6b7280; border-color: transparent; }
         .tab-btn-inativo:hover { color: #e5e7eb; background: rgba(255,255,255,.05); }
@@ -40,7 +42,10 @@ $agendamentosBootstrap = [
     'mode'            => 'user',
 ];
 ?>
-<body class="page-agendamentos bg-gray-950 text-white">
+<body class="page-agendamentos bg-gray-950 text-white h-screen flex overflow-hidden">
+<?php $paginaAtual = 'agendamentos'; include __DIR__ . '/partials/menu-lateral.php'; ?>
+
+<div class="flex-1 min-w-0 flex flex-col overflow-hidden">
 
 <!-- ── Header ──────────────────────────────────────────────────────────── -->
 <header class="flex-shrink-0 bg-gray-900 border-b border-gray-800 px-4 md:px-6 py-3 flex items-center justify-between gap-3">
@@ -270,10 +275,13 @@ $agendamentosBootstrap = [
     </div>
 </div>
 
+</div>
+
 <script>
     window.AGENDAMENTO_BOOTSTRAP = <?= json_encode($agendamentosBootstrap, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
 </script>
 <script src="<?= asset('/assets/js/theme.js') ?>"></script>
 <script src="<?= asset('/assets/js/agendamentos.js') ?>"></script>
+<script src="<?= asset('/assets/js/menu-lateral.js') ?>"></script>
 </body>
 </html>
