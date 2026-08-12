@@ -192,10 +192,11 @@
         </button>
     </div>
 
-    <div id="messages" class="flex-1 overflow-y-auto p-6 flex items-center justify-center">
-        <div id="chat-empty-state" class="text-center select-none px-6">
-            <p class="text-3xl md:text-4xl font-semibold tracking-tight text-gray-300">Bem-vindo ao Chat Interno!</p>
-        </div>
+    <!-- Sem conversa aberta, o chat.js troca este bloco pelo painel de
+         notificações (mostrarEstadoVazioChat). O placeholder existe só para não
+         piscar conteúdo antigo antes do script rodar. -->
+    <div id="messages" class="flex-1 overflow-y-auto p-6">
+        <div id="chat-empty-state" class="max-w-2xl mx-auto pt-10 md:pt-16 text-sm text-gray-600">Carregando…</div>
     </div>
 
     <div id="typing-indicator" class="hidden px-6 py-1 text-xs text-gray-500 italic"></div>

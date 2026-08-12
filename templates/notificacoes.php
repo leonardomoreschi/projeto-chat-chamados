@@ -46,8 +46,45 @@ $naoLidas = (int) ($notificationCount ?? 0);
                 Nenhuma notificação encontrada.
             </div>
         <?php else: ?>
+            <?php
+                // O corte é o estado no momento em que a página carregou: logo
+                // abaixo o JS marca tudo como lida, então "não lida" aqui
+                // significa "chegou depois da última vez que você abriu esta
+                // central". Separar em dois grupos (em vez de olhar a mudança
+                // de estado durante o laço) mantém o marcador correto mesmo se
+                // o usuário tiver lido uma notificação isolada pelo toast.
+                $notificacoesNovas = [];
+                $notificacoesAntigas = [];
+                foreach ($notificacoes as $notificacao) {
+                    if (empty($notificacao['lida_em'])) {
+                        $notificacoesNovas[] = $notificacao;
+                    } else {
+                        $notificacoesAntigas[] = $notificacao;
+                    }
+                }
+                $gruposNotificacoes = [
+                    [
+                        'itens' => $notificacoesNovas,
+                        'titulo' => 'Novas desde sua última visita',
+                        'classes' => 'text-indigo-300 border-indigo-500/30',
+                    ],
+                    [
+                        'itens' => $notificacoesAntigas,
+                        'titulo' => 'Anteriores',
+                        'classes' => 'text-gray-500 border-gray-800',
+                    ],
+                ];
+            ?>
             <div class="space-y-4">
-                <?php foreach ($notificacoes as $notificacao): ?>
+                <?php foreach ($gruposNotificacoes as $grupo): ?>
+                <?php if (empty($grupo['itens'])) { continue; } ?>
+                <div class="flex items-center gap-3 pt-2 first:pt-0">
+                    <span class="text-[11px] font-black uppercase tracking-widest <?= $grupo['classes'] ?> whitespace-nowrap">
+                        <?= htmlspecialchars($grupo['titulo']) ?> (<?= count($grupo['itens']) ?>)
+                    </span>
+                    <span class="h-px flex-1 border-t <?= $grupo['classes'] ?>"></span>
+                </div>
+                <?php foreach ($grupo['itens'] as $notificacao): ?>
                     <?php
                         $ehLida = !empty($notificacao['lida_em']);
                         $tagCor = $notificacao['tipo'] === 'agendamento' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
@@ -77,6 +114,7 @@ $naoLidas = (int) ($notificationCount ?? 0);
                             </div>
                         </div>
                     </button>
+                <?php endforeach; ?>
                 <?php endforeach; ?>
             </div>
         <?php endif; ?>

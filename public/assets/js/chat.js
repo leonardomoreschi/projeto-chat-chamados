@@ -44,6 +44,8 @@ const MAX_ANEXOS_MENSAGEM = 10; // limite validado em ChatController::enviarMens
 // ChatController::PRAZO_APAGAR_SEGUNDOS e a constante de mesmo nome no
 // ChatServer — aqui só some o botão; quem recusa de fato é o servidor.
 const PRAZO_APAGAR_MENSAGEM_MS = 60 * 1000;
+// Quantas notificações a tela inicial do chat mostra antes do "Ver todas".
+const MAX_NOTIFICACOES_INICIO = 8;
 
 // ── WebSocket ─────────────────────────────────
 function conectarWS() {
@@ -155,6 +157,12 @@ document.addEventListener('DOMContentLoaded', async function () {
         conectarWS();
         await carregarConversas();
         await abrirConversaViaUrl();
+
+        // Entrou sem conversa na URL (o caso normal do login): a área central
+        // mostra as notificações em vez da tela de boas-vindas.
+        if (!conversaAtualId) {
+            mostrarEstadoVazioChat();
+        }
         carregarUsuarios();
         configurarBusca();
         configurarNotificacoes();
@@ -371,9 +379,90 @@ function mostrarEstadoVazioChat() {
     atualizarUrlConversa(null);
 
     if (messages) {
-        messages.className = 'flex-1 overflow-y-auto p-6 flex items-center justify-center';
-        messages.innerHTML = '<div id="chat-empty-state" class="text-center select-none px-6"><p class="text-3xl md:text-4xl font-semibold tracking-tight text-gray-300">Bem-vindo ao Chat Interno!</p></div>';
+        // Sem conversa aberta (é o que o usuário vê ao entrar no sistema) a área
+        // central mostra as notificações em vez da tela vazia de boas-vindas.
+        messages.className = 'flex-1 overflow-y-auto p-6';
+        messages.innerHTML = '<div id="chat-empty-state" class="max-w-2xl mx-auto pt-10 md:pt-16">'
+            + '<p class="text-2xl md:text-3xl font-semibold tracking-tight text-gray-300 mb-6">Olá, ' + escapeHtml(CURRENT_USER_NAME) + '!</p>'
+            + '<div id="painel-notificacoes-inicio" class="text-sm text-gray-500">Carregando notificações…</div>'
+            + '</div>';
+
+        carregarPainelNotificacoesInicio();
     }
+}
+
+/**
+ * Notificações recentes na tela inicial do chat.
+ *
+ * De propósito **não** marca nada como lida: quem faz isso é a central
+ * (/notificacoes), que é o marco usado para separar novas de antigas.
+ */
+async function carregarPainelNotificacoesInicio() {
+    const painel = document.getElementById('painel-notificacoes-inicio');
+    if (!painel) return;
+
+    let lista = [];
+    try {
+        const res = await fetch('/api/notificacoes?limite=' + MAX_NOTIFICACOES_INICIO);
+        if (!res.ok) throw new Error('falha');
+        lista = await res.json();
+    } catch (_) {
+        painel.innerHTML = '<p class="text-sm text-gray-500">Não foi possível carregar as notificações agora.</p>';
+        return;
+    }
+
+    if (!Array.isArray(lista) || lista.length === 0) {
+        painel.innerHTML = '<div class="rounded-2xl border border-gray-800 bg-gray-900/60 p-6 text-center">'
+            + '<p class="text-sm text-gray-400">Nenhuma notificação por aqui.</p>'
+            + '<p class="text-xs text-gray-600 mt-1">Chamados e agendamentos que envolverem você aparecem nesta tela.</p>'
+            + '</div>';
+        return;
+    }
+
+    const novas = lista.filter(function (n) { return !n.lida_em; });
+
+    painel.innerHTML = '<div class="flex items-baseline justify-between mb-3">'
+        + '<h2 class="text-xs font-black uppercase tracking-widest text-gray-400">Notificações'
+        + (novas.length ? ' <span class="text-indigo-300">· ' + novas.length + ' nova(s)</span>' : '')
+        + '</h2>'
+        + '<a href="/notificacoes" class="text-xs font-bold text-indigo-300 hover:text-indigo-200 transition">Ver todas</a>'
+        + '</div>'
+        + '<div class="space-y-2">'
+        + lista.map(itemNotificacaoInicio).join('')
+        + '</div>';
+}
+
+/** Hora para o que é de hoje, data para o resto — a lista cobre vários dias. */
+function quandoNotificacao(criadoEm) {
+    const data = parseDataServidorBrasilia(criadoEm);
+    if (!data) return '';
+
+    const opcoes = { timeZone: 'America/Sao_Paulo' };
+    const hoje = new Date().toLocaleDateString('pt-BR', opcoes);
+
+    return data.toLocaleDateString('pt-BR', opcoes) === hoje
+        ? formatarHoraBrasilia(criadoEm)
+        : data.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' });
+}
+
+function itemNotificacaoInicio(n) {
+    const nova = !n.lida_em;
+    const url = n.url || '/notificacoes';
+
+    return '<a href="' + escapeHtml(url) + '" class="block rounded-2xl border p-4 transition hover:border-indigo-500/50 '
+        + (nova ? 'border-indigo-500/30 bg-gray-900' : 'border-gray-800 bg-gray-900/60') + '">'
+        + '<div class="flex items-start justify-between gap-3">'
+        + '<div class="min-w-0">'
+        + '<div class="flex items-center gap-2 mb-1">'
+        + (nova ? '<span class="text-[10px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded border border-amber-500/30 text-amber-300">Nova</span>' : '')
+        + '<span class="text-[10px] font-black uppercase tracking-widest text-gray-500">' + escapeHtml(n.tipo || '') + '</span>'
+        + '</div>'
+        + '<p class="text-sm font-semibold text-white truncate">' + escapeHtml(n.titulo || '') + '</p>'
+        + '<p class="text-xs text-gray-400 mt-1 leading-relaxed">' + escapeHtml(n.mensagem || '') + '</p>'
+        + '</div>'
+        + '<span class="text-[11px] text-gray-600 shrink-0">' + quandoNotificacao(n.criado_em) + '</span>'
+        + '</div>'
+        + '</a>';
 }
 
 function mostrarEstadoConversa() {
