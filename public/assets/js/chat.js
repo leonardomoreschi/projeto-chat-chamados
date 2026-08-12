@@ -41,6 +41,13 @@ const EXTENSOES_ANEXO_CHAMADO = [
 const MAX_ANEXOS_MENSAGEM = 10; // limite validado em ChatController::enviarMensagem
 
 // ── WebSocket ─────────────────────────────────
+let reenviarPresenca = null;
+
+function enviarPresenca(ativo) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return;
+    ws.send(JSON.stringify({ type: 'presenca', ativo: !!ativo }));
+}
+
 function conectarWS() {
     // urlWebSocket (utils.js) resolve ws:// hoje e wss:// quando a página for
     // servida por HTTPS, sem mexer aqui.
@@ -55,6 +62,14 @@ function conectarWS() {
             user_papel: CURRENT_USER_PAPEL,
             conversa_id: conversaAtualId || 0,
         }));
+
+        // O servidor só manda push para quem não tem aba ativa; sem reenviar
+        // isto depois de reconectar, o estado antigo ficaria valendo.
+        if (reenviarPresenca) {
+            reenviarPresenca();
+        } else {
+            reenviarPresenca = window.aoMudarAtividade(enviarPresenca);
+        }
     };
 
     ws.onmessage = function (event) {
@@ -74,11 +89,12 @@ function conectarWS() {
                 if (!data.message || !data.message.id) break;
                 if (document.querySelector('[data-msg-id="' + data.message.id + '"]')) break;
 
-                // Som só para mensagem de outro usuário e fora do replay que o
-                // servidor faz no auth (últimas 100 mensagens viram new_message).
-                if (wsSincronizacaoInicialConcluida
-                    && Number(data.message.usuario_id) !== CURRENT_USER_ID
-                    && window.SomNotificacoes) {
+                // Vale avisar? Só mensagem de outro usuário e fora do replay que
+                // o servidor faz no auth (últimas 100 viram new_message).
+                const avisarMensagem = wsSincronizacaoInicialConcluida
+                    && Number(data.message.usuario_id) !== CURRENT_USER_ID;
+
+                if (avisarMensagem && window.SomNotificacoes) {
                     window.SomNotificacoes.tocar('mensagem', 'msg:' + data.message.id);
                 }
 
@@ -91,10 +107,21 @@ function conectarWS() {
                     renderizarMensagem(data.message);
                     document.getElementById('messages').scrollTop = 99999;
                     fetch('/api/conversas/' + conversaAtualId + '/lida', { method: 'POST' });
-                } else {
-                    if (wsSincronizacaoInicialConcluida) {
-                        notificarMensagem('Nova mensagem de ' + (data.message.usuario_nome || 'Contato'), (data.message.conteudo || 'Nova mensagem').substring(0, 100));
+
+                    // Renderizar na conversa aberta não é aviso nenhum se a aba
+                    // está atrás de outra janela: sem isto, mensagem na conversa
+                    // aberta ficava só no som.
+                    if (avisarMensagem && !window.appAtivo()) {
+                        notificarMensagem(
+                            'Nova mensagem de ' + (data.message.usuario_nome || 'Contato'),
+                            (data.message.conteudo || 'Nova mensagem').substring(0, 100)
+                        );
                     }
+                } else if (avisarMensagem) {
+                    notificarMensagem(
+                        'Nova mensagem de ' + (data.message.usuario_nome || 'Contato'),
+                        (data.message.conteudo || 'Nova mensagem').substring(0, 100)
+                    );
                 }
                 atualizarPreviewSidebar(data.message);
                 break;
@@ -1338,15 +1365,11 @@ function configurarAnexosMensagem() {
 }
 
 function notificarMensagem(titulo, corpo) {
-    if (!('Notification' in window)) return;
-    if (document.hasFocus()) {
-        mostrarToastNotificacao(titulo, corpo);
-        return;
-    }
-    if (Notification.permission !== 'granted') return;
+    // avisoDoSistema (utils.js) resolve popup do SO / push; o toast é o
+    // fallback que garante que nunca sobre só o som.
+    if (window.avisoDoSistema(titulo, corpo)) return;
 
-    const n = new Notification(titulo, { body: corpo });
-    setTimeout(function () { n.close(); }, 5000);
+    mostrarToastNotificacao(titulo, corpo);
 }
 
 function mostrarToastNotificacao(titulo, corpo) {
@@ -1368,7 +1391,12 @@ async function verificarNovasMensagensNotificacao() {
             return acc + (parseInt(c.nao_lidas, 10) || 0);
         }, 0);
 
-        if (notificacoesInicializadas && total > ultimoTotalNaoLidas) {
+        // Aviso genérico só quando o WebSocket está fora do ar: com ele vivo, o
+        // new_message já avisou com nome e conteúdo, e este seria o segundo
+        // popup do mesmo fato.
+        const wsCaido = !ws || ws.readyState !== WebSocket.OPEN;
+
+        if (wsCaido && notificacoesInicializadas && total > ultimoTotalNaoLidas) {
             const delta = total - ultimoTotalNaoLidas;
             notificarMensagem('Chat Interno', 'Voce recebeu ' + delta + ' nova(s) mensagem(ns).');
         }

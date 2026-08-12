@@ -56,6 +56,9 @@ class ChatServer implements MessageComponentInterface
         $conn->lastSeenDeletionAt = date('Y-m-d H:i:s');
         $conn->lastSeenAgendamentoUpdateAt = date('Y-m-d H:i:s');
         $conn->lastSeenNotificationId = 0;
+        // Ate o cliente mandar o primeiro 'presenca', assume aba ativa: e o caso
+        // comum e o erro seguro (no maximo atrasa um push, nunca duplica).
+        $conn->ativo = true;
         echo "Nova conexão: #{$conn->resourceId} | Total: {$this->clients->count()}\n";
     }
 
@@ -75,7 +78,8 @@ class ChatServer implements MessageComponentInterface
                 $from->lastSeenConversationId = 0;
                 $from->lastSeenDeletionAt = date('Y-m-d H:i:s');
                 $from->lastSeenAgendamentoUpdateAt = date('Y-m-d H:i:s');
-                $this->atualizarPresenca($from->userId, true);
+                $from->ativo = (bool) ($data['ativo'] ?? true);
+                $this->sincronizarPresencaUsuario((int) $from->userId);
                 try {
                     $pdo = getDbConnection();
                     $stmtNotif = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM notificacoes WHERE usuario_id = ?');
@@ -92,6 +96,16 @@ class ChatServer implements MessageComponentInterface
 
             case 'join':
                 $from->conversaId = (int) ($data['conversa_id'] ?? 0);
+                break;
+
+            // Aba passou a frente / saiu de frente. E este sinal - e nao o mero
+            // fato de existir uma conexao - que decide se o push worker manda o
+            // popup do SO: com a aba na frente o proprio front mostra o toast.
+            case 'presenca':
+                $from->ativo = (bool) ($data['ativo'] ?? true);
+                if (!empty($from->userId)) {
+                    $this->sincronizarPresencaUsuario((int) $from->userId);
+                }
                 break;
 
             case 'send_message':
@@ -271,10 +285,14 @@ class ChatServer implements MessageComponentInterface
 
     public function onClose(ConnectionInterface $conn): void
     {
-        if (!empty($conn->userId)) {
-            $this->atualizarPresenca((int) $conn->userId, false);
-        }
+        // Detach antes de recalcular: senao a conexao que esta fechando ainda
+        // contaria como aba ativa. Recalcular (em vez de zerar direto) evita
+        // que fechar uma aba apague a presenca de outra ainda aberta.
+        $userId = (int) ($conn->userId ?? 0);
         $this->clients->detach($conn);
+        if ($userId > 0) {
+            $this->sincronizarPresencaUsuario($userId);
+        }
         echo "Conexão fechada: #{$conn->resourceId} ({$conn->userName}) | Total: {$this->clients->count()}\n";
     }
 
@@ -282,6 +300,30 @@ class ChatServer implements MessageComponentInterface
     {
         error_log("WebSocket erro: " . $e->getMessage());
         $conn->close();
+    }
+
+    /**
+     * Recalcula a presenca do usuario a partir das conexoes vivas.
+     *
+     * `online = 1` significa "tem pelo menos uma aba na frente do usuario", nao
+     * "tem socket aberto": e assim que o push worker consegue distinguir quem ja
+     * esta vendo o toast in-page de quem precisa do popup do sistema.
+     */
+    private function sincronizarPresencaUsuario(int $userId): void
+    {
+        if ($userId <= 0) {
+            return;
+        }
+
+        $ativo = false;
+        foreach ($this->clients as $client) {
+            if ((int) ($client->userId ?? 0) === $userId && !empty($client->ativo)) {
+                $ativo = true;
+                break;
+            }
+        }
+
+        $this->atualizarPresenca($userId, $ativo);
     }
 
     private function atualizarPresenca(int $userId, bool $online): void
@@ -302,33 +344,44 @@ class ChatServer implements MessageComponentInterface
     }
 
     /**
-     * Renova o last_seen de todos os usuarios com conexao viva.
+     * Renova o last_seen de todos os usuarios com conexao viva, marcando como
+     * online so quem tem alguma aba na frente.
      *
-     * O push worker usa essa marca para decidir quem esta ausente; sem a
+     * O push worker so confia na linha se o last_seen for recente; sem a
      * renovacao periodica ele acharia que todo mundo saiu depois de 90s.
      */
     private function renovarPresencaConectados(): void
     {
-        $ids = [];
+        $ativos = [];
+        $inativos = [];
+
         foreach ($this->clients as $client) {
             $userId = (int) ($client->userId ?? 0);
-            if ($userId > 0) {
-                $ids[$userId] = true;
+            if ($userId <= 0) {
+                continue;
+            }
+            if (!empty($client->ativo)) {
+                $ativos[$userId] = true;
+            } elseif (!isset($ativos[$userId])) {
+                $inativos[$userId] = true;
             }
         }
 
-        if (!$ids) {
-            return;
-        }
-
-        $ids = array_keys($ids);
+        // Uma aba ativa vence qualquer numero de abas em segundo plano.
+        $inativos = array_diff_key($inativos, $ativos);
 
         try {
-            $marcadores = implode(',', array_fill(0, count($ids), '?'));
-            $stmt = getDbConnection()->prepare(
-                "UPDATE user_presenca SET online = 1, last_seen = NOW() WHERE usuario_id IN ({$marcadores})"
-            );
-            $stmt->execute($ids);
+            $pdo = getDbConnection();
+            foreach ([1 => array_keys($ativos), 0 => array_keys($inativos)] as $online => $ids) {
+                if (!$ids) {
+                    continue;
+                }
+                $marcadores = implode(',', array_fill(0, count($ids), '?'));
+                $stmt = $pdo->prepare(
+                    "UPDATE user_presenca SET online = {$online}, last_seen = NOW() WHERE usuario_id IN ({$marcadores})"
+                );
+                $stmt->execute($ids);
+            }
         } catch (\Throwable $e) {
             error_log('Falha ao renovar presenca: ' . $e->getMessage());
         }

@@ -1,8 +1,30 @@
-# Web Push: como funciona hoje e o que falta para produção
+# Notificações: arquitetura, estado atual e o que falta para produção
 
-Este documento explica por que as notificações do sistema operacional só
-funcionam em `localhost` no estado atual, e o passo a passo para habilitá-las
-para todas as estações da rede.
+**Documento único do assunto notificações neste projeto** — som, toast in-page,
+central do sino, pop-up do sistema operacional (Web Push) e o requisito de TLS.
+Antes de mexer em qualquer coisa de notificação, leia a §1 (o que existe) e a
+§1.2 (quem mostra o aviso em cada situação).
+
+---
+
+## ⚠ Estado da task: **pausada** (12/08/2026)
+
+Todo o trabalho de notificação fora do navegador está na branch **`teste`**, a
+partir do commit `2424cbf` ("início notificações fora do navegador"). **Não está
+mergeado na `main`**, que segue como a versão testada em uso.
+
+| | |
+|---|---|
+| **Por que parou** | O pop-up do SO funcionou nas primeiras tentativas e depois parou de chegar, de forma intermitente. Não foi diagnosticado. |
+| **Decisão em aberto** | Avaliar trocar Web Push por um **app nativo** para as notificações. Se for esse o caminho, boa parte da §4 (TLS) deixa de ser pré-requisito para notificar — mas continua valendo para o resto do sistema. |
+| **Enquanto isso** | Desenvolvimento normal na `main`. Não mergear `teste` sem retomar esta investigação. |
+| **Para retomar** | §10 — checklist de diagnóstico da intermitência. |
+
+O que já foi verificado: a lógica de presença (`user_presenca`) faz o que
+promete nos quatro cenários testados — aba ativa, aba em segundo plano, duas
+abas e fechamento (§1.3). Isso descarta o *desenho* da presença como causa, mas
+**não** descarta uma aba rodando JS antigo (que não manda `presenca` e por isso
+conta como ativa): é a primeira coisa a eliminar na §10.
 
 ---
 
@@ -17,27 +39,91 @@ Ratchet: case 'send_message'          ─┼─► push_fila ─► bin/push-wor
 ChatController::enviarMensagem        ─┘   (outbox)      (2º program: no supervisor)
 ```
 
-Peças novas:
+### 1.1 Mapa do código
+
+Tudo que participa de "avisar o usuário" — inclusive o que já existia antes do
+push:
 
 | Arquivo | Papel |
 |---|---|
-| `app/Support/PushCenter.php` | API única: `enfileirar*()` para os produtores, `processarLote()` para o worker |
+| `app/Support/NotificationCenter.php` | Central do sino: `registrar()` faz upsert por `chave_evento` e, no fim, chama `PushCenter::enfileirarDeNotificacao()` — **ponto único** que transforma notificação em push |
+| `app/Support/PushCenter.php` | API do push: `enfileirar*()` para os produtores, `processarLote()` para o worker, `motivoDescarte()` para as regras da §1.2 |
 | `app/Controllers/PushController.php` | `/api/push/chave-publica`, `/api/push/inscrever` (POST/DELETE), `/api/push/status` |
-| `bin/push-worker.php` | Único processo que fala com FCM/Mozilla |
-| `public/sw.js` | Service Worker: exibe o pop-up e trata o clique |
-| `public/assets/js/push.js` | Registro do SW, inscrição, botão de permissão |
-| `push_subscriptions`, `push_fila` | Tabelas (em `config/schema.sql` e `ensurePushSchema()`) |
+| `app/Services/ChatServer.php` | Broadcast WS; evento `presenca`; `sincronizarPresencaUsuario()` grava `user_presenca` |
+| `app/Controllers/ChatController.php` | `enfileirarPushMensagem()` — push das mensagens enviadas por HTTP (com anexo) |
+| `bin/push-worker.php` | Único processo que fala com FCM/Mozilla (2º programa do supervisor) |
+| `public/sw.js` | Service Worker: exibe o pop-up, trata o clique e a rotação de inscrição |
+| `public/assets/js/push.js` | Registro do SW, inscrição, botão de permissão, `PushWeb.inscrito()` |
+| `public/assets/js/utils.js` | `appAtivo()`, `aoMudarAtividade()`, `avisoDoSistema()` — **a decisão de qual aviso mostrar mora aqui** |
+| `public/assets/js/notificacoes.js` | Sino, badge, toast, `notificar()` e `notificarMensagemChat()` |
+| `public/assets/js/som-notificacoes.js` | Timbres por tipo de evento (`SomNotificacoes.tocar`) |
+| `public/assets/js/chat.js` | Avisos de mensagem na página `/chat` |
+| `public/assets/js/agendamentos.js` | Mesmo tratamento nas páginas com socket próprio |
+| `public/manifest.json`, `public/assets/img/icone-*.png` | PWA e ícones do pop-up (obrigatório no iOS) |
+| `push_subscriptions`, `push_fila`, `user_presenca` | Tabelas (em `config/schema.sql` e `ensurePushSchema()`) |
 
-Duas decisões de comportamento que valem registrar:
+### 1.2 Quem mostra o aviso: a regra única
 
-- **Mensagens de chat geram pop-up mas não entram na central de notificações.**
-  O `ChatServer` e o `ChatController` chamam `PushCenter` diretamente, sem passar
-  por `NotificationCenter` — então o sino e o contador continuam refletindo só
-  chamados e agendamentos.
-- **Quem está com a aba aberta não recebe pop-up do SO.** O worker descarta o
-  item se `user_presenca` mostra WebSocket vivo, e o Service Worker ainda faz uma
-  segunda checagem (`clients.matchAll`) para cobrir a corrida de ~2 s. Nesses
-  casos o aviso vira o toast in-page que já existia.
+Todo aviso passa por `window.avisoDoSistema()` (`public/assets/js/utils.js`).
+**Não chame `new Notification` direto em lugar nenhum** — foi o que produziu o
+bug em que mensagem de chat só tocava o som.
+
+| Estado da aba do destinatário | Quem avisa | O que acontece no servidor |
+|---|---|---|
+| **Ativa** — visível **e** com foco | toast in-page | push descartado: `push_fila.ultimo_erro = 'usuario_ativo'` |
+| **Inativa** com push inscrito | pop-up do SO, pelo `sw.js` | push enviado |
+| **Inativa** sem push (origem insegura, opt-out, permissão negada) | `new Notification` da própria página; toast como último recurso | nada é enfileirado (o `INSERT` exige linha em `push_subscriptions`) |
+
+Dois pontos que se repetem em cada camada, de propósito:
+
+- **`appAtivo()` = `!document.hidden && document.hasFocus()`.** Só
+  `document.hidden` não basta: uma janela atrás de outro aplicativo continua
+  `visible` no Chrome, e um toast ali dentro ninguém vê. O `sw.js` usa o
+  equivalente (`visibilityState === 'visible' && focused`) na checagem que cobre
+  a corrida de ~2 s entre enfileirar e entregar.
+- **Nunca sai "só o som".** Se `avisoDoSistema()` devolve `false`, o chamador é
+  obrigado a mostrar o toast.
+
+**Mensagens de chat geram pop-up mas não entram na central.** `ChatServer` e
+`ChatController` chamam `PushCenter` diretamente, sem passar por
+`NotificationCenter` — o sino e o contador continuam refletindo só chamados e
+agendamentos. Quem mostra o aviso de mensagem é o `chat.js` na `/chat` e o
+`NotificationCenterUI.notificarMensagemChat()` nas demais páginas (elas também
+recebem `new_message` pelo WebSocket).
+
+### 1.3 Presença: "aba na frente", não "socket aberto"
+
+`user_presenca.online = 1` significa **o usuário tem alguma aba na frente** — é
+esse o critério que o worker usa para decidir entre toast e pop-up.
+
+Protocolo: o front manda `{type: 'presenca', ativo: bool}` pelo WebSocket a cada
+mudança de foco/visibilidade (`aoMudarAtividade` em `utils.js`) e logo após cada
+`auth` — inclusive ao reconectar, senão o estado antigo ficaria valendo. O
+`ChatServer` recalcula a linha varrendo as conexões vivas
+(`sincronizarPresencaUsuario`) no `auth`, no evento `presenca` e no `onClose`,
+e renova `last_seen` a cada 30 s. O worker só confia na linha se `last_seen`
+estiver dentro de `PRESENCA_SEGUNDOS` (90 s).
+
+Sem esse sinal — foi o estado até 12/08/2026 — bastava manter o sistema aberto
+para que **todo** push fosse descartado, e os avisos de mensagem eram engolidos.
+
+Comportamento verificado com um cliente WS de teste:
+
+| Cenário | `online` |
+|---|---|
+| conexão com `presenca ativo=1` | 1 |
+| conexão com `presenca ativo=0` (aba em segundo plano) | 0 |
+| duas abas, uma ativa | 1 |
+| fecha a aba ativa, sobra a de segundo plano | 0 |
+
+Duas consequências que valem saber:
+
+- **Cliente com JS antigo em cache não manda `presenca`**; o servidor assume
+  `ativo = true` (erro seguro: no máximo atrasa um push, nunca duplica). Depois
+  de mexer nesse código, **recarregue as abas abertas** antes de testar.
+- **A presença é por usuário, não por dispositivo.** Com o desktop ativo, o
+  celular do mesmo usuário não recebe pop-up. Resolver exige marcar presença por
+  inscrição — ver §9.
 
 ---
 
@@ -282,8 +368,11 @@ SELECT id, origem, status, tentativas, ultimo_erro FROM push_fila ORDER BY id DE
 ```
 
 `status` esperado: `enviado` quando o destinatário estava ausente,
-`descartado` (com `ultimo_erro = 'usuario_online'`) quando ele estava com a aba
-aberta.
+`descartado` (com `ultimo_erro = 'usuario_ativo'`) quando ele estava com a aba
+**na frente** — visível e com foco. Aba aberta em segundo plano, janela
+minimizada ou atrás de outro aplicativo contam como ausente e recebem push: o
+critério vem do evento `presenca` que o front manda pelo WebSocket, gravado em
+`user_presenca.online`.
 
 Nos logs:
 
@@ -359,9 +448,10 @@ Ao avaliar o visual, use uma estação **Windows** — é o parque real. O Linux
 VM de desenvolvimento não representa o que o usuário final vê.
 
 O pop-up com a identidade da aplicação (o toast) continua existindo, mas só no
-caso em que ele é possível: **aba aberta e visível**. Nessa situação o `sw.js`
-detecta a aba via `clients.matchAll()` e encaminha o aviso para o toast in-page
-em vez de mostrar a notificação do SO — é o que evita dois avisos do mesmo fato.
+caso em que ele é possível: **aba ativa** (visível e com foco — §1.2). Nessa
+situação o `sw.js` detecta a aba via `clients.matchAll()` e encaminha o aviso
+para o toast in-page em vez de mostrar a notificação do SO — é o que evita dois
+avisos do mesmo fato.
 
 ---
 
@@ -437,4 +527,76 @@ SELECT status, COUNT(*), LEFT(ultimo_erro, 80)
 - **Rebuild obrigatório ao mexer em dependências.** O `vendor/` vem da imagem
   (volume anônimo no compose); alterar o `composer.json` sem
   `docker compose build php websocket` produz *Class not found* só em produção.
+- **Presença por usuário, não por dispositivo.** Usuário ativo no desktop faz o
+  push ser descartado para **todos** os dispositivos dele, inclusive o celular
+  (§1.3). Corrigir exige guardar a presença por inscrição (`push_subscriptions`)
+  em vez de por `usuario_id`, e o worker filtrar endpoint a endpoint.
 - **Compatibilidade e requisito de saída de rede**: ver §7 e §8.
+
+---
+
+## 10. Retomada: diagnóstico da intermitência
+
+Sintoma a explicar: **o pop-up chegou nas primeiras tentativas e depois parou**,
+sem mudança de código no meio. Rodar na ordem — a primeira consulta costuma já
+separar as três famílias de causa.
+
+```sql
+-- 1. O que aconteceu com a fila na última hora?
+SELECT status, LEFT(ultimo_erro, 80) AS erro, COUNT(*), MAX(criado_em)
+  FROM push_fila
+ WHERE criado_em > NOW() - INTERVAL 1 HOUR
+ GROUP BY status, LEFT(ultimo_erro, 80);
+```
+
+| O que aparece | Leitura | Onde continuar |
+|---|---|---|
+| `descartado` / `usuario_ativo` | O servidor achou que a aba estava na frente. Aba com **JS antigo em cache** não manda `presenca` e o padrão é `ativo = true` (§1.3). | Recarregar as abas; conferir `SELECT * FROM user_presenca` com a janela em segundo plano — tem que virar `0` |
+| `ultimo_erro` com o motivo do provedor — `410 Gone`, `404`, `NotRegistered` | **Suspeito principal desta intermitência**: o navegador revogou/rotacionou a inscrição. O `PushCenter` **apaga a linha de `push_subscriptions` na hora** (`isSubscriptionExpired`), então a partir daí não se enfileira mais nada e o silêncio é total. | Ver bloco abaixo |
+| `falha` com timeout / erro de conexão | Saída 443 bloqueada ou proxy interceptando. | §8 |
+| `descartado` / `expirado` | `push-worker` parado por mais de 10 min (TTL). | `supervisorctl status` |
+| **fila vazia** | Ninguém enfileirou: sem linha em `push_subscriptions` o `INSERT` é no-op. | Bloco abaixo |
+
+```sql
+-- 2. As inscrições ainda existem e batem com o navegador em uso?
+SELECT id, usuario_id, LEFT(endpoint, 60), falhas, criado_em, ultimo_uso_em
+  FROM push_subscriptions ORDER BY id DESC;
+```
+
+A inscrição some do banco por dois caminhos: **na hora**, quando o serviço de
+push responde 404/410 (`removerInscricao`), ou depois de
+`MAX_FALHAS_INSCRICAO` (10) falhas consecutivas de outro tipo. Nos dois casos o
+usuário para de receber **sem nenhum sinal na interface** — o botão continua
+dizendo "Notificações ativas" enquanto o Service Worker ainda tiver a inscrição
+local. É exatamente o formato "funcionou e depois parou".
+
+**Comparar o `endpoint` do banco com o que o DevTools mostra em Application →
+Service Workers → Push subscription é o teste decisivo**: se divergiu (ou se o
+banco não tem a linha e o navegador tem a inscrição), o `pushsubscriptionchange`
+do `sw.js` não reinscreveu.
+
+Vale olhar também `push_fila.tentativas`: item que falha é reagendado com
+backoff de 2, 4, 8 e 16 minutos e só vira `falha` na 5ª tentativa
+(`MAX_TENTATIVAS`) — então logo depois do problema começar ele ainda aparece
+como `pendente`, não como `falha`.
+
+Hipóteses a testar, em ordem de suspeita:
+
+1. **Rotação de inscrição não reinscreve.** O handler `pushsubscriptionchange`
+   (`sw.js`) depende de o SW estar ativo no momento do evento; se falhar, só o
+   próximo carregamento de página conserta (`sincronizarInscricao`). Reproduzir:
+   revogar a permissão, recarregar, reconceder, e verificar se o `endpoint` no
+   banco acompanhou.
+2. **Troca do par VAPID.** Se `VAPID_PUBLIC_KEY` mudar (rebuild com `.env`
+   diferente), toda inscrição antiga para de decifrar. O `push.js` compara a
+   chave e refaz a inscrição, mas só no próximo carregamento.
+3. **`localhost` × IP.** Inscrição feita em `http://localhost:8188` vale só para
+   aquela origem; abrir pelo IP não tem push (§2) e não é o mesmo registro de SW.
+4. **Worker vivo mas travado.** `docker exec chat_websocket supervisorctl status`
+   e o log em `/var/log/supervisor/push-worker.out.log`; itens presos em
+   `processando` indicam shutdown abrupto (são destravados no boot do worker).
+
+Se a decisão for **app nativo**, o que sobrevive desta implementação é toda a
+metade de servidor — `NotificationCenter`, `PushCenter` como outbox, `push_fila`,
+o worker e a regra de presença da §1.3 — trocando apenas o transporte
+(FCM/APNs direto para o app) e o `sw.js`/`push.js` pelo cliente do app.

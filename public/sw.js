@@ -45,16 +45,19 @@ self.addEventListener('push', function (event) {
 
     event.waitUntil((async function () {
         const janelas = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-        const visivel = janelas.find(function (cliente) {
-            return cliente.visibilityState === 'visible';
+        // Mesmo critério do appAtivo() do front: visível E com foco. Uma janela
+        // atrás de outro aplicativo continua 'visible', e um toast ali dentro
+        // ninguém veria — esse caso precisa do popup do SO.
+        const ativa = janelas.find(function (cliente) {
+            return cliente.visibilityState === 'visible' && cliente.focused;
         });
 
-        // O worker já descarta push de quem tem WebSocket vivo, mas existe uma
+        // O worker já descarta push de quem tem aba ativa, mas existe uma
         // janela de ~2s entre enfileirar e enviar em que o usuário pode voltar
         // para a aba. Nesse caso o aviso vira toast in-page, não popup do SO,
         // para não duplicar o que o WebSocket já mostrou.
-        if (visivel) {
-            visivel.postMessage({ tipo: 'push_recebido', payload: dados });
+        if (ativa) {
+            ativa.postMessage({ tipo: 'push_recebido', payload: dados });
             return;
         }
 

@@ -15,6 +15,7 @@ let diaSelecionado = null;
 let agendamentoAtual = null;
 let editandoServicoId = null;
 let wsAgendamentos = null;
+let wsAgendamentosAutenticado = false;
 let tabAtiva = AG_MODO === 'admin' ? 'kanban' : 'calendario';
 
 const HORA_INICIO = 7;
@@ -930,26 +931,53 @@ function prepararAgenda() {
 }
 
 // ── WebSocket ───────────────────────────────────────────────────────────────
+function enviarPresencaAgendamentos(ativo) {
+    if (!wsAgendamentos || wsAgendamentos.readyState !== WebSocket.OPEN) return;
+    wsAgendamentos.send(JSON.stringify({ type: 'presenca', ativo: !!ativo }));
+}
+
+let reenviarPresencaAgendamentos = null;
+
 function conectarWSAgendamentos() {
     try {
         wsAgendamentos = new WebSocket(window.urlWebSocket());
-        wsAgendamentos.onopen = () => wsAgendamentos.send(JSON.stringify({
-            type: 'auth', user_id: AG_USER_ID, user_nome: AG_USER_NAME, user_papel: AG_USER_PAPEL, conversa_id: 0,
-        }));
+        wsAgendamentos.onopen = () => {
+            wsAgendamentos.send(JSON.stringify({
+                type: 'auth', user_id: AG_USER_ID, user_nome: AG_USER_NAME, user_papel: AG_USER_PAPEL, conversa_id: 0,
+            }));
+
+            // O servidor só manda push para quem não tem aba ativa; sem
+            // reenviar isto depois de reconectar, o estado antigo ficaria valendo.
+            if (reenviarPresencaAgendamentos) {
+                reenviarPresencaAgendamentos();
+            } else {
+                reenviarPresencaAgendamentos = window.aoMudarAtividade(enviarPresencaAgendamentos);
+            }
+        };
         wsAgendamentos.onmessage = e => {
             try {
                 const msg = JSON.parse(e.data);
-                if (msg.type === 'schedule_updated') {
+                if (msg.type === 'auth_ok') {
+                    // Antes disto vem o replay das últimas 100 mensagens.
+                    wsAgendamentosAutenticado = true;
+                } else if (msg.type === 'schedule_updated') {
                     carregarServicos().catch(() => { });
                     carregarAgendamentos().catch(() => { });
                     if (agendamentoAtual && Number(msg.agendamento?.id) === Number(agendamentoAtual.id))
                         abrirDetalhe(Number(agendamentoAtual.id));
                 } else if (msg.type === 'notification_created' && window.NotificationCenterUI) {
                     window.NotificationCenterUI.handleRealtimeNotification(msg.notification);
+                } else if (msg.type === 'new_message' && wsAgendamentosAutenticado && window.NotificationCenterUI) {
+                    // Esta página tem socket próprio: sem isto, mensagem de chat
+                    // recebida aqui não avisaria nada.
+                    window.NotificationCenterUI.notificarMensagemChat(msg.message);
                 }
             } catch (_) { }
         };
-        wsAgendamentos.onclose = () => setTimeout(conectarWSAgendamentos, 3000);
+        wsAgendamentos.onclose = () => {
+            wsAgendamentosAutenticado = false;
+            setTimeout(conectarWSAgendamentos, 3000);
+        };
     } catch (e) {
         console.error('WS agendamentos', e);
     }

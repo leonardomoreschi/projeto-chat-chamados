@@ -69,6 +69,7 @@
     if (!SUPORTADO) {
         window.PushWeb = {
             suportado: false,
+            inscrito: function () { return false; },
             ativar: function () { return Promise.resolve(false); },
             desativar: function () { return Promise.resolve(false); },
             sincronizar: function () { return Promise.resolve(false); },
@@ -198,6 +199,22 @@
         })();
 
         return estado.sincronizando;
+    }
+
+    /**
+     * Este dispositivo vai receber o popup pelo Service Worker?
+     *
+     * Consultado pelo avisoDoSistema() (utils.js) para não mostrar um segundo
+     * aviso pela própria página. Durante a primeira sincronização a resposta é
+     * uma aposta pela permissão já concedida: melhor perder um aviso in-page de
+     * um segundo do que duplicar todos.
+     */
+    function inscrito() {
+        if (estado.inscricao) return true;
+
+        return estado.sincronizando !== null
+            && Notification.permission === 'granted'
+            && !optOut();
     }
 
     async function ativar() {
@@ -391,6 +408,7 @@
 
     window.PushWeb = {
         suportado: true,
+        inscrito: inscrito,
         ativar: ativar,
         desativar: desativar,
         sincronizar: sincronizarInscricao,

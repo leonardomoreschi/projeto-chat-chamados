@@ -9,7 +9,15 @@
         socket: null,
         reconectarTimer: null,
         idsProcessados: new Set(),
+        mensagensProcessadas: new Set(),
+        autenticado: false,
+        reenviarPresenca: null,
     };
+
+    function enviarPresenca(ativo) {
+        if (!state.socket || state.socket.readyState !== WebSocket.OPEN) return;
+        state.socket.send(JSON.stringify({ type: 'presenca', ativo: !!ativo }));
+    }
 
     function usuarioAtual() {
         return window.APP_USER || {};
@@ -131,15 +139,44 @@
         tocarSom(notificacao);
         updateBadgeDelta(1);
 
-        if (document.hidden && 'Notification' in window && Notification.permission === 'granted') {
-            const n = new Notification(String(notificacao.titulo || 'Nova notificação'), {
-                body: String(notificacao.mensagem || ''),
-            });
-            setTimeout(function () { n.close(); }, 5000);
+        // avisoDoSistema decide entre popup do SO, push (Service Worker) e
+        // toast — a mesma regra usada pelas mensagens de chat.
+        if (window.avisoDoSistema(notificacao.titulo || 'Nova notificação', notificacao.mensagem || '')) {
             return;
         }
 
         mostrarToast(notificacao);
+    }
+
+    /**
+     * Aviso de mensagem de chat nas páginas que não carregam o chat.js.
+     *
+     * Mensagem não entra na central nem no contador do sino (decisão do
+     * NotificationCenter): aqui é só som + aviso visual, para que quem está em
+     * "Meus chamados" ou no dashboard não perca a mensagem em silêncio.
+     */
+    function notificarMensagemChat(mensagem) {
+        if (!mensagem || !mensagem.id) return;
+        if (Number(mensagem.usuario_id) === Number(usuarioAtual().id)) return;
+
+        const id = Number(mensagem.id);
+        if (state.mensagensProcessadas.has(id)) return;
+        state.mensagensProcessadas.add(id);
+
+        if (window.SomNotificacoes) {
+            window.SomNotificacoes.tocar('mensagem', 'msg:' + id);
+        }
+
+        const titulo = 'Nova mensagem de ' + (mensagem.usuario_nome || 'Contato');
+        const corpo = String(mensagem.conteudo || 'Nova mensagem').substring(0, 100);
+
+        if (window.avisoDoSistema(titulo, corpo)) return;
+
+        mostrarToast({
+            titulo: titulo,
+            mensagem: corpo,
+            url: '/chat?conversa=' + Number(mensagem.conversa_id || 0),
+        });
     }
 
     async function marcarComoLida(id) {
@@ -182,6 +219,7 @@
         }
 
         state.socket.onopen = function () {
+            state.autenticado = false;
             state.socket.send(JSON.stringify({
                 type: 'auth',
                 user_id: usuario.id,
@@ -189,13 +227,27 @@
                 user_papel: usuario.papel || 'usuario',
                 conversa_id: 0,
             }));
+
+            // O servidor só manda push para quem não tem aba ativa; sem
+            // reenviar isto depois de reconectar, o estado antigo ficaria valendo.
+            if (state.reenviarPresenca) {
+                state.reenviarPresenca();
+            } else {
+                state.reenviarPresenca = window.aoMudarAtividade(enviarPresenca);
+            }
         };
 
         state.socket.onmessage = function (event) {
             try {
                 const msg = JSON.parse(event.data);
-                if (msg.type === 'notification_created') {
+                if (msg.type === 'auth_ok') {
+                    // Só depois daqui os new_message são novos de verdade: o
+                    // servidor replica as últimas 100 mensagens antes do auth_ok.
+                    state.autenticado = true;
+                } else if (msg.type === 'notification_created') {
                     notificar(msg.notification);
+                } else if (msg.type === 'new_message' && state.autenticado) {
+                    notificarMensagemChat(msg.message);
                 }
             } catch (_) {
                 // payload inesperado: ignora
@@ -203,6 +255,7 @@
         };
 
         state.socket.onclose = function () {
+            state.autenticado = false;
             if (state.reconectarTimer) clearTimeout(state.reconectarTimer);
             state.reconectarTimer = window.setTimeout(conectarSocket, 3000);
         };
@@ -228,6 +281,7 @@
         renderBadge: renderBadge,
         fetchResumo: fetchResumo,
         notificar: notificar,
+        notificarMensagemChat: notificarMensagemChat,
         mostrarToast: mostrarToast,
         marcarComoLida: marcarComoLida,
         marcarTodasComoLidas: marcarTodasComoLidas,

@@ -364,11 +364,13 @@ class PushCenter
             return 'expirado';
         }
 
-        // Quem está com WebSocket vivo já é atendido por notificacoes.js/chat.js
-        // (toast ou Notification na própria aba). Mandar push também renderia
-        // dois avisos para o mesmo fato.
-        if (self::usuarioOnline($pdo, (int) $item['usuario_id'])) {
-            return 'usuario_online';
+        // Quem está com a aba na frente já é atendido pelo toast in-page de
+        // notificacoes.js/chat.js; mandar push também renderia dois avisos para
+        // o mesmo fato. Note que o critério é "aba ativa" (o ChatServer só marca
+        // online = 1 com visibilidade + foco), e não "socket aberto": com o
+        // segundo, ninguém que deixasse o sistema aberto receberia popup algum.
+        if (self::usuarioAtivo($pdo, (int) $item['usuario_id'])) {
+            return 'usuario_ativo';
         }
 
         $notificacaoId = (int) ($item['notificacao_id'] ?? 0);
@@ -379,7 +381,13 @@ class PushCenter
         return null;
     }
 
-    private static function usuarioOnline(PDO $pdo, int $usuarioId): bool
+    /**
+     * O usuário tem alguma aba na frente agora?
+     *
+     * `user_presenca.online` é escrito pelo ChatServer a partir do evento
+     * 'presenca' do front (visibilidade + foco), renovado a cada 30s.
+     */
+    private static function usuarioAtivo(PDO $pdo, int $usuarioId): bool
     {
         try {
             // A janela é constante de classe e entra interpolada de propósito:
@@ -395,8 +403,8 @@ class PushCenter
             return (bool) $stmt->fetchColumn();
         } catch (\Throwable $e) {
             // Sem presença confiável é melhor entregar: o SW ainda suprime o
-            // popup se achar uma aba visível.
-            error_log('PushCenter::usuarioOnline falhou: ' . $e->getMessage());
+            // popup se achar uma aba ativa.
+            error_log('PushCenter::usuarioAtivo falhou: ' . $e->getMessage());
 
             return false;
         }
