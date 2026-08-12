@@ -40,6 +40,10 @@ const EXTENSOES_ANEXO_CHAMADO = [
     'step', 'stp', 'exe',
 ];
 const MAX_ANEXOS_MENSAGEM = 10; // limite validado em ChatController::enviarMensagem
+// Janela para apagar a própria mensagem. Espelha
+// ChatController::PRAZO_APAGAR_SEGUNDOS e a constante de mesmo nome no
+// ChatServer — aqui só some o botão; quem recusa de fato é o servidor.
+const PRAZO_APAGAR_MENSAGEM_MS = 60 * 1000;
 
 // ── WebSocket ─────────────────────────────────
 function conectarWS() {
@@ -583,9 +587,9 @@ function criarElementoMensagem(m) {
             : '<a href="' + arquivoUrl + '" target="_blank" download class="inline-flex mt-2 text-xs text-indigo-300 underline">Anexo: ' + (m.arquivo_nome || 'arquivo') + '</a>')
         : '';
 
-    const podeApagar = proprio && !foiApagada;
+    const podeApagar = proprio && !foiApagada && msRestantesParaApagar(m.criado_em) > 0;
     const btnApagar = podeApagar
-        ? '<button onclick="apagarMensagem(' + m.id + ')" class="opacity-0 group-hover:opacity-100 text-[10px] text-red-300 hover:text-red-200 transition">Apagar</button>'
+        ? '<button data-btn-apagar onclick="apagarMensagem(' + m.id + ')" class="opacity-0 group-hover:opacity-100 text-[10px] text-red-300 hover:text-red-200 transition">Apagar</button>'
         : '';
 
     const div = document.createElement('div');
@@ -601,7 +605,37 @@ function criarElementoMensagem(m) {
         + '<div class="' + (proprio ? 'bg-indigo-600' : 'bg-gray-800') + ' rounded-2xl ' + (proprio ? 'rounded-tr-sm' : 'rounded-tl-sm') + ' px-4 py-2.5 text-sm ' + (proprio ? 'text-white' : 'text-gray-200') + '">' + conteudoHtml + anexoHtml + '</div>'
         + '</div>';
 
+    if (podeApagar) {
+        agendarSumicoDoBotaoApagar(div, m.criado_em);
+    }
+
     return div;
+}
+
+/**
+ * Quanto falta para o prazo de exclusão acabar, em milissegundos.
+ * Zero (ou negativo) significa que já passou.
+ */
+function msRestantesParaApagar(criadoEm) {
+    const data = parseDataServidorBrasilia(criadoEm);
+    if (!data) return 0;
+
+    return PRAZO_APAGAR_MENSAGEM_MS - (Date.now() - data.getTime());
+}
+
+/**
+ * O botão precisa sumir sozinho: sem isto, uma mensagem aberta na tela
+ * continuaria oferecendo "Apagar" para sempre, e o clique só falharia no
+ * servidor.
+ */
+function agendarSumicoDoBotaoApagar(elemento, criadoEm) {
+    const restante = msRestantesParaApagar(criadoEm);
+    if (restante <= 0) return;
+
+    setTimeout(function () {
+        const botao = elemento.querySelector('[data-btn-apagar]');
+        if (botao) botao.remove();
+    }, restante);
 }
 
 function formatarConteudoMensagem(texto) {

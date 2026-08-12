@@ -13,6 +13,14 @@ class ChatServer implements MessageComponentInterface
 {
     use SchemaInspector;
 
+    /**
+     * Janela para o autor apagar a propria mensagem.
+     *
+     * Espelha App\Controllers\ChatController::PRAZO_APAGAR_SEGUNDOS (caminho
+     * HTTP) e PRAZO_APAGAR_MENSAGEM_MS em chat.js (esconde o botao).
+     */
+    private const PRAZO_APAGAR_SEGUNDOS = 60;
+
     private SplObjectStorage $clients;
 
     /**
@@ -195,7 +203,7 @@ class ChatServer implements MessageComponentInterface
                     $pdo = getDbConnection();
 
                     $stmtMsg = $pdo->prepare(
-                        'SELECT m.id, m.conversa_id, m.usuario_id
+                        'SELECT m.id, m.conversa_id, m.usuario_id, m.criado_em
                          FROM mensagens m
                          INNER JOIN participantes p ON p.conversa_id = m.conversa_id AND p.usuario_id = ?
                          WHERE m.id = ?
@@ -216,6 +224,19 @@ class ChatServer implements MessageComponentInterface
                     $dono = (int) $msg['usuario_id'] === (int) $from->userId;
                     if (!$dono && $papel !== 'admin') {
                         $from->send(json_encode(['type' => 'action_error', 'action' => 'delete_message', 'message' => 'Sem permissao para apagar']));
+                        return;
+                    }
+
+                    // Prazo vale para todo mundo, inclusive admin: passou de 1
+                    // minuto, a mensagem e definitiva. Data ilegivel conta como
+                    // fora do prazo. Mesmo limite em ChatController e chat.js.
+                    $criadoEm = strtotime((string) ($msg['criado_em'] ?? ''));
+                    if ($criadoEm === false || (time() - $criadoEm) > self::PRAZO_APAGAR_SEGUNDOS) {
+                        $from->send(json_encode([
+                            'type' => 'action_error',
+                            'action' => 'delete_message',
+                            'message' => 'O prazo para apagar esta mensagem (1 minuto) já passou',
+                        ], JSON_UNESCAPED_UNICODE));
                         return;
                     }
 

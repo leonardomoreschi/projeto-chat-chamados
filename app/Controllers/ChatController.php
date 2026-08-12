@@ -11,6 +11,17 @@ class ChatController
 {
     use SchemaInspector;
 
+    /**
+     * Janela para o autor apagar a própria mensagem.
+     *
+     * O mesmo limite existe em `ChatServer` (case 'delete_message', o caminho
+     * usado quando o WebSocket está vivo) e em `chat.js`
+     * (`PRAZO_APAGAR_MENSAGEM_MS`, que só esconde o botão). Mudou aqui, mude
+     * nos três — não há classe compartilhada porque o autoloader é otimizado e
+     * arquivo novo só entra depois de `composer dump-autoload`.
+     */
+    public const PRAZO_APAGAR_SEGUNDOS = 60;
+
     // GET /api/conversas
     public function listarConversas(Request $request, Response $response): Response
     {
@@ -203,7 +214,7 @@ class ChatController
         $mensagemId = (int) $args['id'];
         $pdo = getDbConnection();
 
-        $stmtBusca = $pdo->prepare('SELECT id, usuario_id FROM mensagens WHERE id = ? LIMIT 1');
+        $stmtBusca = $pdo->prepare('SELECT id, usuario_id, criado_em FROM mensagens WHERE id = ? LIMIT 1');
         $stmtBusca->execute([$mensagemId]);
         $msg = $stmtBusca->fetch(\PDO::FETCH_ASSOC);
 
@@ -214,6 +225,14 @@ class ChatController
         $dono = (int) $msg['usuario_id'] === $userId;
         if (!$dono && $papel !== 'admin') {
             return Json::erro($response, 'Sem permissão para apagar esta mensagem', 403);
+        }
+
+        // Prazo vale para todo mundo, inclusive admin: passou de 1 minuto, a
+        // mensagem é definitiva. Data ilegível conta como fora do prazo, para
+        // não virar exclusão liberada para sempre.
+        $criadoEm = strtotime((string) ($msg['criado_em'] ?? ''));
+        if ($criadoEm === false || (time() - $criadoEm) > self::PRAZO_APAGAR_SEGUNDOS) {
+            return Json::erro($response, 'O prazo para apagar esta mensagem (1 minuto) já passou', 403);
         }
 
         $temExclusao = $this->columnExists($pdo, 'mensagens', 'excluida_em') && $this->columnExists($pdo, 'mensagens', 'excluida_por');
