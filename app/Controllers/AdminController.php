@@ -5,9 +5,12 @@ namespace App\Controllers;
 use Psr\Http\Message\ResponseInterface as Response;
 use Psr\Http\Message\ServerRequestInterface as Request;
 use App\Helpers\Response as Json;
+use App\Support\SchemaInspector;
 
 class AdminController
 {
+    use SchemaInspector;
+
     // ── USUÁRIOS ──────────────────────────────
 
     // GET /api/admin/usuarios
@@ -65,11 +68,21 @@ class AdminController
         }
         $offset = ($page - 1) * $perPage;
 
+        // Presença é o estado inicial da coluna "Conexão"; a partir daí quem
+        // atualiza é o evento presence_updated do WebSocket (admin.js).
+        $temPresenca = $this->tableExists($pdo, 'user_presenca');
+        $selectPresenca = $temPresenca
+            ? 'COALESCE(up.online, 0) AS online, up.last_seen'
+            : '0 AS online, NULL AS last_seen';
+        $joinPresenca = $temPresenca ? 'LEFT JOIN user_presenca up ON up.usuario_id = u.id' : '';
+
         $stmt = $pdo->prepare(
             "SELECT u.id, u.nome, u.email, u.papel, u.ativo,
-                    u.criado_em, s.id AS setor_id, s.nome AS setor
+                    u.criado_em, s.id AS setor_id, s.nome AS setor,
+                    {$selectPresenca}
              FROM usuarios u
              LEFT JOIN setores s ON s.id = u.setor_id
+             {$joinPresenca}
              {$whereSql}
              ORDER BY u.nome ASC
              LIMIT {$perPage} OFFSET {$offset}"
@@ -84,6 +97,30 @@ class AdminController
                 'total' => $total,
                 'total_pages' => $totalPages,
             ],
+        ]);
+    }
+
+    /**
+     * GET /api/admin/usuarios/presenca
+     *
+     * Só quem está online, em resposta mínima. O painel usa isto para
+     * reconciliar a coluna "Conexão" quando o WebSocket cai e volta — o tempo
+     * real de verdade vem do evento `presence_updated`.
+     */
+    public function listarPresenca(Request $request, Response $response): Response
+    {
+        $pdo = getDbConnection();
+
+        if (!$this->tableExists($pdo, 'user_presenca')) {
+            return Json::json($response, ['online' => []]);
+        }
+
+        $stmt = $pdo->query(
+            'SELECT usuario_id FROM user_presenca WHERE online = 1'
+        );
+
+        return Json::json($response, [
+            'online' => array_map('intval', $stmt->fetchAll(\PDO::FETCH_COLUMN)),
         ]);
     }
 

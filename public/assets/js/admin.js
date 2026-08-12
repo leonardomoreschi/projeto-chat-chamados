@@ -3,6 +3,9 @@ const CORES_PAPEL = { admin: 'bg-purple-500/20 text-purple-400', ti: 'bg-blue-50
 let usuarioEditandoId = null;
 let usuariosPaginaAtual = [];
 let debounceBuscaUsuarios = null;
+let presencaOnline = new Set();
+let wsPresenca = null;
+let reconectarPresencaTimer = null;
 const estadoUsuarios = {
     page: 1,
     perPage: 7,
@@ -52,9 +55,19 @@ async function carregarUsuarios() {
     atualizarRodapePaginacao();
 
     if (!lista.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="text-center py-8 text-gray-500 text-sm">Nenhum usuário cadastrado</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-8 text-gray-500 text-sm">Nenhum usuário cadastrado</td></tr>';
         return;
     }
+
+    // A listagem traz o estado atual da presença; a partir daqui quem manda é
+    // o WebSocket (presence_updated).
+    lista.forEach(u => {
+        if (Number(u.online || 0) === 1) {
+            presencaOnline.add(Number(u.id));
+        } else {
+            presencaOnline.delete(Number(u.id));
+        }
+    });
 
     tbody.innerHTML = lista.map(u => `
         <tr class="hover:bg-gray-800/50 transition">
@@ -78,6 +91,7 @@ async function carregarUsuarios() {
                     ${u.ativo ? 'Ativo' : 'Inativo'}
                 </span>
             </td>
+            <td class="px-6 py-4" data-presenca-usuario="${u.id}">${badgePresenca(u.id)}</td>
             <td class="px-6 py-4">
                 <div class="flex items-center gap-2">
                     <button onclick="editarUsuario(${u.id})"
@@ -351,6 +365,111 @@ async function deletarSetor(id, nome) {
     mostrarToast('Setor removido.');
 }
 
+// ── Presença (coluna "Conexão") ───────────────
+//
+// Online = o usuário tem o sistema aberto em alguma aba (conexão WebSocket
+// viva). O estado inicial vem junto da listagem; as mudanças chegam pelo evento
+// `presence_updated`, que o ChatServer manda só para conexões de admin. O poll
+// de 30s é rede de segurança para o intervalo em que o WebSocket esteve caído.
+
+function badgePresenca(usuarioId) {
+    const online = presencaOnline.has(Number(usuarioId));
+    const cor = online ? 'bg-green-500/20 text-green-400' : 'bg-gray-500/20 text-gray-400';
+    const ponto = online ? 'bg-green-400' : 'bg-gray-500';
+
+    return `<span class="text-xs font-medium px-2.5 py-1 rounded-lg inline-flex items-center gap-1.5 ${cor}">
+                <span class="w-1.5 h-1.5 rounded-full ${ponto}"></span>${online ? 'Online' : 'Offline'}
+            </span>`;
+}
+
+/** Repinta só as células de presença, sem redesenhar a tabela inteira. */
+function aplicarPresencaNaTabela() {
+    document.querySelectorAll('[data-presenca-usuario]').forEach(celula => {
+        celula.innerHTML = badgePresenca(celula.dataset.presencaUsuario);
+    });
+}
+
+function marcarPresenca(usuarioId, online) {
+    const id = Number(usuarioId);
+    if (!id) return;
+
+    if (online) {
+        presencaOnline.add(id);
+    } else {
+        presencaOnline.delete(id);
+    }
+
+    const celula = document.querySelector(`[data-presenca-usuario="${id}"]`);
+    if (celula) celula.innerHTML = badgePresenca(id);
+}
+
+async function sincronizarPresenca() {
+    try {
+        const res = await fetch('/api/admin/usuarios/presenca');
+        if (!res.ok) return;
+
+        const data = await res.json();
+        presencaOnline = new Set((data.online || []).map(Number));
+        aplicarPresencaNaTabela();
+    } catch (_) {
+        // Sem fallback visível: a coluna mantém o último estado conhecido.
+    }
+}
+
+function indicarConexaoPainel(ativa) {
+    const el = document.getElementById('presenca-indicador');
+    if (!el) return;
+    el.classList.toggle('text-green-500', ativa);
+    el.classList.toggle('text-gray-600', !ativa);
+    el.title = ativa ? 'Atualização em tempo real ativa' : 'Reconectando…';
+}
+
+function conectarPresencaWS() {
+    const usuario = window.APP_USER || {};
+    if (!usuario.id || !('WebSocket' in window)) return;
+
+    try {
+        wsPresenca = new WebSocket('ws://' + window.location.hostname + ':8080');
+    } catch (_) {
+        return;
+    }
+
+    wsPresenca.onopen = () => {
+        indicarConexaoPainel(true);
+        wsPresenca.send(JSON.stringify({
+            type: 'auth',
+            user_id: usuario.id,
+            user_nome: usuario.nome || '',
+            user_papel: usuario.papel || 'admin',
+            conversa_id: 0,
+            // Esta aba só quer presença: dispensa o replay de mensagens e o
+            // ciclo de sincronização de 0,8s do servidor.
+            somente_presenca: true,
+        }));
+
+        // Reconecta depois de uma queda: o que mudou enquanto esteve fora não
+        // chegou por evento nenhum.
+        sincronizarPresenca();
+    };
+
+    wsPresenca.onmessage = evento => {
+        try {
+            const msg = JSON.parse(evento.data);
+            if (msg.type === 'presence_updated') {
+                marcarPresenca(msg.usuario_id, !!msg.online);
+            }
+        } catch (_) {
+            // payload inesperado: ignora
+        }
+    };
+
+    wsPresenca.onclose = () => {
+        indicarConexaoPainel(false);
+        clearTimeout(reconectarPresencaTimer);
+        reconectarPresencaTimer = setTimeout(conectarPresencaWS, 3000);
+    };
+}
+
 // ── Toast ─────────────────────────────────────
 function mostrarToast(msg) {
     const t = document.createElement('div');
@@ -365,4 +484,9 @@ document.addEventListener('DOMContentLoaded', async () => {
     await carregarSetoresNoSelect();
     configurarFiltrosUsuarios();
     carregarUsuarios();
+
+    conectarPresencaWS();
+    // Reconciliação periódica: cobre evento perdido e aba que ficou em segundo
+    // plano com o socket suspenso pelo navegador.
+    setInterval(sincronizarPresenca, 30000);
 });

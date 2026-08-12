@@ -45,6 +45,8 @@ $app->get('/admin', function ($request, $response) {
     $userId = (int) $request->getAttribute('user_id');
     return TemplateRenderer::render($response, __DIR__ . '/../templates/admin.php', [
         'userName' => $userName,
+        'userId' => $userId,
+        'userPapel' => $request->getAttribute('user_papel'),
         'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), $userId),
     ]);
 })->add(new AdminMiddleware())->add(new AuthMiddleware());
@@ -184,7 +186,7 @@ $app->group('/api', function ($group) {
     $group->get('/mensagens',        [ChatController::class, 'listarMensagens']);
     $group->post('/mensagens',       [ChatController::class, 'enviarMensagem']);
     $group->delete('/mensagens/{id}',[ChatController::class, 'apagarMensagem']);
-    $group->get('/usuarios/online',  [ChatController::class, 'listarUsuarios']);
+    $group->get('/usuarios',         [ChatController::class, 'listarUsuarios']);
 
     // Notificações
     $group->get('/notificacoes', [NotificacaoController::class, 'listar']);
@@ -235,16 +237,20 @@ $app->group('/api', function ($group) {
     $group->patch('/servicos-agendamento/{id}', [AgendamentoController::class, 'atualizarServico']);
     $group->delete('/servicos-agendamento/{id}', [AgendamentoController::class, 'desativarServico']);
 
-    // Admin — usuários
-    $group->get('/admin/usuarios',         [AdminController::class, 'listarUsuarios']);
-    $group->post('/admin/usuarios',        [AdminController::class, 'criarUsuario']);
-    $group->patch('/admin/usuarios/{id}',  [AdminController::class, 'atualizarUsuario']);
-    $group->delete('/admin/usuarios/{id}', [AdminController::class, 'desativarUsuario']);
+    // Admin — usuários e setores.
+    // O AdminMiddleware fica no grupo: só o painel (admin.js) consome estas
+    // rotas, e a presença dos usuários não pode vazar para quem não é admin.
+    $group->group('/admin', function ($admin) {
+        $admin->get('/usuarios',            [AdminController::class, 'listarUsuarios']);
+        $admin->get('/usuarios/presenca',   [AdminController::class, 'listarPresenca']);
+        $admin->post('/usuarios',           [AdminController::class, 'criarUsuario']);
+        $admin->patch('/usuarios/{id}',     [AdminController::class, 'atualizarUsuario']);
+        $admin->delete('/usuarios/{id}',    [AdminController::class, 'desativarUsuario']);
 
-    // Admin — setores
-    $group->get('/admin/setores',          [AdminController::class, 'listarSetores']);
-    $group->post('/admin/setores',         [AdminController::class, 'criarSetor']);
-    $group->delete('/admin/setores/{id}',  [AdminController::class, 'deletarSetor']);
+        $admin->get('/setores',             [AdminController::class, 'listarSetores']);
+        $admin->post('/setores',            [AdminController::class, 'criarSetor']);
+        $admin->delete('/setores/{id}',     [AdminController::class, 'deletarSetor']);
+    })->add(new AdminMiddleware());
 })->add(new AuthMiddleware());
 
 $app->get('/', function ($request, $response) {

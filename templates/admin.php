@@ -6,6 +6,14 @@
     <title>Admin — Chat Interno</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
+    <script>
+        // Identidade para o WebSocket que alimenta a coluna "Conexão".
+        window.APP_USER = <?= json_encode([
+            'id' => (int) ($userId ?? 0),
+            'nome' => (string) ($userName ?? ''),
+            'papel' => (string) ($userPapel ?? 'admin'),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    </script>
     <style>
     </style>
 </head>
@@ -100,11 +108,15 @@
                         <th class="text-left px-6 py-3">Setor</th>
                         <th class="text-left px-6 py-3">Papel</th>
                         <th class="text-left px-6 py-3">Status</th>
+                        <th class="text-left px-6 py-3">
+                            Conexão
+                            <span id="presenca-indicador" class="ml-1 text-[10px] normal-case tracking-normal text-gray-600" title="Atualização em tempo real">•</span>
+                        </th>
                         <th class="text-left px-6 py-3">Ações</th>
                     </tr>
                 </thead>
                 <tbody id="tabela-usuarios" class="divide-y divide-gray-800">
-                    <tr><td colspan="6" class="text-center py-8 text-gray-500 text-sm">Carregando...</td></tr>
+                    <tr><td colspan="7" class="text-center py-8 text-gray-500 text-sm">Carregando...</td></tr>
                 </tbody>
             </table>
             </div>

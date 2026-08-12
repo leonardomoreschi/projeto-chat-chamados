@@ -58,10 +58,8 @@
             </div>
             <div>
                 <p class="text-sm font-semibold text-white"><?= htmlspecialchars($userName) ?></p>
-                <p class="text-xs text-green-400 flex items-center gap-1">
-                    <span class="w-1.5 h-1.5 bg-green-400 rounded-full inline-block"></span>
-                    Online
-                </p>
+                <?php $rotulosPapel = ['admin' => 'Admin', 'ti' => 'TI', 'usuario' => 'Usuário']; ?>
+                <p class="text-xs text-gray-400"><?= htmlspecialchars($rotulosPapel[$userPapel] ?? 'Usuário') ?></p>
             </div>
         </div>
         <div class="flex items-center gap-1">

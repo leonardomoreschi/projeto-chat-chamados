@@ -228,27 +228,25 @@ class ChatController
         return Json::json($response, ['ok' => true]);
     }
 
-    // GET /api/usuarios/online
+    /**
+     * GET /api/usuarios
+     *
+     * Lista para montar conversas (sidebar, nova conversa, grupos). **Não**
+     * devolve presença de propósito: quem está online só o admin vê, no painel
+     * administrativo (`/api/admin/usuarios/presenca`).
+     */
     public function listarUsuarios(Request $request, Response $response): Response
     {
         $userId = $request->getAttribute('user_id');
         $pdo    = getDbConnection();
 
-        $temPresenca = $this->tableExists($pdo, 'user_presenca');
-        $joinPresenca = $temPresenca ? 'LEFT JOIN user_presenca up ON up.usuario_id = u.id' : '';
-        $selectPresenca = $temPresenca
-            ? 'COALESCE(up.online, 0) AS online, up.last_seen AS last_seen,'
-            : '0 AS online, NULL AS last_seen,';
-
-        $stmt = $pdo->prepare(" 
-            SELECT u.id, u.nome, u.papel, s.nome AS setor, {$selectPresenca}
-                   u.ativo
+        $stmt = $pdo->prepare('
+            SELECT u.id, u.nome, u.papel, s.nome AS setor, u.ativo
             FROM usuarios u
             LEFT JOIN setores s ON s.id = u.setor_id
-            {$joinPresenca}
             WHERE u.ativo = 1 AND u.id != ?
-            ORDER BY online DESC, u.nome ASC
-        ");
+            ORDER BY u.nome ASC
+        ');
         $stmt->execute([$userId]);
 
         return Json::json($response, $stmt->fetchAll());

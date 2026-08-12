@@ -15,10 +15,25 @@ class ChatServer implements MessageComponentInterface
 
     private SplObjectStorage $clients;
 
+    /**
+     * Ultimo estado de presenca ja anunciado, por usuario.
+     *
+     * Serve para so mandar `presence_updated` quando algo muda de verdade: sem
+     * isso, cada aba aberta/fechada de um mesmo usuario viraria um broadcast.
+     *
+     * @var array<int, bool>
+     */
+    private array $presencaAnunciada = [];
+
     public function __construct()
     {
         $this->clients = new SplObjectStorage();
         echo "Servidor de chat iniciado!\n";
+
+        // Este processo e o unico que escreve user_presenca: se ele caiu com
+        // gente conectada, sobraram linhas online=1 mentindo para sempre - e o
+        // painel do admin mostraria como online quem ja foi embora.
+        $this->zerarPresencaResidual();
 
         // Busca mudancas geradas fora do WS (ex.: mensagens automaticas de chamado)
         Loop::addPeriodicTimer(0.8, function (): void {
@@ -43,6 +58,9 @@ class ChatServer implements MessageComponentInterface
         $conn->lastSeenDeletionAt = date('Y-m-d H:i:s');
         $conn->lastSeenAgendamentoUpdateAt = date('Y-m-d H:i:s');
         $conn->lastSeenNotificationId = 0;
+        // Conexao so para acompanhar presenca (painel do admin): nao recebe
+        // replay de mensagens nem entra no ciclo de sincronizacao.
+        $conn->somentePresenca = false;
         echo "Nova conexão: #{$conn->resourceId} | Total: {$this->clients->count()}\n";
     }
 
@@ -62,7 +80,8 @@ class ChatServer implements MessageComponentInterface
                 $from->lastSeenConversationId = 0;
                 $from->lastSeenDeletionAt = date('Y-m-d H:i:s');
                 $from->lastSeenAgendamentoUpdateAt = date('Y-m-d H:i:s');
-                $this->atualizarPresenca($from->userId, true);
+                $from->somentePresenca = !empty($data['somente_presenca']);
+                $this->sincronizarPresencaUsuario((int) $from->userId);
                 try {
                     $pdo = getDbConnection();
                     $stmtNotif = $pdo->prepare('SELECT COALESCE(MAX(id), 0) FROM notificacoes WHERE usuario_id = ?');
@@ -73,7 +92,9 @@ class ChatServer implements MessageComponentInterface
                 }
                 echo "Autenticado: {$from->userName} (#{$from->userId})\n";
                 // Sincronização inicial para pegar mensagens recentes
-                $this->sincronizacaoInicial($from);
+                if (!$from->somentePresenca) {
+                    $this->sincronizacaoInicial($from);
+                }
                 $from->send(json_encode(['type' => 'auth_ok', 'userId' => $from->userId]));
                 break;
 
@@ -239,10 +260,14 @@ class ChatServer implements MessageComponentInterface
 
     public function onClose(ConnectionInterface $conn): void
     {
-        if (!empty($conn->userId)) {
-            $this->atualizarPresenca((int) $conn->userId, false);
-        }
+        // Detach antes de recalcular: senao a conexao que esta fechando ainda
+        // contaria, e recalcular (em vez de marcar offline direto) evita que
+        // fechar uma aba derrube a presenca de outra ainda aberta.
+        $userId = (int) ($conn->userId ?? 0);
         $this->clients->detach($conn);
+        if ($userId > 0) {
+            $this->sincronizarPresencaUsuario($userId);
+        }
         echo "Conexão fechada: #{$conn->resourceId} ({$conn->userName}) | Total: {$this->clients->count()}\n";
     }
 
@@ -250,6 +275,68 @@ class ChatServer implements MessageComponentInterface
     {
         error_log("WebSocket erro: " . $e->getMessage());
         $conn->close();
+    }
+
+    /**
+     * Recalcula a presenca do usuario a partir das conexoes vivas e, se mudou,
+     * avisa os admins conectados.
+     *
+     * Online = tem pelo menos uma conexao WebSocket aberta, ou seja, tem o
+     * sistema aberto em alguma aba. E o que a coluna "Conexao" do painel do
+     * admin mostra.
+     */
+    private function sincronizarPresencaUsuario(int $userId): void
+    {
+        if ($userId <= 0) {
+            return;
+        }
+
+        $online = false;
+        foreach ($this->clients as $client) {
+            if ((int) ($client->userId ?? 0) === $userId) {
+                $online = true;
+                break;
+            }
+        }
+
+        $this->atualizarPresenca($userId, $online);
+
+        if (($this->presencaAnunciada[$userId] ?? null) === $online) {
+            return;
+        }
+
+        $this->presencaAnunciada[$userId] = $online;
+        $this->broadcastPresenca($userId, $online);
+    }
+
+    /**
+     * Presenca so interessa ao painel administrativo, entao o evento vai apenas
+     * para as conexoes de admin.
+     */
+    private function broadcastPresenca(int $userId, bool $online): void
+    {
+        $payload = json_encode([
+            'type' => 'presence_updated',
+            'usuario_id' => $userId,
+            'online' => $online,
+            'atualizado_em' => date('Y-m-d H:i:s'),
+        ], JSON_UNESCAPED_UNICODE);
+
+        foreach ($this->clients as $client) {
+            if (($client->userPapel ?? '') === 'admin') {
+                $client->send($payload);
+            }
+        }
+    }
+
+    private function zerarPresencaResidual(): void
+    {
+        try {
+            getDbConnection()->exec('UPDATE user_presenca SET online = 0 WHERE online = 1');
+        } catch (\Throwable $e) {
+            // Tabela ainda inexistente no primeiro boot: atualizarPresenca cria.
+            error_log('Falha ao zerar presenca residual: ' . $e->getMessage());
+        }
     }
 
     private function atualizarPresenca(int $userId, bool $online): void
@@ -272,7 +359,7 @@ class ChatServer implements MessageComponentInterface
     private function sincronizarAtualizacoes(): void
     {
         foreach ($this->clients as $client) {
-            if (empty($client->userId)) {
+            if (empty($client->userId) || !empty($client->somentePresenca)) {
                 continue;
             }
 

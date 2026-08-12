@@ -148,7 +148,7 @@ Todas as rotas de API exigem sessão autenticada.
 - GET /api/mensagens
 - POST /api/mensagens
 - DELETE /api/mensagens/{id}
-- GET /api/usuarios/online
+- GET /api/usuarios (lista para montar conversas; **não** devolve presença)
 
 ### Chamados
 
@@ -196,7 +196,10 @@ Todas as rotas de API exigem sessão autenticada.
 
 ### Admin
 
-- GET /api/admin/usuarios
+Todas sob `AdminMiddleware` (403 para quem não é admin).
+
+- GET /api/admin/usuarios (inclui `online`/`last_seen` para a coluna "Conexão")
+- GET /api/admin/usuarios/presenca (ids online; reconciliação do tempo real)
 - POST /api/admin/usuarios
 - PATCH /api/admin/usuarios/{id}
 - DELETE /api/admin/usuarios/{id}
@@ -216,7 +219,7 @@ Comportamento:
 
 Eventos usados no canal:
 
-- auth
+- auth (aceita `somente_presenca: true` — conexão que só acompanha presença, sem replay de mensagens)
 - auth_ok
 - join
 - send_message
@@ -224,6 +227,7 @@ Eventos usados no canal:
 - notification_created
 - typing
 - message_deleted
+- presence_updated (usuário ficou online/offline; enviado **apenas** para conexões de admin)
 
 ## Estrutura resumida de dados
 

@@ -380,7 +380,7 @@ function mostrarEstadoConversa() {
 
 // ── Usuários (sidebar) ────────────────────────
 async function carregarUsuarios() {
-    const res = await fetch('/api/usuarios/online');
+    const res = await fetch('/api/usuarios');
     const lista = await res.json();
     const nav = document.getElementById('lista-usuarios');
     nav.innerHTML = '';
@@ -390,20 +390,17 @@ async function carregarUsuarios() {
         return;
     }
 
+    // Sem indicador de presença aqui: quem está online é informação restrita ao
+    // painel administrativo (coluna "Conexão" em /admin).
     const cores = ['bg-pink-700', 'bg-emerald-700', 'bg-amber-700', 'bg-purple-700'];
     lista.forEach(function (u) {
         const cor = cores[u.id % cores.length];
-        const isOnline = !!parseInt(u.online || 0, 10);
-        const statusTexto = isOnline ? 'Online' : 'Offline';
-        const statusCor = isOnline ? 'text-green-400' : 'text-gray-500';
-        const dotCor = isOnline ? 'bg-green-400' : 'bg-gray-500';
 
         const btn = document.createElement('button');
         btn.className = 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left';
         btn.innerHTML = '<div class="w-9 h-9 ' + cor + ' rounded-xl flex items-center justify-center text-sm font-bold shrink-0">' + u.nome.charAt(0).toUpperCase() + '</div>'
             + '<div class="flex-1 min-w-0"><p class="text-sm font-medium text-white truncate">' + u.nome + '</p>'
-            + '<p class="text-xs text-gray-400 truncate">' + (u.setor || u.papel) + '</p>'
-            + '<p class="text-xs ' + statusCor + ' truncate flex items-center gap-1"><span class="w-1.5 h-1.5 rounded-full ' + dotCor + '"></span>' + statusTexto + '</p></div>';
+            + '<p class="text-xs text-gray-400 truncate">' + (u.setor || u.papel) + '</p></div>';
         nav.appendChild(btn);
     });
 }
@@ -1013,7 +1010,7 @@ function trocarTipoConversa(tipo) {
 }
 
 async function carregarUsuariosModal() {
-    const res = await fetch('/api/usuarios/online');
+    const res = await fetch('/api/usuarios');
     const lista = await res.json();
     const div = document.getElementById('lista-usuarios-conversa');
     if (!lista.length) {
@@ -1032,7 +1029,7 @@ async function carregarUsuariosModal() {
 }
 
 async function carregarUsuariosGrupo() {
-    const res = await fetch('/api/usuarios/online');
+    const res = await fetch('/api/usuarios');
     const lista = await res.json();
     const div = document.getElementById('lista-usuarios-grupo');
     const cores = ['bg-pink-700', 'bg-emerald-700', 'bg-amber-700', 'bg-purple-700', 'bg-blue-700'];
@@ -1240,7 +1237,7 @@ async function salvarDescricaoGrupo() {
 async function carregarMembrosGrupo() {
     const resMembros = await fetch('/api/conversas/' + grupoEditandoId + '/participantes');
     const membros = await resMembros.json();
-    const resAll = await fetch('/api/usuarios/online');
+    const resAll = await fetch('/api/usuarios');
     const todos = await resAll.json();
 
     const divMembros = document.getElementById('editar-grupo-membros');
