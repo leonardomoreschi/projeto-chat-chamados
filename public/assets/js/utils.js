@@ -3,6 +3,26 @@
         return;
     }
 
+    /**
+     * Sessão derrubada pelo servidor → volta para o login.
+     *
+     * O AuthMiddleware responde 401 nas rotas /api quando a conta teve e-mail,
+     * senha ou papel alterados (ou foi desativada). Sem isto o fetch receberia
+     * o 401 calado e a tela continuaria aberta, aparentando funcionar.
+     */
+    const fetchOriginal = window.fetch.bind(window);
+
+    window.fetch = function (...argumentos) {
+        return fetchOriginal(...argumentos).then(function (resposta) {
+            if (resposta.status === 401 && !window.redirecionandoParaLogin) {
+                window.redirecionandoParaLogin = true;
+                window.location.href = '/login';
+            }
+
+            return resposta;
+        });
+    };
+
     window.escapeHtml = function escapeHtml(valor) {
         return String(valor || '')
             .replace(/&/g, '&amp;')

@@ -25,6 +25,9 @@ CREATE TABLE usuarios (
     setor_id     INT UNSIGNED,
     papel        ENUM('admin','ti','usuario') NOT NULL DEFAULT 'usuario',
     ativo        TINYINT(1) NOT NULL DEFAULT 1,
+    -- Incrementada quando o admin mexe em e-mail, senha, papel ou desativa a
+    -- conta: sessoes abertas com versao anterior sao derrubadas (AuthMiddleware).
+    sessao_versao INT UNSIGNED NOT NULL DEFAULT 0,
     criado_em    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (setor_id) REFERENCES setores(id) ON DELETE SET NULL,
     INDEX idx_email (email)

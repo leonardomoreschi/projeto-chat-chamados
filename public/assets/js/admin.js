@@ -6,6 +6,8 @@ let debounceBuscaUsuarios = null;
 let presencaOnline = new Set();
 let wsPresenca = null;
 let reconectarPresencaTimer = null;
+// Cancelamento do modal de confirmação em aberto (definido por pedirCredenciaisAdmin).
+let confirmacaoAdminPendente = null;
 const estadoUsuarios = {
     page: 1,
     perPage: 7,
@@ -157,7 +159,9 @@ async function editarUsuario(id) {
     document.getElementById('senha-hint').textContent = '(deixe em branco para não alterar)';
     document.getElementById('usuario-nome').value = u.nome;
     document.getElementById('usuario-email').value = u.email;
-    document.getElementById('usuario-email').disabled = true;
+    // E-mail é editável também na edição; a troca é confirmada com a senha do
+    // admin no salvar, e o backend recusa e-mail repetido.
+    document.getElementById('usuario-email').disabled = false;
     document.getElementById('usuario-senha').value = '';
     document.getElementById('usuario-papel').value = u.papel;
     document.getElementById('modal-usuario').classList.remove('hidden');
@@ -174,10 +178,6 @@ function fecharModalUsuario() {
 }
 
 async function salvarUsuario() {
-    const btn = document.getElementById('btn-salvar-usuario');
-    btn.disabled = true;
-    btn.textContent = 'Salvando...';
-
     const body = new URLSearchParams({
         nome: document.getElementById('usuario-nome').value.trim(),
         email: document.getElementById('usuario-email').value.trim(),
@@ -185,6 +185,22 @@ async function salvarUsuario() {
         papel: document.getElementById('usuario-papel').value,
         setor_id: document.getElementById('usuario-setor').value,
     });
+
+    // Editar exige reconferir quem está no teclado; criar não altera dado de
+    // ninguém e segue direto.
+    if (usuarioEditandoId) {
+        const credenciais = await pedirCredenciaisAdmin(
+            'Confirme seu e-mail e senha de administrador para salvar as alterações deste usuário.'
+        );
+        if (!credenciais) return;
+
+        body.set('admin_email', credenciais.email);
+        body.set('admin_senha', credenciais.senha);
+    }
+
+    const btn = document.getElementById('btn-salvar-usuario');
+    btn.disabled = true;
+    btn.textContent = 'Salvando...';
 
     try {
         const url = usuarioEditandoId ? `/api/admin/usuarios/${usuarioEditandoId}` : '/api/admin/usuarios';
@@ -207,18 +223,136 @@ async function salvarUsuario() {
 
 async function desativarUsuario(id, nome) {
     if (!confirm(`Desativar o usuário "${nome}"? Ele não conseguirá mais fazer login.`)) return;
-    const res = await fetch(`/api/admin/usuarios/${id}`, { method: 'DELETE' });
-    if (res.ok) { carregarUsuarios(); mostrarToast('Usuário desativado.'); }
+
+    const credenciais = await pedirCredenciaisAdmin(
+        `Confirme seu e-mail e senha de administrador para desativar "${nome}".`
+    );
+    if (!credenciais) return;
+
+    const res = await fetch(`/api/admin/usuarios/${id}`, {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            admin_email: credenciais.email,
+            admin_senha: credenciais.senha,
+        }),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        alert('Erro: ' + (data.erro || 'não foi possível desativar'));
+        return;
+    }
+
+    carregarUsuarios();
+    mostrarToast('Usuário desativado.');
 }
 
 async function reativarUsuario(id, nome) {
     if (!confirm(`Reativar o usuário "${nome}"?`)) return;
+
+    // Mesma exigência do salvar: toda alteração de usuário passa pela
+    // reconferência, sem exceção por campo.
+    const credenciais = await pedirCredenciaisAdmin(
+        `Confirme seu e-mail e senha de administrador para reativar "${nome}".`
+    );
+    if (!credenciais) return;
+
+    const body = new URLSearchParams({
+        ativo: '1',
+        admin_email: credenciais.email,
+        admin_senha: credenciais.senha,
+    });
+
     const res = await fetch(`/api/admin/usuarios/${id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: 'ativo=1'
+        body,
     });
-    if (res.ok) { carregarUsuarios(); mostrarToast('Usuário reativado!'); }
+
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+        alert('Erro: ' + (data.erro || 'não foi possível reativar'));
+        return;
+    }
+
+    carregarUsuarios();
+    mostrarToast('Usuário reativado!');
+}
+
+// ── Confirmação de identidade do admin ────────
+//
+// Abre o modal e resolve com {email, senha} ou null se o admin cancelar. O
+// backend é quem valida: aqui só se coleta.
+function pedirCredenciaisAdmin(descricao) {
+    return new Promise(resolve => {
+        const modal = document.getElementById('modal-confirmar-admin');
+        const campoEmail = document.getElementById('confirmar-admin-email');
+        const campoSenha = document.getElementById('confirmar-admin-senha');
+        const erro = document.getElementById('confirmar-admin-erro');
+        const btn = document.getElementById('btn-confirmar-admin');
+        const texto = document.getElementById('confirmar-admin-descricao');
+
+        if (!modal || !campoEmail || !campoSenha || !btn) {
+            resolve(null);
+            return;
+        }
+
+        if (texto && descricao) texto.textContent = descricao;
+        // Os dois campos sempre em branco: a conferência é digitar as
+        // credenciais de novo, não confirmar o que já está na tela.
+        campoEmail.value = '';
+        campoSenha.value = '';
+        erro.classList.add('hidden');
+        erro.textContent = '';
+
+        modal.classList.remove('hidden');
+        setTimeout(() => campoEmail.focus(), 50);
+
+        function encerrar(resultado) {
+            btn.removeEventListener('click', confirmar);
+            campoSenha.removeEventListener('keydown', porEnter);
+            campoEmail.removeEventListener('keydown', porEnter);
+            confirmacaoAdminPendente = null;
+            modal.classList.add('hidden');
+            resolve(resultado);
+        }
+
+        function confirmar() {
+            const email = campoEmail.value.trim();
+            const senha = campoSenha.value;
+
+            if (!email || !senha) {
+                erro.textContent = 'Informe e-mail e senha.';
+                erro.classList.remove('hidden');
+                return;
+            }
+
+            encerrar({ email, senha });
+        }
+
+        function porEnter(evento) {
+            if (evento.key === 'Enter') {
+                evento.preventDefault();
+                confirmar();
+            }
+        }
+
+        // fecharConfirmacaoAdmin() (botões Cancelar e X) cai aqui.
+        confirmacaoAdminPendente = () => encerrar(null);
+
+        btn.addEventListener('click', confirmar);
+        campoEmail.addEventListener('keydown', porEnter);
+        campoSenha.addEventListener('keydown', porEnter);
+    });
+}
+
+function fecharConfirmacaoAdmin() {
+    if (confirmacaoAdminPendente) {
+        confirmacaoAdminPendente();
+        return;
+    }
+    document.getElementById('modal-confirmar-admin').classList.add('hidden');
 }
 
 // ── Setores ───────────────────────────────────

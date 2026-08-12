@@ -133,6 +133,14 @@ docker compose down -v
 
 Todas as rotas de API exigem sessão autenticada.
 
+A sessão morre sozinha quando o admin altera e-mail, senha ou papel da conta, ou
+a desativa: essas mudanças incrementam `usuarios.sessao_versao`, e o
+`AuthMiddleware` compara com o valor gravado no login — vale para todos os
+dispositivos onde a pessoa estiver logada. Página perdida vai para `/login`;
+rota `/api/*` recebe `401` com `{"sessao_encerrada": true}` (o `utils.js`
+redireciona), e o `ChatServer` fecha as conexões WebSocket em até 5s com o
+evento `sessao_encerrada`.
+
 ### Chat
 
 - GET /api/conversas
@@ -197,6 +205,11 @@ Todas as rotas de API exigem sessão autenticada.
 ### Admin
 
 Todas sob `AdminMiddleware` (403 para quem não é admin).
+
+Alterar um usuário que já existe (PATCH e DELETE) exige reconferir a identidade:
+os campos `admin_email` e `admin_senha` do **admin logado na sessão** vão no
+corpo da requisição e são validados com `password_verify`. Criar usuário não
+exige (não altera dado de ninguém).
 
 - GET /api/admin/usuarios (inclui `online`/`last_seen` para a coluna "Conexão")
 - GET /api/admin/usuarios/presenca (ids online; reconciliação do tempo real)

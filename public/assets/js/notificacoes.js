@@ -196,6 +196,11 @@
                 const msg = JSON.parse(event.data);
                 if (msg.type === 'notification_created') {
                     notificar(msg.notification);
+                } else if (msg.type === 'sessao_encerrada') {
+                    // Conta alterada pelo admin: o servidor fecha a conexão e a
+                    // sessão HTTP já não vale mais.
+                    state.sessaoEncerrada = true;
+                    window.location.href = '/login';
                 }
             } catch (_) {
                 // payload inesperado: ignora
@@ -203,6 +208,7 @@
         };
 
         state.socket.onclose = function () {
+            if (state.sessaoEncerrada) return;
             if (state.reconectarTimer) clearTimeout(state.reconectarTimer);
             state.reconectarTimer = window.setTimeout(conectarSocket, 3000);
         };

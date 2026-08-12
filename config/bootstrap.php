@@ -12,6 +12,7 @@ function bootstrapDefaultData(): void
 
     try {
         ensureUniqueSectorNames($pdo);
+        ensureSessionVersionColumn($pdo);
         ensureNotificationsSchema($pdo);
         ensureParticipantsSchema($pdo);
         ensureAgendamentoSchema($pdo);
@@ -23,6 +24,38 @@ function bootstrapDefaultData(): void
             $unlockStmt = $pdo->prepare('SELECT RELEASE_LOCK(?)');
             $unlockStmt->execute([$lockName]);
         }
+    }
+}
+
+/**
+ * usuarios.sessao_versao — contador que invalida sessoes abertas.
+ *
+ * Sobe quando o admin altera e-mail, senha ou papel, ou desativa a conta. O
+ * AuthMiddleware compara com o valor gravado na sessao no login e derruba quem
+ * ficou para tras. Espelha a coluna em config/schema.sql (instalacao nova).
+ */
+function ensureSessionVersionColumn(PDO $pdo): void
+{
+    static $alreadyChecked = false;
+    if ($alreadyChecked) {
+        return;
+    }
+
+    $alreadyChecked = true;
+
+    try {
+        $existe = $pdo->query(
+            "SELECT COUNT(*) FROM information_schema.columns
+              WHERE table_schema = DATABASE()
+                AND table_name = 'usuarios'
+                AND column_name = 'sessao_versao'"
+        )->fetchColumn();
+
+        if ((int) $existe === 0) {
+            $pdo->exec('ALTER TABLE usuarios ADD COLUMN sessao_versao INT UNSIGNED NOT NULL DEFAULT 0 AFTER ativo');
+        }
+    } catch (\Throwable $e) {
+        error_log('Nao foi possivel adicionar coluna sessao_versao em usuarios: ' . $e->getMessage());
     }
 }
 

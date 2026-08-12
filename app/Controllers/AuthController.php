@@ -21,7 +21,7 @@ class AuthController
 
         $pdo  = getDbConnection();
         $stmt = $pdo->prepare(
-            'SELECT id, nome, senha_hash, papel, ativo FROM usuarios WHERE email = ? LIMIT 1'
+            'SELECT id, nome, senha_hash, papel, ativo, sessao_versao FROM usuarios WHERE email = ? LIMIT 1'
         );
         $stmt->execute([$email]);
         $usuario = $stmt->fetch();
@@ -36,6 +36,10 @@ class AuthController
         $_SESSION['user_id']    = $usuario['id'];
         $_SESSION['user_nome']  = $usuario['nome'];
         $_SESSION['user_papel'] = $usuario['papel'];
+        // Carimbo do estado da conta neste login: se o admin mexer em e-mail,
+        // senha, papel ou desativar, a versao no banco sobe e o AuthMiddleware
+        // derruba esta sessao.
+        $_SESSION['sessao_versao'] = (int) ($usuario['sessao_versao'] ?? 0);
         session_write_close(); // grava antes de redirecionar
 
         return $response->withHeader('Location', '/chat')->withStatus(302);

@@ -101,6 +101,44 @@ class AdminController
     }
 
     /**
+     * Reconfere e-mail e senha do admin que está logado nesta sessão.
+     *
+     * Sempre as credenciais do **próprio** admin da sessão: aceitar as de
+     * qualquer outro admin transformaria o campo numa segunda porta de login.
+     *
+     * @return string|null mensagem de erro, ou null se conferiu
+     */
+    private function conferirCredenciaisAdmin(Request $request, array $data): ?string
+    {
+        $email = trim((string) ($data['admin_email'] ?? ''));
+        $senha = (string) ($data['admin_senha'] ?? '');
+
+        if ($email === '' || $senha === '') {
+            return 'Informe e-mail e senha do administrador para confirmar a alteração';
+        }
+
+        $stmt = getDbConnection()->prepare(
+            'SELECT email, senha_hash, papel, ativo FROM usuarios WHERE id = ? LIMIT 1'
+        );
+        $stmt->execute([(int) $request->getAttribute('user_id')]);
+        $admin = $stmt->fetch();
+
+        // Mensagem única para e-mail errado e senha errada: separar as duas
+        // contaria a quem tentar qual das metades já acertou.
+        if (
+            !$admin
+            || !$admin['ativo']
+            || $admin['papel'] !== 'admin'
+            || strcasecmp($email, (string) $admin['email']) !== 0
+            || !password_verify($senha, (string) $admin['senha_hash'])
+        ) {
+            return 'E-mail ou senha do administrador não conferem';
+        }
+
+        return null;
+    }
+
+    /**
      * GET /api/admin/usuarios/presenca
      *
      * Só quem está online, em resposta mínima. O painel usa isto para
@@ -183,16 +221,47 @@ class AdminController
         $data = (array) $request->getParsedBody();
         $pdo  = getDbConnection();
 
+        // Alterar dados de outra pessoa exige o admin provar de novo quem é: só
+        // a sessão não basta (máquina destravada, aba esquecida aberta).
+        $erroCredencial = $this->conferirCredenciaisAdmin($request, $data);
+        if ($erroCredencial !== null) {
+            return Json::erro($response, $erroCredencial, 403);
+        }
+
         $campos = [];
         $values = [];
+        // Mudou credencial ou permissão? As sessões abertas dessa pessoa (em
+        // qualquer dispositivo) precisam morrer — ver ensureSessionVersionColumn.
+        $derrubarSessoes = false;
 
         if (!empty($data['nome'])) {
             $campos[] = 'nome = ?';
             $values[] = trim($data['nome']);
         }
+        if (!empty($data['email'])) {
+            $email = trim((string) $data['email']);
+
+            if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                return Json::erro($response, 'E-mail inválido');
+            }
+
+            // E-mail é a credencial de login: não pode colidir com outra conta.
+            $check = $pdo->prepare('SELECT id FROM usuarios WHERE email = ? AND id <> ? LIMIT 1');
+            $check->execute([$email, $id]);
+            if ($check->fetch()) {
+                return Json::erro($response, 'E-mail já cadastrado');
+            }
+
+            $campos[] = 'email = ?';
+            $values[] = $email;
+            $derrubarSessoes = true;
+        }
         if (!empty($data['papel'])) {
             $campos[] = 'papel = ?';
             $values[] = $data['papel'];
+            // O papel fica em cache na sessão ($_SESSION['user_papel']): sem
+            // derrubar, um usuário rebaixado manteria o acesso antigo.
+            $derrubarSessoes = true;
         }
         if (isset($data['setor_id'])) {
             $campos[] = 'setor_id = ?';
@@ -208,10 +277,16 @@ class AdminController
             }
             $campos[] = 'senha_hash = ?';
             $values[] = password_hash($data['senha'], PASSWORD_BCRYPT, ['cost' => 12]);
+            $derrubarSessoes = true;
         }
 
         if (empty($campos)) {
             return Json::erro($response, 'Nenhum campo para atualizar');
+        }
+
+        // Desativar já derruba pelo próprio `ativo` conferido no AuthMiddleware.
+        if ($derrubarSessoes) {
+            $campos[] = 'sessao_versao = sessao_versao + 1';
         }
 
         $values[] = $id;
@@ -229,6 +304,13 @@ class AdminController
 
         if ($id === $myId) {
             return Json::erro($response, 'Você não pode desativar sua própria conta');
+        }
+
+        // Mesma exigência do atualizarUsuario: tirar o acesso de alguém é
+        // alteração de dado como qualquer outra.
+        $erroCredencial = $this->conferirCredenciaisAdmin($request, (array) $request->getParsedBody());
+        if ($erroCredencial !== null) {
+            return Json::erro($response, $erroCredencial, 403);
         }
 
         $pdo  = getDbConnection();

@@ -14,6 +14,8 @@
             'papel' => (string) ($userPapel ?? 'admin'),
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
+    <!-- utils.js: redireciona para /login quando a API responde 401. -->
+    <script src="<?= asset('/assets/js/utils.js') ?>"></script>
     <style>
     </style>
 </head>
@@ -208,6 +210,48 @@
             <button id="btn-salvar-usuario" onclick="salvarUsuario()"
                     class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-2.5 text-sm font-bold transition">
                 Salvar
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- MODAL CONFIRMAÇÃO DO ADMIN -->
+<!-- Pedido sempre que dados de um usuário forem alterados: a sessão sozinha não
+     confirma que quem está no teclado é o admin. -->
+<div id="modal-confirmar-admin" class="hidden fixed inset-0 bg-black/70 z-[60] flex items-center justify-center p-4">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-sm shadow-2xl">
+        <div class="flex items-center justify-between p-6 border-b border-gray-800">
+            <h3 class="font-bold text-white">Confirmar identidade</h3>
+            <button onclick="fecharConfirmacaoAdmin()" class="text-gray-500 hover:text-white">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </div>
+        <div class="p-6 space-y-4">
+            <p id="confirmar-admin-descricao" class="text-sm text-gray-400">
+                Informe seu e-mail e senha de administrador para aplicar a alteração.
+            </p>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">E-mail do administrador</label>
+                <input type="email" id="confirmar-admin-email" autocomplete="username" placeholder="admin@empresa.com"
+                       class="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-sm font-medium text-gray-300 mb-2">Senha</label>
+                <input type="password" id="confirmar-admin-senha" autocomplete="current-password" placeholder="••••••••"
+                       class="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <p id="confirmar-admin-erro" class="hidden text-xs text-red-400"></p>
+        </div>
+        <div class="flex gap-3 px-6 pb-6">
+            <button onclick="fecharConfirmacaoAdmin()"
+                    class="btn-cancelar-modal flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl py-2.5 text-sm transition">
+                Cancelar
+            </button>
+            <button id="btn-confirmar-admin"
+                    class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl py-2.5 text-sm font-bold transition">
+                Confirmar
             </button>
         </div>
     </div>

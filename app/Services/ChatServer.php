@@ -40,6 +40,13 @@ class ChatServer implements MessageComponentInterface
             $this->sincronizarAtualizacoes();
         });
 
+        // Derruba quem teve e-mail, senha ou papel alterados (ou foi desativado)
+        // enquanto estava conectado: o HTTP ja recusa, mas sem isto a aba
+        // continuaria mandando mensagem pelo socket ate ser recarregada.
+        Loop::addPeriodicTimer(5, function (): void {
+            $this->encerrarSessoesInvalidadas();
+        });
+
         // Move agendamentos vencidos para avaliacao mesmo sem requisicoes HTTP ativas
         Loop::addPeriodicTimer(60, function (): void {
             $this->arquivarAgendamentosVencidos();
@@ -61,6 +68,7 @@ class ChatServer implements MessageComponentInterface
         // Conexao so para acompanhar presenca (painel do admin): nao recebe
         // replay de mensagens nem entra no ciclo de sincronizacao.
         $conn->somentePresenca = false;
+        $conn->sessaoVersao = null;
         echo "Nova conexão: #{$conn->resourceId} | Total: {$this->clients->count()}\n";
     }
 
@@ -81,6 +89,8 @@ class ChatServer implements MessageComponentInterface
                 $from->lastSeenDeletionAt = date('Y-m-d H:i:s');
                 $from->lastSeenAgendamentoUpdateAt = date('Y-m-d H:i:s');
                 $from->somentePresenca = !empty($data['somente_presenca']);
+                // Carimbo para o timer de encerrarSessoesInvalidadas comparar.
+                $from->sessaoVersao = $this->versaoSessaoUsuario((int) $from->userId);
                 $this->sincronizarPresencaUsuario((int) $from->userId);
                 try {
                     $pdo = getDbConnection();
@@ -326,6 +336,88 @@ class ChatServer implements MessageComponentInterface
             if (($client->userPapel ?? '') === 'admin') {
                 $client->send($payload);
             }
+        }
+    }
+
+    /**
+     * Versao de sessao da conta, ou null se a coluna/usuario nao existir.
+     *
+     * Null significa "nao da para comparar": nesse caso ninguem e derrubado.
+     */
+    private function versaoSessaoUsuario(int $userId): ?int
+    {
+        if ($userId <= 0 || !$this->columnExists(getDbConnection(), 'usuarios', 'sessao_versao')) {
+            return null;
+        }
+
+        try {
+            $stmt = getDbConnection()->prepare('SELECT sessao_versao FROM usuarios WHERE id = ? LIMIT 1');
+            $stmt->execute([$userId]);
+            $versao = $stmt->fetchColumn();
+
+            return $versao === false ? null : (int) $versao;
+        } catch (\Throwable $e) {
+            error_log('Falha ao ler sessao_versao: ' . $e->getMessage());
+
+            return null;
+        }
+    }
+
+    /**
+     * Fecha as conexoes de quem teve a conta alterada depois do auth.
+     *
+     * Uma consulta so para todos os usuarios conectados, a cada 5s.
+     */
+    private function encerrarSessoesInvalidadas(): void
+    {
+        $ids = [];
+        foreach ($this->clients as $client) {
+            $userId = (int) ($client->userId ?? 0);
+            if ($userId > 0 && ($client->sessaoVersao ?? null) !== null) {
+                $ids[$userId] = true;
+            }
+        }
+
+        if (!$ids) {
+            return;
+        }
+
+        try {
+            $ids = array_keys($ids);
+            $marcadores = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = getDbConnection()->prepare(
+                "SELECT id, ativo, sessao_versao FROM usuarios WHERE id IN ({$marcadores})"
+            );
+            $stmt->execute($ids);
+
+            $atual = [];
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $linha) {
+                $atual[(int) $linha['id']] = [
+                    'ativo' => (int) $linha['ativo'] === 1,
+                    'versao' => (int) $linha['sessao_versao'],
+                ];
+            }
+
+            foreach ($this->clients as $client) {
+                $userId = (int) ($client->userId ?? 0);
+                $versaoConexao = $client->sessaoVersao ?? null;
+                if ($userId <= 0 || $versaoConexao === null || !isset($atual[$userId])) {
+                    continue;
+                }
+
+                if ($atual[$userId]['ativo'] && $atual[$userId]['versao'] === $versaoConexao) {
+                    continue;
+                }
+
+                $client->send(json_encode([
+                    'type' => 'sessao_encerrada',
+                    'motivo' => 'Seus dados de acesso foram alterados. Entre novamente.',
+                ], JSON_UNESCAPED_UNICODE));
+                $client->close();
+                echo "Sessao encerrada por alteracao de conta: usuario #{$userId}\n";
+            }
+        } catch (\Throwable $e) {
+            error_log('Falha ao encerrar sessoes invalidadas: ' . $e->getMessage());
         }
     }
 

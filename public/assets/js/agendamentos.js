@@ -15,6 +15,7 @@ let diaSelecionado = null;
 let agendamentoAtual = null;
 let editandoServicoId = null;
 let wsAgendamentos = null;
+let wsAgendamentosSessaoEncerrada = false;
 let tabAtiva = AG_MODO === 'admin' ? 'kanban' : 'calendario';
 
 const HORA_INICIO = 7;
@@ -946,10 +947,17 @@ function conectarWSAgendamentos() {
                         abrirDetalhe(Number(agendamentoAtual.id));
                 } else if (msg.type === 'notification_created' && window.NotificationCenterUI) {
                     window.NotificationCenterUI.handleRealtimeNotification(msg.notification);
+                } else if (msg.type === 'sessao_encerrada') {
+                    // Conta alterada pelo admin: sessão HTTP já não vale mais.
+                    wsAgendamentosSessaoEncerrada = true;
+                    window.location.href = '/login';
                 }
             } catch (_) { }
         };
-        wsAgendamentos.onclose = () => setTimeout(conectarWSAgendamentos, 3000);
+        wsAgendamentos.onclose = () => {
+            if (wsAgendamentosSessaoEncerrada) return;
+            setTimeout(conectarWSAgendamentos, 3000);
+        };
     } catch (e) {
         console.error('WS agendamentos', e);
     }

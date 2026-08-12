@@ -19,6 +19,7 @@ let sincronizacaoIntervalId = null;
 let conversasConhecidas = new Set();
 let sincronizacaoInicialConversasFeita = false;
 let wsSincronizacaoInicialConcluida = false;
+let wsSessaoEncerrada = false;
 let emojiPicker = null;
 let emojiPickerVisivel = false;
 let emojiFallbackVisivel = false;
@@ -115,6 +116,13 @@ function conectarWS() {
                     mostrarTyping(data.user_nome);
                 }
                 break;
+            case 'sessao_encerrada':
+                // O servidor fechou a conexão; a reconexão automática do
+                // onclose não pode disputar com o redirecionamento.
+                wsSessaoEncerrada = true;
+                alert(data.motivo || 'Sua sessão foi encerrada. Entre novamente.');
+                window.location.href = '/login';
+                break;
             case 'action_error':
                 if (data.action === 'delete_message') {
                     alert(data.message || 'Erro ao apagar mensagem');
@@ -124,8 +132,10 @@ function conectarWS() {
     };
 
     ws.onclose = function () {
-        console.log('WS desconectado. Reconectando em 3s...');
         wsSincronizacaoInicialConcluida = false;
+        if (wsSessaoEncerrada) return;
+
+        console.log('WS desconectado. Reconectando em 3s...');
         setTimeout(conectarWS, 3000);
     };
 
