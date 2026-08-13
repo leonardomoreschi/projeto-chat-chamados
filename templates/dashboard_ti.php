@@ -302,9 +302,17 @@
                 <input type="hidden" id="comentario-chamado-id">
                 <textarea id="comentario-texto" rows="3" placeholder="Adicionar comentário técnico..." class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm text-gray-100 placeholder-gray-500 outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
                 <div class="flex flex-col sm:flex-row sm:items-center gap-3">
-                    <input id="comentario-anexos" type="file" name="anexos[]" multiple class="block w-full text-xs text-gray-300 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-gray-700 file:text-gray-100 hover:file:bg-gray-600" />
+                    <label class="flex flex-1 items-center gap-3 bg-gray-800 border border-dashed border-gray-600 rounded-xl px-4 py-2.5 cursor-pointer hover:border-gray-500 transition">
+                        <svg class="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                        </svg>
+                        <span id="label-comentario-anexos" class="text-sm text-gray-400">Clique para selecionar arquivos</span>
+                        <input id="comentario-anexos" type="file" name="anexos[]" multiple class="hidden" accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.heif,.pdf,.doc,.docx,.txt,.step,.stp,.exe" />
+                    </label>
                     <button type="submit" class="w-full sm:w-auto px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-sm font-bold text-white">Salvar comentário</button>
                 </div>
+                <div id="comentario-anexos-lista" class="hidden space-y-2 max-h-44 overflow-y-auto"></div>
             </form>
         </div>
     </div>
@@ -346,6 +354,7 @@
 </div>
 
     <script src="<?= asset('/assets/js/theme.js') ?>"></script>
+    <script src="<?= asset('/assets/js/anexos.js') ?>"></script>
     <script>
         window.DASHBOARD_TI_BOOTSTRAP = <?= json_encode($chamadosBootstrap ?? [], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>

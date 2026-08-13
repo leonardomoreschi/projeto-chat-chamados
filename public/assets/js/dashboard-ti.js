@@ -6,6 +6,14 @@ const anexosChamadosCache = {};
 const comentariosChamadosCache = {};
 let comentariosModoEdicao = false;
 let comentariosChamadoAtualId = 0;
+let anexosComentario = null;
+
+// Espelha a allowlist de ChamadoController::salvarArquivoComentario.
+const EXTENSOES_ANEXO_COMENTARIO = [
+    'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif',
+    'pdf', 'doc', 'docx', 'txt',
+    'step', 'stp', 'exe',
+];
 
 // INICIALIZAÇÃO
 document.addEventListener('DOMContentLoaded', () => {
@@ -23,7 +31,36 @@ document.addEventListener('DOMContentLoaded', () => {
         popularFiltroHistoricoSubcategorias();
     });
     carregarDados();
+    configurarAnexosComentario();
 });
+
+function configurarAnexosComentario() {
+    if (!window.criarGerenciadorAnexos) return;
+
+    const label = document.getElementById('label-comentario-anexos');
+
+    anexosComentario = window.criarGerenciadorAnexos({
+        input: 'comentario-anexos',
+        lista: 'comentario-anexos-lista',
+        extensoes: EXTENSOES_ANEXO_COMENTARIO,
+        aoMudar: function (estado) {
+            if (!label) return;
+
+            if (estado.quantidade === 0) {
+                label.textContent = 'Clique para selecionar arquivos';
+                label.classList.remove('text-indigo-300', 'font-semibold');
+                label.classList.add('text-gray-400');
+                return;
+            }
+
+            label.textContent = estado.quantidade === 1
+                ? '1 arquivo selecionado'
+                : estado.quantidade + ' arquivos selecionados';
+            label.classList.remove('text-gray-400');
+            label.classList.add('text-indigo-300', 'font-semibold');
+        },
+    });
+}
 
 function respostaIndicaSessaoExpirada(res) {
     if (!res) return false;
@@ -653,7 +690,11 @@ async function abrirModalComentarios(chamadoId, titulo = '', permiteEdicao = fal
     chamadoIdInput.value = String(chamadoId);
     subtitulo.innerText = `Chamado #${chamadoId}${titulo ? ` - ${titulo}` : ''}`;
     textoInput.value = '';
-    anexosInput.value = '';
+    if (anexosComentario) {
+        anexosComentario.limpar();
+    } else {
+        anexosInput.value = '';
+    }
     atualizarModoComentarios(permiteEdicao);
 
     await carregarComentariosChamado(chamadoId, true, permiteEdicao);
@@ -854,10 +895,12 @@ if (formComentario) {
         const chamadoId = Number(document.getElementById('comentario-chamado-id').value || 0);
         const texto = document.getElementById('comentario-texto').value.trim();
         const inputAnexos = document.getElementById('comentario-anexos');
-        const arquivos = inputAnexos ? Array.from(inputAnexos.files || []) : [];
+        const quantidadeAnexos = anexosComentario
+            ? anexosComentario.quantidade()
+            : (inputAnexos ? (inputAnexos.files || []).length : 0);
 
         if (!chamadoId) return;
-        if (!texto && arquivos.length === 0) {
+        if (!texto && quantidadeAnexos === 0) {
             alert('Informe um comentário ou adicione um anexo.');
             return;
         }
@@ -865,7 +908,12 @@ if (formComentario) {
         const formData = new FormData();
         formData.append('comentario', texto);
         formData.append('tipo', 'comentario');
-        arquivos.forEach((arquivo) => formData.append('anexos[]', arquivo));
+
+        if (anexosComentario) {
+            anexosComentario.anexarEm(formData, 'anexos[]');
+        } else if (inputAnexos) {
+            Array.from(inputAnexos.files || []).forEach((arquivo) => formData.append('anexos[]', arquivo));
+        }
 
         const res = await fetch(`/api/chamados/${chamadoId}/comentarios`, {
             method: 'POST',
@@ -883,7 +931,11 @@ if (formComentario) {
         }
 
         document.getElementById('comentario-texto').value = '';
-        if (inputAnexos) inputAnexos.value = '';
+        if (anexosComentario) {
+            anexosComentario.limpar();
+        } else if (inputAnexos) {
+            inputAnexos.value = '';
+        }
         await carregarComentariosChamado(chamadoId, true, true);
     };
 }
