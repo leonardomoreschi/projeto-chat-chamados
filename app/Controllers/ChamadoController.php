@@ -1297,6 +1297,55 @@ class ChamadoController
         }
     }
 
+    // POST /api/chamados/{id}/chamar-setor
+    // Abre (ou reaproveita) a conversa privada com o solicitante e já deixa
+    // gravada a mensagem que identifica o chamado, para o setor saber do que se
+    // trata sem depender do atendente digitar.
+    public function chamarSetor(Request $request, Response $response, array $args): Response
+    {
+        $papel = (string) $request->getAttribute('user_papel');
+        if (!in_array($papel, ['admin', 'ti'], true)) {
+            return Json::erro($response, 'Apenas TI pode chamar o setor', 403);
+        }
+
+        $chamadoId = (int) ($args['id'] ?? 0);
+        if ($chamadoId <= 0) {
+            return Json::erro($response, 'ID de chamado invalido');
+        }
+
+        $pdo = getDbConnection();
+        $stmt = $pdo->prepare('SELECT id, usuario_id, titulo FROM chamados WHERE id = ? LIMIT 1');
+        $stmt->execute([$chamadoId]);
+        $chamado = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        if (!$chamado) {
+            return Json::erro($response, 'Chamado nao encontrado', 404);
+        }
+
+        $userId = (int) $request->getAttribute('user_id');
+        $solicitanteId = (int) $chamado['usuario_id'];
+        if ($solicitanteId === $userId) {
+            return Json::erro($response, 'O chamado e seu: nao ha setor para chamar');
+        }
+
+        $conversaId = $this->obterOuCriarConversaPrivada($pdo, $userId, $solicitanteId);
+
+        // Mesmo formato das demais mensagens automaticas: Chamado #12 ("Titulo").
+        $titulo = trim((string) ($chamado['titulo'] ?? ''));
+        $mensagem = 'Referente ao chamado #' . $chamadoId
+            . ($titulo !== '' ? ' ("' . $titulo . '")' : '')
+            . ': a equipe de TI precisa falar com você sobre este chamado.';
+
+        $pdo->prepare('INSERT INTO mensagens (conversa_id, usuario_id, conteudo, criado_em) VALUES (?, ?, ?, NOW())')
+            ->execute([$conversaId, $userId, $mensagem]);
+
+        return Json::json($response, [
+            'ok' => true,
+            'conversa_id' => $conversaId,
+            'chamado_id' => $chamadoId,
+        ]);
+    }
+
     private function obterOuCriarConversaPrivada(\PDO $pdo, int $usuarioA, int $usuarioB): int
     {
         $check = $pdo->prepare("\n            SELECT c.id FROM conversas c\n            INNER JOIN participantes p1 ON p1.conversa_id = c.id AND p1.usuario_id = ?\n            INNER JOIN participantes p2 ON p2.conversa_id = c.id AND p2.usuario_id = ?\n            WHERE c.tipo = 'privada'\n            LIMIT 1\n        ");

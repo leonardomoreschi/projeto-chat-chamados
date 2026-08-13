@@ -187,6 +187,9 @@ evento `sessao_encerrada`.
 - POST /api/agendamentos
 - PATCH /api/agendamentos/{id}/aprovar
 - PATCH /api/agendamentos/{id}/recusar
+- PATCH /api/agendamentos/{id}/reagendar
+- PATCH /api/agendamentos/{id}/reagendamento/aceitar
+- PATCH /api/agendamentos/{id}/reagendamento/recusar
 - PATCH /api/agendamentos/{id}/cancelar
 - PATCH /api/agendamentos/{id}/encerrar
 - GET /api/servicos-agendamento

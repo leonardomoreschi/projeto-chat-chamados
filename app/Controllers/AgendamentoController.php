@@ -54,6 +54,8 @@ class AgendamentoController
                        a.aprovado_por_id, ap.nome AS aprovado_por_nome,
                        a.cancelado_por_id, ca.nome AS cancelado_por_nome,
                        a.encerrado_por_id, en.nome AS encerrado_por_nome,
+                       a.reagendamento_por_id, re.nome AS reagendamento_por_nome,
+                       a.reagendamento_inicio, a.reagendamento_fim, a.reagendamento_motivo, a.reagendamento_em,
                        a.status, a.data_inicio, a.data_fim, a.observacoes, a.motivo_recusa,
                        a.motivo_cancelamento, a.realizado, a.observacao_fechamento,
                        a.aprovado_em, a.avaliado_em, a.cancelado_em, a.encerrado_em,
@@ -64,6 +66,7 @@ class AgendamentoController
                 LEFT JOIN usuarios ap ON ap.id = a.aprovado_por_id
                 LEFT JOIN usuarios ca ON ca.id = a.cancelado_por_id
                 LEFT JOIN usuarios en ON en.id = a.encerrado_por_id
+                LEFT JOIN usuarios re ON re.id = a.reagendamento_por_id
                 WHERE " . implode(' AND ', $where) . "
                 ORDER BY a.data_inicio ASC, a.id ASC";
 
@@ -237,6 +240,228 @@ class AgendamentoController
         }
 
         return Json::json($response, $agendamentoAtualizado ?: $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']));
+    }
+
+    // PATCH /api/agendamentos/{id}/reagendar — equipe propõe outro período.
+    // A proposta fica em reagendamento_* até o solicitante aceitar; data_inicio
+    // e data_fim só mudam no aceite.
+    public function reagendar(Request $request, Response $response, array $args): Response
+    {
+        if (!$this->ehEquipe($request)) {
+            return Json::erro($response, 'Acesso restrito a Admin/TI', 403);
+        }
+
+        $agendamento = $this->buscarAgendamentoVisivel($request, (int) ($args['id'] ?? 0));
+        if (!$agendamento) {
+            return Json::erro($response, 'Agendamento não encontrado', 404);
+        }
+
+        if (!in_array((string) $agendamento['status'], ['solicitado', 'agendado'], true)) {
+            return Json::erro($response, 'Só é possível reagendar solicitações em aberto ou já agendadas');
+        }
+
+        $data = (array) $request->getParsedBody();
+        $inicioTexto = $this->normalizarDataHora((string) ($data['data_inicio'] ?? ''));
+        $fimTexto = $this->normalizarDataHora((string) ($data['data_fim'] ?? ''));
+        $motivo = trim((string) ($data['motivo'] ?? ''));
+
+        if (!$inicioTexto || !$fimTexto) {
+            return Json::erro($response, 'Informe a nova data de início e de término');
+        }
+
+        try {
+            $inicio = new \DateTimeImmutable($inicioTexto);
+            $fim = new \DateTimeImmutable($fimTexto);
+        } catch (\Throwable $e) {
+            return Json::erro($response, 'Datas inválidas');
+        }
+
+        if ($fim <= $inicio) {
+            return Json::erro($response, 'Data de fim deve ser posterior à data de início');
+        }
+
+        $userId = (int) $request->getAttribute('user_id');
+        $this->atualizarAgendamento((int) $agendamento['id'], [
+            'reagendamento_inicio' => $inicio->format('Y-m-d H:i:s'),
+            'reagendamento_fim' => $fim->format('Y-m-d H:i:s'),
+            'reagendamento_motivo' => $motivo !== '' ? $motivo : null,
+            'reagendamento_por_id' => $userId,
+            'reagendamento_em' => date('Y-m-d H:i:s'),
+        ]);
+
+        $atualizado = $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']);
+        if ($atualizado) {
+            $periodo = $this->formatarPeriodo($inicio, $fim);
+
+            $this->registrarNotificacaoAgendamento(
+                getDbConnection(),
+                $atualizado,
+                'reagendamento_proposto',
+                'Sugestão de novo horário',
+                (string) ($atualizado['reagendamento_por_nome'] ?? 'A equipe')
+                    . ' sugeriu outro horário para "' . (string) $atualizado['servico_nome'] . '": ' . $periodo . '.'
+                    . ($motivo !== '' ? ' Motivo: ' . $motivo . '.' : '')
+                    . ' Abra o agendamento para aceitar ou recusar a sugestão.',
+                (string) $atualizado['status'],
+                (string) $agendamento['status'],
+                [
+                    'servico_nome' => (string) $atualizado['servico_nome'],
+                    'reagendamento_inicio' => $inicio->format('Y-m-d H:i:s'),
+                    'reagendamento_fim' => $fim->format('Y-m-d H:i:s'),
+                    'reagendamento_motivo' => $motivo !== '' ? $motivo : null,
+                    'detalhe_equipe' => 'Novo período sugerido: ' . $periodo . '. Aguardando resposta do solicitante.',
+                ],
+                $userId,
+                '/agendamentos?agendamento=' . (int) $agendamento['id'],
+                (string) ($atualizado['reagendamento_em'] ?? '')
+            );
+        }
+
+        return Json::json($response, $atualizado ?: $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']));
+    }
+
+    // PATCH /api/agendamentos/{id}/reagendamento/aceitar — só o solicitante.
+    public function aceitarReagendamento(Request $request, Response $response, array $args): Response
+    {
+        $agendamento = $this->buscarAgendamentoVisivel($request, (int) ($args['id'] ?? 0));
+        if (!$agendamento) {
+            return Json::erro($response, 'Agendamento não encontrado', 404);
+        }
+
+        $userId = (int) $request->getAttribute('user_id');
+        if ((int) $agendamento['solicitante_id'] !== $userId) {
+            return Json::erro($response, 'Apenas o solicitante pode responder à sugestão de horário', 403);
+        }
+
+        if (empty($agendamento['reagendamento_inicio']) || empty($agendamento['reagendamento_fim'])) {
+            return Json::erro($response, 'Não há sugestão de horário pendente neste agendamento');
+        }
+
+        $novoInicio = (string) $agendamento['reagendamento_inicio'];
+        $novoFim = (string) $agendamento['reagendamento_fim'];
+        $statusAnterior = (string) $agendamento['status'];
+
+        $this->atualizarAgendamento((int) $agendamento['id'], [
+            'data_inicio' => $novoInicio,
+            'data_fim' => $novoFim,
+            'status' => 'agendado',
+            // Quem propôs o horário é quem confirma a agenda.
+            'aprovado_por_id' => (int) ($agendamento['reagendamento_por_id'] ?? 0) ?: null,
+            'aprovado_em' => date('Y-m-d H:i:s'),
+            'reagendamento_inicio' => null,
+            'reagendamento_fim' => null,
+            'reagendamento_motivo' => null,
+            'reagendamento_por_id' => null,
+            'reagendamento_em' => null,
+        ]);
+
+        $atualizado = $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']);
+        if ($atualizado) {
+            $periodo = $this->formatarPeriodo(new \DateTimeImmutable($novoInicio), new \DateTimeImmutable($novoFim));
+
+            $this->registrarNotificacaoAgendamento(
+                getDbConnection(),
+                $atualizado,
+                'reagendamento_aceito',
+                'Novo horário confirmado',
+                'Você aceitou o novo horário para "' . (string) $atualizado['servico_nome'] . '": ' . $periodo . '.',
+                'agendado',
+                $statusAnterior,
+                [
+                    'servico_nome' => (string) $atualizado['servico_nome'],
+                    'data_inicio' => $novoInicio,
+                    'data_fim' => $novoFim,
+                    'detalhe_equipe' => 'Novo período confirmado: ' . $periodo . '.',
+                ],
+                $userId
+            );
+        }
+
+        return Json::json($response, $atualizado ?: $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']));
+    }
+
+    // PATCH /api/agendamentos/{id}/reagendamento/recusar — o solicitante recusa
+    // a sugestão e abre uma conversa no chat com quem propôs, para combinarem.
+    public function recusarReagendamento(Request $request, Response $response, array $args): Response
+    {
+        $agendamento = $this->buscarAgendamentoVisivel($request, (int) ($args['id'] ?? 0));
+        if (!$agendamento) {
+            return Json::erro($response, 'Agendamento não encontrado', 404);
+        }
+
+        $userId = (int) $request->getAttribute('user_id');
+        if ((int) $agendamento['solicitante_id'] !== $userId) {
+            return Json::erro($response, 'Apenas o solicitante pode responder à sugestão de horário', 403);
+        }
+
+        if (empty($agendamento['reagendamento_inicio']) || empty($agendamento['reagendamento_fim'])) {
+            return Json::erro($response, 'Não há sugestão de horário pendente neste agendamento');
+        }
+
+        $propostoPorId = (int) ($agendamento['reagendamento_por_id'] ?? 0);
+        $periodoSugerido = $this->formatarPeriodo(
+            new \DateTimeImmutable((string) $agendamento['reagendamento_inicio']),
+            new \DateTimeImmutable((string) $agendamento['reagendamento_fim'])
+        );
+        $periodoOriginal = $this->formatarPeriodo(
+            new \DateTimeImmutable((string) $agendamento['data_inicio']),
+            new \DateTimeImmutable((string) $agendamento['data_fim'])
+        );
+
+        $this->atualizarAgendamento((int) $agendamento['id'], [
+            'reagendamento_inicio' => null,
+            'reagendamento_fim' => null,
+            'reagendamento_motivo' => null,
+            'reagendamento_por_id' => null,
+            'reagendamento_em' => null,
+        ]);
+
+        // A conversa é aberta, mas a mensagem NÃO é enviada: ela volta como
+        // sugestão e o front deixa o texto pronto no editor do chat — quem
+        // envia (ou reescreve) é o solicitante.
+        $mensagemSugerida = 'Sobre o agendamento #' . (int) $agendamento['id'] . ' — "'
+            . (string) $agendamento['servico_nome'] . '" (' . $periodoOriginal . '): '
+            . 'não consigo no horário sugerido (' . $periodoSugerido . ').'
+            . ' Podemos combinar outra data por aqui?';
+
+        $conversaId = 0;
+        if ($propostoPorId > 0 && $propostoPorId !== $userId) {
+            try {
+                $conversaId = $this->obterOuCriarConversaPrivada(getDbConnection(), $userId, $propostoPorId);
+            } catch (\Throwable $e) {
+                error_log('Aviso: nao foi possivel abrir o chat apos recusa de reagendamento: ' . $e->getMessage());
+                $conversaId = 0;
+            }
+        }
+
+        $atualizado = $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']);
+        if ($atualizado) {
+            $this->registrarNotificacaoAgendamento(
+                getDbConnection(),
+                $atualizado,
+                'reagendamento_recusado',
+                'Sugestão de horário recusada',
+                'Você recusou o horário sugerido para "' . (string) $atualizado['servico_nome']
+                    . '". O agendamento segue previsto para ' . $periodoOriginal
+                    . '. Combine o novo horário com a equipe pelo chat.',
+                (string) $atualizado['status'],
+                (string) $atualizado['status'],
+                [
+                    'servico_nome' => (string) $atualizado['servico_nome'],
+                    'periodo_sugerido' => $periodoSugerido,
+                    'conversa_id' => $conversaId,
+                    'detalhe_equipe' => 'O solicitante recusou o período ' . $periodoSugerido
+                        . ' e vai combinar outra data pelo chat.',
+                ],
+                $userId
+            );
+        }
+
+        $corpo = $atualizado ?: $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']);
+        $corpo['conversa_id'] = $conversaId;
+        $corpo['mensagem_sugerida'] = $mensagemSugerida;
+
+        return Json::json($response, $corpo);
     }
 
     public function cancelar(Request $request, Response $response, array $args): Response
@@ -559,6 +784,8 @@ class AgendamentoController
                     a.aprovado_por_id, ap.nome AS aprovado_por_nome,
                     a.cancelado_por_id, ca.nome AS cancelado_por_nome,
                     a.encerrado_por_id, en.nome AS encerrado_por_nome,
+                    a.reagendamento_por_id, re.nome AS reagendamento_por_nome,
+                    a.reagendamento_inicio, a.reagendamento_fim, a.reagendamento_motivo, a.reagendamento_em,
                     a.status, a.data_inicio, a.data_fim, a.observacoes, a.motivo_recusa,
                     a.motivo_cancelamento, a.realizado, a.observacao_fechamento,
                     a.aprovado_em, a.avaliado_em, a.cancelado_em, a.encerrado_em,
@@ -569,6 +796,7 @@ class AgendamentoController
              LEFT JOIN usuarios ap ON ap.id = a.aprovado_por_id
              LEFT JOIN usuarios ca ON ca.id = a.cancelado_por_id
              LEFT JOIN usuarios en ON en.id = a.encerrado_por_id
+             LEFT JOIN usuarios re ON re.id = a.reagendamento_por_id
              WHERE a.id = ?
              LIMIT 1'
         );
@@ -625,7 +853,48 @@ class AgendamentoController
         'encerrado' => 'encerrado',
         'atualizado' => 'atualizado',
         'solicitado' => 'solicitado',
+        'reagendamento_proposto' => 'reagendado pela equipe',
+        'reagendamento_aceito' => 'confirmado no novo horário',
+        'reagendamento_recusado' => 'mantido no horário original',
     ];
+
+    private function formatarPeriodo(\DateTimeInterface $inicio, \DateTimeInterface $fim): string
+    {
+        // Mesmo dia: "13/08/2026 das 09:00 às 10:00". Dias diferentes: intervalo completo.
+        if ($inicio->format('Y-m-d') === $fim->format('Y-m-d')) {
+            return $inicio->format('d/m/Y') . ' das ' . $inicio->format('H:i') . ' às ' . $fim->format('H:i');
+        }
+
+        return $inicio->format('d/m/Y H:i') . ' até ' . $fim->format('d/m/Y H:i');
+    }
+
+    // Gêmeo de ChamadoController::obterOuCriarConversaPrivada — o chat não tem
+    // camada compartilhada, cada controller fala com o banco direto.
+    private function obterOuCriarConversaPrivada(\PDO $pdo, int $usuarioA, int $usuarioB): int
+    {
+        $check = $pdo->prepare(
+            "SELECT c.id FROM conversas c
+             INNER JOIN participantes p1 ON p1.conversa_id = c.id AND p1.usuario_id = ?
+             INNER JOIN participantes p2 ON p2.conversa_id = c.id AND p2.usuario_id = ?
+             WHERE c.tipo = 'privada'
+             LIMIT 1"
+        );
+        $check->execute([$usuarioA, $usuarioB]);
+        $existente = $check->fetch(\PDO::FETCH_ASSOC);
+
+        if ($existente && isset($existente['id'])) {
+            return (int) $existente['id'];
+        }
+
+        $stmt = $pdo->prepare("INSERT INTO conversas (tipo, nome, criado_por) VALUES ('privada', NULL, ?)");
+        $stmt->execute([$usuarioA]);
+        $conversaId = (int) $pdo->lastInsertId();
+
+        $pdo->prepare('INSERT INTO participantes (conversa_id, usuario_id) VALUES (?, ?)')->execute([$conversaId, $usuarioA]);
+        $pdo->prepare('INSERT INTO participantes (conversa_id, usuario_id) VALUES (?, ?)')->execute([$conversaId, $usuarioB]);
+
+        return $conversaId;
+    }
 
     private function registrarNotificacaoAgendamento(
         \PDO $pdo,
@@ -636,14 +905,20 @@ class AgendamentoController
         string $statusDestino,
         ?string $statusOrigem = null,
         array $metadados = [],
-        ?int $autorId = null
+        ?int $autorId = null,
+        ?string $urlSolicitante = null,
+        // Diferencia eventos que podem se repetir no mesmo agendamento (uma
+        // segunda sugestão de horário, por exemplo). Sem sufixo, o upsert por
+        // chave_evento atualizaria a notificação antiga — que já pode estar
+        // marcada como lida, e o aviso passaria despercebido.
+        ?string $chaveSufixo = null
     ): void {
         $solicitanteId = (int) ($agendamento['solicitante_id'] ?? 0);
         if ($solicitanteId <= 0) {
             return;
         }
 
-        $this->notificarEquipeAgendamento($pdo, $agendamento, $evento, $titulo, $statusDestino, $statusOrigem, $metadados, $autorId);
+        $this->notificarEquipeAgendamento($pdo, $agendamento, $evento, $titulo, $statusDestino, $statusOrigem, $metadados, $autorId, $chaveSufixo);
 
         // 'detalhe_equipe' só serve para montar a mensagem do painel; o
         // solicitante já recebe o motivo/parecer no corpo da própria mensagem.
@@ -655,10 +930,12 @@ class AgendamentoController
             'evento' => $evento,
             'entidade' => 'agendamento',
             'entidade_id' => (int) ($agendamento['id'] ?? 0),
-            'chave_evento' => 'agendamento:' . $evento . ':' . (int) ($agendamento['id'] ?? 0) . ':' . $solicitanteId,
+            'chave_evento' => 'agendamento:' . $evento . ':' . (int) ($agendamento['id'] ?? 0) . ':' . $solicitanteId
+                . ($chaveSufixo !== null ? ':' . $chaveSufixo : ''),
             'titulo' => $titulo,
             'mensagem' => $mensagem,
-            'url' => '/agendamentos',
+            // Eventos que exigem ação abrem direto o agendamento (?agendamento=ID).
+            'url' => $urlSolicitante ?? '/agendamentos',
             'status_origem' => $statusOrigem,
             'status_destino' => $statusDestino,
             'metadados' => array_merge([
@@ -684,7 +961,8 @@ class AgendamentoController
         string $statusDestino,
         ?string $statusOrigem,
         array $metadados,
-        ?int $autorId
+        ?int $autorId,
+        ?string $chaveSufixo = null
     ): void {
         if ($evento === 'solicitado') {
             return;
@@ -712,7 +990,8 @@ class AgendamentoController
             'evento' => $evento,
             'entidade' => 'agendamento',
             'entidade_id' => $agendamentoId,
-            'chave_evento' => 'agendamento:' . $evento . ':' . $agendamentoId . ':gestor',
+            'chave_evento' => 'agendamento:' . $evento . ':' . $agendamentoId . ':gestor'
+                . ($chaveSufixo !== null ? ':' . $chaveSufixo : ''),
             'titulo' => $titulo,
             'mensagem' => $mensagem,
             'url' => '/painel-agendamentos',

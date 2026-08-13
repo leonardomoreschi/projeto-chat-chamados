@@ -205,6 +205,7 @@ CREATE TABLE IF NOT EXISTS agendamentos (
     aprovado_por_id     INT UNSIGNED NULL,
     cancelado_por_id    INT UNSIGNED NULL,
     encerrado_por_id    INT UNSIGNED NULL,
+    reagendamento_por_id INT UNSIGNED NULL,
     status              ENUM('solicitado','agendado','em_avaliacao','cancelado','encerrado') NOT NULL DEFAULT 'solicitado',
     data_inicio         DATETIME NOT NULL,
     data_fim            DATETIME NOT NULL,
@@ -213,6 +214,12 @@ CREATE TABLE IF NOT EXISTS agendamentos (
     motivo_cancelamento TEXT NULL,
     realizado           TINYINT(1) NULL DEFAULT NULL,
     observacao_fechamento TEXT NULL,
+    -- Proposta de novo período feita pela equipe; só vira data_inicio/data_fim
+    -- quando o solicitante aceita.
+    reagendamento_inicio DATETIME NULL DEFAULT NULL,
+    reagendamento_fim    DATETIME NULL DEFAULT NULL,
+    reagendamento_motivo TEXT NULL,
+    reagendamento_em     TIMESTAMP NULL DEFAULT NULL,
     aprovado_em         TIMESTAMP NULL DEFAULT NULL,
     avaliado_em         TIMESTAMP NULL DEFAULT NULL,
     cancelado_em        TIMESTAMP NULL DEFAULT NULL,
@@ -224,6 +231,7 @@ CREATE TABLE IF NOT EXISTS agendamentos (
     FOREIGN KEY (aprovado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,
     FOREIGN KEY (cancelado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,
     FOREIGN KEY (encerrado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,
+    FOREIGN KEY (reagendamento_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,
     INDEX idx_agendamentos_status_inicio (status, data_inicio),
     INDEX idx_agendamentos_solicitante_status_inicio (solicitante_id, status, data_inicio),
     INDEX idx_agendamentos_servico_inicio (servico_id, data_inicio)

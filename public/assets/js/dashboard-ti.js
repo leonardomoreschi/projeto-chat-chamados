@@ -667,17 +667,35 @@ function fecharModal(modalId) {
 /**
  * Abre o chat com o solicitante já identificando o chamado de origem.
  *
- * O chat monta a frase e a deixa na barra de digitação sem enviar
- * (`preencherMensagemChamado` em chat.js); aqui só se transporta o contexto.
+ * Com chamado, quem grava a mensagem automática é o backend
+ * (ChamadoController::chamarSetor) — assim o solicitante recebe o aviso mesmo
+ * que o atendente não digite nada. Sem chamado, só abre a conversa.
  */
-function chamarSetor(usuarioId, chamadoId = 0, titulo = '') {
-    let url = `/chat?conversa_com=${usuarioId}`;
-
-    if (chamadoId) {
-        url += `&chamado=${chamadoId}&chamado_titulo=${encodeURIComponent(titulo || '')}`;
+async function chamarSetor(usuarioId, chamadoId = 0, titulo = '') {
+    if (!chamadoId) {
+        window.location.href = `/chat?conversa_com=${usuarioId}`;
+        return;
     }
 
-    window.location.href = url;
+    try {
+        const res = await fetch(`/api/chamados/${chamadoId}/chamar-setor`, { method: 'POST' });
+
+        if (respostaIndicaSessaoExpirada(res)) {
+            window.location.href = '/login';
+            return;
+        }
+
+        const data = await res.json();
+        if (!res.ok || !data.conversa_id) {
+            throw new Error(data.erro || 'Falha ao abrir a conversa');
+        }
+
+        window.location.href = `/chat?conversa=${data.conversa_id}`;
+    } catch (e) {
+        console.error(e);
+        // O chat ainda resolve: abre a conversa com o solicitante mesmo assim.
+        window.location.href = `/chat?conversa_com=${usuarioId}`;
+    }
 }
 
 async function finalizarChamado(id, titulo) {

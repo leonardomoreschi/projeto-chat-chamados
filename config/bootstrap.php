@@ -242,6 +242,37 @@ function ensureAgendamentoSchema(PDO $pdo): void
     $pdo->exec("\n        CREATE TABLE IF NOT EXISTS agendamentos (\n            id                  INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,\n            servico_id          INT UNSIGNED NOT NULL,\n            solicitante_id      INT UNSIGNED NOT NULL,\n            aprovado_por_id     INT UNSIGNED NULL,\n            cancelado_por_id    INT UNSIGNED NULL,\n            encerrado_por_id    INT UNSIGNED NULL,\n            status              ENUM('solicitado','agendado','em_avaliacao','cancelado','encerrado') NOT NULL DEFAULT 'solicitado',\n            data_inicio         DATETIME NOT NULL,\n            data_fim            DATETIME NOT NULL,\n            observacoes         TEXT NULL,\n            motivo_recusa       TEXT NULL,\n            motivo_cancelamento TEXT NULL,\n            realizado            TINYINT(1) NULL DEFAULT NULL,\n            observacao_fechamento TEXT NULL,\n            aprovado_em         TIMESTAMP NULL DEFAULT NULL,\n            avaliado_em         TIMESTAMP NULL DEFAULT NULL,\n            cancelado_em        TIMESTAMP NULL DEFAULT NULL,\n            encerrado_em        TIMESTAMP NULL DEFAULT NULL,\n            criado_em           TIMESTAMP DEFAULT CURRENT_TIMESTAMP,\n            atualizado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,\n            FOREIGN KEY (servico_id) REFERENCES servicos_agendamento(id) ON DELETE RESTRICT,\n            FOREIGN KEY (solicitante_id) REFERENCES usuarios(id) ON DELETE CASCADE,\n            FOREIGN KEY (aprovado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,\n            FOREIGN KEY (cancelado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,\n            FOREIGN KEY (encerrado_por_id) REFERENCES usuarios(id) ON DELETE SET NULL,\n            INDEX idx_agendamentos_status_inicio (status, data_inicio),\n            INDEX idx_agendamentos_solicitante_status_inicio (solicitante_id, status, data_inicio),\n            INDEX idx_agendamentos_servico_inicio (servico_id, data_inicio)\n        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci\n    ");
 
     ensureAgendamentosEmAvaliacaoColumns($pdo);
+    ensureAgendamentosReagendamentoColumns($pdo);
+}
+
+/**
+ * Proposta de novo período feita pela equipe (reagendamento), pendente de
+ * aceite do solicitante. Espelha as colunas de config/schema.sql.
+ */
+function ensureAgendamentosReagendamentoColumns(PDO $pdo): void
+{
+    $colunas = [
+        'reagendamento_inicio' => 'DATETIME NULL DEFAULT NULL',
+        'reagendamento_fim' => 'DATETIME NULL DEFAULT NULL',
+        'reagendamento_motivo' => 'TEXT NULL',
+        'reagendamento_por_id' => 'INT UNSIGNED NULL',
+        'reagendamento_em' => 'TIMESTAMP NULL DEFAULT NULL',
+    ];
+
+    foreach ($colunas as $coluna => $definicao) {
+        try {
+            $existe = $pdo->prepare("
+                SELECT COUNT(*) FROM information_schema.columns
+                WHERE table_schema = DATABASE() AND table_name = 'agendamentos' AND column_name = ?
+            ");
+            $existe->execute([$coluna]);
+            if ((int) $existe->fetchColumn() === 0) {
+                $pdo->exec("ALTER TABLE agendamentos ADD COLUMN {$coluna} {$definicao}");
+            }
+        } catch (\Throwable $e) {
+            error_log("Nao foi possivel adicionar coluna {$coluna} em agendamentos: " . $e->getMessage());
+        }
+    }
 }
 
 function ensureAgendamentosEmAvaliacaoColumns(PDO $pdo): void

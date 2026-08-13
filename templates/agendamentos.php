@@ -221,7 +221,7 @@ $agendamentosBootstrap = [
 
 <!-- ── Modal: Detalhe do agendamento ────────────────────────────────────── -->
 <div id="modal-detalhe" class="hidden fixed inset-0 bg-black/75 z-50 flex items-center justify-center p-4">
-    <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-xl shadow-2xl max-h-[88vh] flex flex-col">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-4xl shadow-2xl max-h-[88vh] flex flex-col">
         <div class="flex items-center justify-between px-6 pt-5 pb-4 border-b border-gray-800 flex-shrink-0">
             <div class="min-w-0 flex-1 pr-4">
                 <p class="text-[10px] uppercase tracking-[.2em] text-gray-500 font-bold leading-none mb-1">Agendamento</p>
@@ -230,12 +230,12 @@ $agendamentosBootstrap = [
             <button data-close-modal="modal-detalhe" class="text-gray-500 hover:text-white text-2xl leading-none w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-800 transition flex-shrink-0">×</button>
         </div>
         <div class="p-6 space-y-4 overflow-y-auto flex-1">
-            <div class="grid grid-cols-2 gap-3 text-sm">
-                <div class="bg-gray-800/70 border border-gray-700/60 rounded-xl p-3 col-span-2">
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 text-sm">
+                <div class="bg-gray-800/70 border border-gray-700/60 rounded-xl p-3 col-span-2 lg:col-span-1">
                     <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold mb-1">Solicitante</p>
                     <p id="detalhe-solicitante" class="text-white text-sm"></p>
                 </div>
-                <div class="bg-gray-800/70 border border-gray-700/60 rounded-xl p-3">
+                <div class="bg-gray-800/70 border border-gray-700/60 rounded-xl p-3 col-span-2 lg:col-span-1">
                     <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold mb-1">Status</p>
                     <p id="detalhe-status" class="text-white mt-0.5"></p>
                 </div>
@@ -243,7 +243,7 @@ $agendamentosBootstrap = [
                     <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold mb-1">Início</p>
                     <p id="detalhe-inicio" class="text-white text-sm"></p>
                 </div>
-                <div class="bg-gray-800/70 border border-gray-700/60 rounded-xl p-3 col-span-2">
+                <div class="bg-gray-800/70 border border-gray-700/60 rounded-xl p-3">
                     <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold mb-1">Término</p>
                     <p id="detalhe-fim" class="text-white text-sm"></p>
                 </div>
@@ -251,6 +251,58 @@ $agendamentosBootstrap = [
             <div class="bg-gray-800/70 border border-gray-700/60 rounded-xl p-3">
                 <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold mb-2">Observações</p>
                 <p id="detalhe-observacoes" class="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed"></p>
+            </div>
+            <!-- Sugestão de novo horário pendente: quem vê o bloco de resposta é
+                 o solicitante; a equipe vê apenas o aviso de que está aguardando. -->
+            <div id="bloco-reagendamento-pendente" class="hidden bg-amber-500/10 border border-amber-500/40 rounded-xl p-4 space-y-3">
+                <p class="text-[10px] uppercase tracking-wide text-amber-400 font-bold">Sugestão de novo horário</p>
+                <p id="reagendamento-periodo" class="text-sm text-white font-semibold"></p>
+                <p id="reagendamento-detalhe" class="text-xs text-gray-400"></p>
+                <p data-erro-formulario class="hidden text-[11px] font-semibold text-red-400"></p>
+                <div id="reagendamento-acoes" class="hidden flex flex-wrap gap-2 pt-1">
+                    <button id="btn-reagendamento-aceitar" class="bg-green-600/90 hover:bg-green-600 text-white rounded-lg px-3.5 py-2 text-xs font-bold transition">Aceitar novo horário</button>
+                    <button id="btn-reagendamento-recusar" class="bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-3.5 py-2 text-xs font-bold transition">Recusar e combinar no chat</button>
+                </div>
+            </div>
+            <div id="bloco-reagendamento-form" class="hidden bg-gray-800/70 border border-amber-700/50 rounded-xl p-4 space-y-3">
+                <p class="text-[10px] uppercase tracking-wide text-amber-400 font-bold">Sugerir outro horário</p>
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <label class="block">
+                        <span class="text-[11px] text-gray-400">Novo início</span>
+                        <input id="reagendamento-inicio" type="datetime-local" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 transition">
+                    </label>
+                    <label class="block">
+                        <span class="text-[11px] text-gray-400">Novo término</span>
+                        <input id="reagendamento-fim" type="datetime-local" class="w-full mt-1 bg-gray-800 border border-gray-700 rounded-xl px-3 py-2.5 text-white text-sm focus:outline-none focus:border-amber-500 transition">
+                    </label>
+                </div>
+                <textarea id="reagendamento-motivo" rows="2" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm resize-none focus:outline-none focus:border-amber-500 transition" placeholder="Motivo da sugestão (opcional) — vai na notificação do solicitante"></textarea>
+                <p class="text-[11px] text-gray-500">O solicitante recebe a sugestão e precisa aceitar antes de o período ser trocado.</p>
+                <p data-erro-formulario class="hidden text-[11px] font-semibold text-red-400"></p>
+                <div class="flex flex-wrap justify-end gap-2 pt-1">
+                    <button id="btn-reagendamento-fechar" class="bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-3.5 py-2 text-xs font-bold transition">Voltar</button>
+                    <button id="btn-reagendamento-enviar" class="bg-amber-500/90 hover:bg-amber-500 text-white rounded-lg px-3.5 py-2 text-xs font-bold transition">Enviar sugestão</button>
+                </div>
+            </div>
+            <div id="bloco-cancelamento-form" class="hidden bg-gray-800/70 border border-red-700/50 rounded-xl p-4 space-y-3">
+                <p class="text-[10px] uppercase tracking-wide text-red-400 font-bold">Cancelar agendamento</p>
+                <textarea id="cancelamento-motivo" rows="2" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm resize-none focus:outline-none focus:border-red-500 transition" placeholder="Motivo do cancelamento (obrigatório) — este texto vai na notificação do solicitante"></textarea>
+                <p class="text-[11px] text-gray-500">O motivo é obrigatório e fica registrado no histórico do agendamento.</p>
+                <p data-erro-formulario class="hidden text-[11px] font-semibold text-red-400"></p>
+                <div class="flex flex-wrap justify-end gap-2 pt-1">
+                    <button id="btn-cancelamento-fechar" class="bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-3.5 py-2 text-xs font-bold transition">Voltar</button>
+                    <button id="btn-cancelamento-confirmar" class="bg-red-600/90 hover:bg-red-600 text-white rounded-lg px-3.5 py-2 text-xs font-bold transition">Confirmar cancelamento</button>
+                </div>
+            </div>
+            <div id="bloco-recusa-form" class="hidden bg-gray-800/70 border border-amber-700/50 rounded-xl p-4 space-y-3">
+                <p class="text-[10px] uppercase tracking-wide text-amber-400 font-bold">Recusar solicitação</p>
+                <textarea id="recusa-motivo" rows="2" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm resize-none focus:outline-none focus:border-amber-500 transition" placeholder="Motivo da recusa (obrigatório) — este texto vai na notificação do solicitante"></textarea>
+                <p class="text-[11px] text-gray-500">O motivo é obrigatório e fica registrado no histórico do agendamento.</p>
+                <p data-erro-formulario class="hidden text-[11px] font-semibold text-red-400"></p>
+                <div class="flex flex-wrap justify-end gap-2 pt-1">
+                    <button id="btn-recusa-fechar" class="bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-3.5 py-2 text-xs font-bold transition">Voltar</button>
+                    <button id="btn-recusa-confirmar" class="bg-amber-600/90 hover:bg-amber-600 text-white rounded-lg px-3.5 py-2 text-xs font-bold transition">Confirmar recusa</button>
+                </div>
             </div>
             <div id="bloco-registro" class="hidden bg-gray-800/70 border border-gray-700/60 rounded-xl p-3">
                 <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold mb-2">Registro do agendamento</p>
@@ -264,13 +316,19 @@ $agendamentosBootstrap = [
                 </label>
                 <textarea id="fechamento-observacao" rows="2" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm resize-none focus:outline-none focus:border-indigo-500 transition" placeholder="Parecer do encerramento (obrigatório) — este texto vai na notificação do solicitante" required></textarea>
                 <p class="text-[11px] text-gray-500">O parecer é obrigatório e será enviado ao solicitante junto com o aviso de encerramento.</p>
+                <p data-erro-formulario class="hidden text-[11px] font-semibold text-red-400"></p>
+                <div class="flex flex-wrap justify-end gap-2 pt-1">
+                    <button id="btn-fechamento-fechar" class="bg-gray-700 hover:bg-gray-600 text-white rounded-lg px-3.5 py-2 text-xs font-bold transition">Voltar</button>
+                    <button id="btn-fechamento-confirmar" class="bg-indigo-600/90 hover:bg-indigo-600 text-white rounded-lg px-3.5 py-2 text-xs font-bold transition">Confirmar encerramento</button>
+                </div>
             </div>
         </div>
-<div class="flex gap-3 px-6 pb-6 flex-shrink-0 flex-wrap">
-    <button id="btn-detalhe-cancelar" class="hidden bg-red-600/90 hover:bg-red-600 text-white rounded-xl px-5 py-3 text-base font-semibold transition">Cancelar agendamento</button>
-    <button id="btn-detalhe-aprovar"  class="hidden bg-green-600/90 hover:bg-green-600 text-white rounded-xl px-5 py-3 text-base font-semibold transition">Aprovar</button>
-    <button id="btn-detalhe-recusar"  class="hidden bg-amber-600/90 hover:bg-amber-600 text-white rounded-xl px-5 py-3 text-base font-semibold transition">Recusar</button>
-    <button id="btn-detalhe-encerrar" class="hidden bg-indigo-600/90 hover:bg-indigo-600 text-white rounded-xl px-5 py-3 text-base font-semibold transition">Encerrar</button>
+<div class="flex flex-wrap items-center justify-end gap-2 px-6 pb-6 pt-4 border-t border-gray-800 flex-shrink-0">
+    <button id="btn-detalhe-cancelar" class="hidden bg-red-600/90 hover:bg-red-600 text-white rounded-lg px-4 py-2 text-sm font-semibold transition">Cancelar agendamento</button>
+    <button id="btn-detalhe-recusar"  class="hidden bg-amber-600/90 hover:bg-amber-600 text-white rounded-lg px-4 py-2 text-sm font-semibold transition">Recusar</button>
+    <button id="btn-detalhe-reagendar" class="hidden bg-amber-500/90 hover:bg-amber-500 text-white rounded-lg px-4 py-2 text-sm font-semibold transition">Reagendar horário</button>
+    <button id="btn-detalhe-aprovar"  class="hidden bg-green-600/90 hover:bg-green-600 text-white rounded-lg px-4 py-2 text-sm font-semibold transition">Aprovar</button>
+    <button id="btn-detalhe-encerrar" class="hidden bg-indigo-600/90 hover:bg-indigo-600 text-white rounded-lg px-4 py-2 text-sm font-semibold transition">Encerrar</button>
 </div>
     </div>
 </div>

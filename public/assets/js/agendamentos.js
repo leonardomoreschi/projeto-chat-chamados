@@ -116,6 +116,13 @@ function statusClasses(s) {
 // admin/ti recebem todos, o usuário comum só os dele.
 const COR_AGENDAMENTO_PASSADO = '#4b5563';
 
+// O calendário mostra só o que já foi aprovado (e o que veio depois disso).
+// Enquanto está em 'solicitado', o agendamento vive apenas na triagem — kanban
+// do painel Admin/TI e aba "Meus Agendamentos" do solicitante.
+function apareceNoCalendario(item) {
+    return !!item && item.status !== 'solicitado';
+}
+
 function agendamentoPassado(item) {
     if (['encerrado', 'em_avaliacao'].includes(item.status)) return true;
     const fim = parseDataServidorBrasilia(item.data_fim || item.data_inicio);
@@ -225,6 +232,7 @@ async function navAnterior() {
     if (viewMode === 'month') dataAtual = new Date(dataAtual.getFullYear(), dataAtual.getMonth() - 1, 1);
     else if (viewMode === 'week') dataAtual = addDias(dataAtual, -7);
     else dataAtual = addDias(dataAtual, -1);
+    diaSelecionado = null;
     await carregarAgendamentos();
 }
 
@@ -232,16 +240,19 @@ async function navProximo() {
     if (viewMode === 'month') dataAtual = new Date(dataAtual.getFullYear(), dataAtual.getMonth() + 1, 1);
     else if (viewMode === 'week') dataAtual = addDias(dataAtual, 7);
     else dataAtual = addDias(dataAtual, 1);
+    diaSelecionado = null;
     await carregarAgendamentos();
 }
 
 async function navHoje() {
     dataAtual = new Date();
+    diaSelecionado = null;
     await carregarAgendamentos();
 }
 
 async function mudarView(modo) {
     viewMode = modo;
+    diaSelecionado = null;
     ['month', 'week', 'day'].forEach(m => {
         const btn = document.getElementById('btn-view-' + m);
         if (!btn) return;
@@ -253,6 +264,21 @@ async function mudarView(modo) {
         btn.classList.toggle('border-gray-700', !ativo);
     });
     await carregarAgendamentos();
+}
+
+// ── Dia selecionado ─────────────────────────────────────────────────────────
+// O realce do dia (bg-indigo-600 na visão mensal) precisa ser pintado no mesmo
+// gesto que o define. Antes o estado mudava sem repintar e só aparecia no
+// refresh automático de 30s — o dia "ficava roxo do nada" muito depois do
+// clique, e nunca era limpo.
+function definirDiaSelecionado(chave) {
+    if (diaSelecionado === chave) return;
+    diaSelecionado = chave;
+    renderizarCalendario();
+}
+
+function limparDiaSelecionado() {
+    definirDiaSelecionado(null);
 }
 
 // ── Dispatch de render ──────────────────────────────────────────────────────
@@ -286,7 +312,7 @@ function renderizarMensal() {
     for (let dia = 1; dia <= totalDias; dia++) {
         const data = new Date(dataAtual.getFullYear(), dataAtual.getMonth(), dia, 12, 0, 0);
         const chave = chaveDia(data);
-        const itens = agendamentosCache.filter(item => agendamentoCobreDia(item, data));
+        const itens = agendamentosCache.filter(item => apareceNoCalendario(item) && agendamentoCobreDia(item, data));
         const sel = diaSelecionado === chave;
         const isHoje = chave === hoje;
 
@@ -360,7 +386,7 @@ function renderizarSemanal() {
     const gutter = '52px';
     const bgLinhas = `repeating-linear-gradient(to bottom,transparent 0px,transparent ${PX_HORA - 1}px,#1f2937 ${PX_HORA - 1}px,#1f2937 ${PX_HORA}px)`;
 
-    const agsDaSemana = agendamentosCache.filter(ag => dias.some(d => agendamentoCobreDia(ag, d)));
+    const agsDaSemana = agendamentosCache.filter(ag => apareceNoCalendario(ag) && dias.some(d => agendamentoCobreDia(ag, d)));
     const allDayAgs = agsDaSemana.filter(ehMultiDia);
     const timedAgs = agsDaSemana.filter(ag => !ehMultiDia(ag));
 
@@ -445,7 +471,7 @@ function renderizarSemanal() {
         el.addEventListener('click', () => {
             const chave = el.getAttribute('data-date');
             if (!chave) return;
-            diaSelecionado = chave;
+            definirDiaSelecionado(chave);
             const lblEl = document.getElementById('dia-selecionado-rotulo');
             if (lblEl) {
                 const d = parseDataServidorBrasilia(chave + 'T12:00:00');
@@ -462,7 +488,7 @@ function renderizarDiario() {
     container.style.cssText = '';
 
     const chave = chaveDia(dataAtual);
-    const agsDia = agendamentosCache.filter(ag => agendamentoCobreDia(ag, dataAtual));
+    const agsDia = agendamentosCache.filter(ag => apareceNoCalendario(ag) && agendamentoCobreDia(ag, dataAtual));
     const timedAgs = agsDia.filter(ag => !ehMultiDia(ag));
     const allDayAgs = agsDia.filter(ehMultiDia);
     const totalH = (HORA_FIM - HORA_INICIO) * PX_HORA;
@@ -531,7 +557,7 @@ function renderizarDiario() {
     container.querySelectorAll('[data-date]').forEach(el =>
         el.addEventListener('click', () => {
             const d = el.getAttribute('data-date');
-            if (d) { diaSelecionado = d; abrirModalSolicitacao(d); }
+            if (d) { definirDiaSelecionado(d); abrirModalSolicitacao(d); }
         })
     );
 }
@@ -702,9 +728,9 @@ function _bindItensDoDialListeners(el) {
 }
 
 function abrirDia(dataIso) {
-    diaSelecionado = dataIso;
+    definirDiaSelecionado(dataIso);
     const data = parseDataServidorBrasilia(dataIso + 'T12:00:00');
-    const itens = agendamentosCache.filter(item => agendamentoCobreDia(item, data || new Date()));
+    const itens = agendamentosCache.filter(item => apareceNoCalendario(item) && agendamentoCobreDia(item, data || new Date()));
     const html = _buildItensDoDialHtml(itens);
 
     if (data) {
@@ -742,6 +768,7 @@ async function abrirDetalhe(id) {
     set('detalhe-fim', formatarDataAgendamento(data.data_fim));
     set('detalhe-observacoes', data.observacoes || 'Sem observações');
 
+    renderizarReagendamento(data);
     renderizarRegistroAgendamento(data);
 
     const checkRealizado = document.getElementById('fechamento-realizado');
@@ -751,6 +778,198 @@ async function abrirDetalhe(id) {
 
     configurarAcoesDetalhe(data);
     abrirModal('modal-detalhe');
+}
+
+// ── Reagendamento ───────────────────────────────────────────────────────────
+function temReagendamentoPendente(data) {
+    return !!(data && data.reagendamento_inicio && data.reagendamento_fim);
+}
+
+function periodoReagendamento(data) {
+    return formatarDataAgendamento(data.reagendamento_inicio) + ' até ' + formatarDataAgendamento(data.reagendamento_fim);
+}
+
+// Mostra a sugestão pendente. Só o solicitante responde; a equipe vê o aviso
+// de que a resposta está pendente.
+function renderizarReagendamento(data) {
+    const bloco = document.getElementById('bloco-reagendamento-pendente');
+    const acoes = document.getElementById('reagendamento-acoes');
+    if (!bloco) return;
+
+    if (!temReagendamentoPendente(data)) {
+        bloco.classList.add('hidden');
+        acoes?.classList.add('hidden');
+        return;
+    }
+
+    const ehSolicitante = Number(data.solicitante_id) === AG_USER_ID;
+    const periodo = document.getElementById('reagendamento-periodo');
+    const detalhe = document.getElementById('reagendamento-detalhe');
+
+    if (periodo) periodo.textContent = periodoReagendamento(data);
+    if (detalhe) {
+        const autor = data.reagendamento_por_nome ? 'Sugerido por ' + data.reagendamento_por_nome : 'Sugerido pela equipe';
+        const motivo = (data.reagendamento_motivo || '').trim();
+        detalhe.textContent = autor
+            + (data.reagendamento_em ? ' • ' + formatarDataAgendamento(data.reagendamento_em) : '')
+            + (motivo ? ' — Motivo: ' + motivo : '')
+            + (ehSolicitante ? '' : ' — aguardando a resposta do solicitante.');
+    }
+
+    bloco.classList.remove('hidden');
+    acoes?.classList.toggle('hidden', !ehSolicitante);
+}
+
+async function aceitarReagendamento() {
+    if (!agendamentoAtual) return;
+    await alterarStatus(agendamentoAtual.id, 'reagendamento/aceitar', {}, 'bloco-reagendamento-pendente');
+}
+
+// Recusar leva direto para a conversa com quem sugeriu, com o texto pronto no
+// editor do chat — quem envia (ou reescreve) é o próprio solicitante.
+async function recusarReagendamento() {
+    if (!agendamentoAtual) return;
+
+    const res = await fetch(`/api/agendamentos/${agendamentoAtual.id}/reagendamento/recusar`, { method: 'PATCH' });
+    const data = await res.json();
+    if (!res.ok) {
+        mostrarErroFormulario('bloco-reagendamento-pendente', data.erro || 'Não foi possível recusar a sugestão');
+        return;
+    }
+
+    if (data.conversa_id) {
+        const params = new URLSearchParams({ conversa: String(data.conversa_id) });
+        if (data.mensagem_sugerida) params.set('texto', data.mensagem_sugerida);
+        window.location.href = '/chat?' + params;
+        return;
+    }
+
+    mostrarErroFormulario(
+        'bloco-reagendamento-pendente',
+        'Sugestão recusada, mas não foi possível abrir a conversa. Procure a equipe pelo chat para combinar outra data.'
+    );
+    await carregarAgendamentos();
+}
+
+// ── Formulários de ação (reagendar, cancelar, recusar, encerrar) ────────────
+// Nenhuma ação usa prompt/alert do navegador: cada botão abre o próprio bloco
+// dentro do modal, com o campo de texto e os erros ali mesmo.
+const FORMULARIOS_ACAO = [
+    'bloco-reagendamento-form',
+    'bloco-cancelamento-form',
+    'bloco-recusa-form',
+    'bloco-fechamento-form',
+];
+
+function limparErroFormulario(blocoId) {
+    const alvo = document.getElementById(blocoId)?.querySelector('[data-erro-formulario]');
+    if (!alvo) return;
+    alvo.textContent = '';
+    alvo.classList.add('hidden');
+}
+
+function mostrarErroFormulario(blocoId, mensagem) {
+    const alvo = document.getElementById(blocoId)?.querySelector('[data-erro-formulario]');
+    if (!alvo) return;
+    alvo.textContent = mensagem;
+    alvo.classList.remove('hidden');
+}
+
+function fecharFormulariosAcao() {
+    FORMULARIOS_ACAO.forEach(id => {
+        document.getElementById(id)?.classList.add('hidden');
+        limparErroFormulario(id);
+    });
+}
+
+// Abre um formulário por vez e devolve o foco ao primeiro campo.
+function abrirFormularioAcao(blocoId) {
+    fecharFormulariosAcao();
+
+    const bloco = document.getElementById(blocoId);
+    if (!bloco) return;
+
+    if (blocoId === 'bloco-reagendamento-form') {
+        const inputInicio = document.getElementById('reagendamento-inicio');
+        const inputFim = document.getElementById('reagendamento-fim');
+        const ini = agendamentoAtual ? parseDataServidorBrasilia(agendamentoAtual.data_inicio) : null;
+        const fim = agendamentoAtual ? parseDataServidorBrasilia(agendamentoAtual.data_fim) : null;
+        if (inputInicio) inputInicio.value = ini ? dataToLocalValue(ini) : '';
+        if (inputFim) inputFim.value = fim ? dataToLocalValue(fim) : '';
+    }
+
+    bloco.querySelectorAll('textarea').forEach(campo => { campo.value = ''; });
+
+    bloco.classList.remove('hidden');
+    bloco.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    bloco.querySelector('textarea, input')?.focus();
+}
+
+async function enviarCancelamento() {
+    if (!agendamentoAtual) return;
+
+    const motivo = document.getElementById('cancelamento-motivo')?.value.trim() || '';
+    if (!motivo) {
+        mostrarErroFormulario('bloco-cancelamento-form', 'Informe o motivo do cancelamento — ele vai na notificação do solicitante.');
+        document.getElementById('cancelamento-motivo')?.focus();
+        return;
+    }
+
+    limparErroFormulario('bloco-cancelamento-form');
+    await alterarStatus(agendamentoAtual.id, 'cancelar', { motivo }, 'bloco-cancelamento-form');
+}
+
+async function enviarRecusa() {
+    if (!agendamentoAtual) return;
+
+    const motivo = document.getElementById('recusa-motivo')?.value.trim() || '';
+    if (!motivo) {
+        mostrarErroFormulario('bloco-recusa-form', 'Informe o motivo da recusa — ele vai na notificação do solicitante.');
+        document.getElementById('recusa-motivo')?.focus();
+        return;
+    }
+
+    limparErroFormulario('bloco-recusa-form');
+    await alterarStatus(agendamentoAtual.id, 'recusar', { motivo }, 'bloco-recusa-form');
+}
+
+async function enviarEncerramento() {
+    if (!agendamentoAtual) return;
+
+    const campoObservacao = document.getElementById('fechamento-observacao');
+    const observacao_fechamento = campoObservacao?.value.trim() || '';
+    if (!observacao_fechamento) {
+        mostrarErroFormulario('bloco-fechamento-form', 'Informe o parecer de encerramento — ele vai na notificação do solicitante.');
+        campoObservacao?.focus();
+        return;
+    }
+
+    const realizado = document.getElementById('fechamento-realizado')?.checked ? '1' : '0';
+    limparErroFormulario('bloco-fechamento-form');
+    await alterarStatus(agendamentoAtual.id, 'encerrar', { realizado, observacao_fechamento }, 'bloco-fechamento-form');
+}
+
+async function enviarReagendamento() {
+    if (!agendamentoAtual) return;
+
+    const inicio = document.getElementById('reagendamento-inicio')?.value || '';
+    const fim = document.getElementById('reagendamento-fim')?.value || '';
+    if (!inicio || !fim) {
+        mostrarErroFormulario('bloco-reagendamento-form', 'Informe o novo início e o novo término.');
+        return;
+    }
+    if (new Date(fim) <= new Date(inicio)) {
+        mostrarErroFormulario('bloco-reagendamento-form', 'O término precisa ser depois do início.');
+        return;
+    }
+
+    limparErroFormulario('bloco-reagendamento-form');
+    const motivo = document.getElementById('reagendamento-motivo')?.value.trim() || '';
+    await alterarStatus(agendamentoAtual.id, 'reagendar', {
+        data_inicio: inicio.replace('T', ' '),
+        data_fim: fim.replace('T', ' '),
+        motivo,
+    }, 'bloco-reagendamento-form');
 }
 
 // ── Registro (histórico) do agendamento ─────────────────────────────────────
@@ -779,6 +998,17 @@ function renderizarRegistroAgendamento(data) {
 
     if (data.aprovado_em || data.aprovado_por_nome) {
         entradas.push(itemRegistro('Aprovado', data.aprovado_por_nome, data.aprovado_em, '', 'border-green-500'));
+    }
+
+    if (temReagendamentoPendente(data)) {
+        const motivo = (data.reagendamento_motivo || '').trim();
+        entradas.push(itemRegistro(
+            'Novo horário sugerido (aguardando o solicitante)',
+            data.reagendamento_por_nome,
+            data.reagendamento_em,
+            periodoReagendamento(data) + (motivo ? '\nMotivo: ' + motivo : ''),
+            'border-amber-500'
+        ));
     }
 
     if (data.status === 'cancelado' || data.cancelado_em) {
@@ -814,12 +1044,13 @@ function renderizarRegistroAgendamento(data) {
 }
 
 function configurarAcoesDetalhe(data) {
-    const btns = ['cancelar', 'aprovar', 'recusar', 'encerrar'].reduce((acc, k) => {
+    const btns = ['cancelar', 'aprovar', 'recusar', 'encerrar', 'reagendar'].reduce((acc, k) => {
         acc[k] = document.getElementById('btn-detalhe-' + k);
         return acc;
     }, {});
     Object.values(btns).forEach(b => b?.classList.add('hidden'));
-    document.getElementById('bloco-fechamento-form')?.classList.add('hidden');
+    // Reabrir o detalhe sempre começa com todos os formulários fechados.
+    fecharFormulariosAcao();
 
     if (btns.cancelar && (Number(data.solicitante_id) === AG_USER_ID || AG_EQUIP) && !['encerrado', 'cancelado'].includes(data.status))
         btns.cancelar.classList.remove('hidden');
@@ -827,9 +1058,15 @@ function configurarAcoesDetalhe(data) {
     if (!AG_EQUIP) return;
     if (btns.aprovar && data.status === 'solicitado') btns.aprovar.classList.remove('hidden');
     if (btns.recusar && data.status === 'solicitado') btns.recusar.classList.remove('hidden');
+
+    // Enquanto houver sugestão pendente a equipe espera a resposta em vez de
+    // sugerir outro horário por cima. O formulário em si só abre no clique.
+    if (btns.reagendar && ['solicitado', 'agendado'].includes(data.status) && !temReagendamentoPendente(data)) {
+        btns.reagendar.classList.remove('hidden');
+    }
+
     if (btns.encerrar && ['agendado', 'em_avaliacao'].includes(data.status)) {
         btns.encerrar.classList.remove('hidden');
-        document.getElementById('bloco-fechamento-form')?.classList.remove('hidden');
     }
 }
 
@@ -865,14 +1102,21 @@ async function enviarSolicitacao() {
 }
 
 // ── Ações de status ─────────────────────────────────────────────────────────
-async function alterarStatus(id, acao, payload = {}) {
+// blocoErro: id do formulário que mostra a mensagem de erro no lugar de um
+// alert do navegador.
+async function alterarStatus(id, acao, payload = {}, blocoErro = null) {
     const res = await fetch(`/api/agendamentos/${id}/${acao}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams(payload),
     });
     const data = await res.json();
-    if (!res.ok) { alert(data.erro || 'Não foi possível atualizar o agendamento'); return; }
+    if (!res.ok) {
+        const mensagem = data.erro || 'Não foi possível atualizar o agendamento';
+        if (blocoErro) mostrarErroFormulario(blocoErro, mensagem);
+        else alert(mensagem);
+        return;
+    }
     agendamentoAtual = data;
     fecharModal('modal-detalhe');
     await carregarAgendamentos();
@@ -975,40 +1219,39 @@ function prepararAgenda() {
         btn.addEventListener('click', () => trocarTab(btn.dataset.tab))
     );
 
+    // Cada botão da barra abre o formulário correspondente; a confirmação (com
+    // o motivo/parecer obrigatório) acontece dentro do próprio bloco.
     const detalheAcoes = {
-        // Motivo e parecer são obrigatórios: eles são o corpo da notificação que
-        // o solicitante recebe. O backend recusa o envio sem eles.
-        'btn-detalhe-cancelar': async () => {
-            if (!agendamentoAtual) return;
-            const motivo = prompt('Informe o motivo do cancelamento (o solicitante será avisado):') || '';
-            if (!motivo.trim()) return;
-            await alterarStatus(agendamentoAtual.id, 'cancelar', { motivo: motivo.trim() });
-        },
         'btn-detalhe-aprovar': async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'aprovar'),
-        'btn-detalhe-encerrar': async () => {
-            if (!agendamentoAtual) return;
-            const campoObservacao = document.getElementById('fechamento-observacao');
-            const observacao_fechamento = campoObservacao?.value.trim() || '';
-            if (!observacao_fechamento) {
-                alert('Informe o parecer de encerramento — ele vai na notificação do solicitante.');
-                campoObservacao?.focus();
-                return;
-            }
-            const realizado = document.getElementById('fechamento-realizado')?.checked ? '1' : '0';
-            await alterarStatus(agendamentoAtual.id, 'encerrar', { realizado, observacao_fechamento });
-        },
-        'btn-detalhe-recusar': async () => {
-            if (!agendamentoAtual) return;
-            const motivo = prompt('Informe o motivo da recusa:') || '';
-            if (!motivo.trim()) return;
-            await alterarStatus(agendamentoAtual.id, 'recusar', { motivo });
-        },
+
+        'btn-detalhe-cancelar': () => abrirFormularioAcao('bloco-cancelamento-form'),
+        'btn-cancelamento-fechar': fecharFormulariosAcao,
+        'btn-cancelamento-confirmar': enviarCancelamento,
+
+        'btn-detalhe-recusar': () => abrirFormularioAcao('bloco-recusa-form'),
+        'btn-recusa-fechar': fecharFormulariosAcao,
+        'btn-recusa-confirmar': enviarRecusa,
+
+        'btn-detalhe-encerrar': () => abrirFormularioAcao('bloco-fechamento-form'),
+        'btn-fechamento-fechar': fecharFormulariosAcao,
+        'btn-fechamento-confirmar': enviarEncerramento,
+
+        'btn-detalhe-reagendar': () => abrirFormularioAcao('bloco-reagendamento-form'),
+        'btn-reagendamento-fechar': fecharFormulariosAcao,
+        'btn-reagendamento-enviar': enviarReagendamento,
+
+        'btn-reagendamento-aceitar': aceitarReagendamento,
+        'btn-reagendamento-recusar': recusarReagendamento,
     };
     Object.entries(detalheAcoes).forEach(([id, fn]) => document.getElementById(id)?.addEventListener('click', fn));
 
     document.addEventListener('click', e => {
         const key = e.target?.getAttribute?.('data-close-modal');
-        if (key) fecharModal(key);
+        if (!key) return;
+
+        fecharModal(key);
+        // Fechou o dia: some também o realce, senão ele fica preso na grade.
+        if (key === 'modal-dia') limparDiaSelecionado();
     });
 }
 
@@ -1076,5 +1319,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     await _carregarServicosUmaVez();
     await carregarAgendamentos();
+    await abrirAgendamentoViaUrl();
     setInterval(carregarAgendamentos, 30000);
 });
+
+// A notificação de sugestão de horário aponta para /agendamentos?agendamento=ID
+// — abrimos o detalhe direto para o solicitante aceitar ou recusar.
+async function abrirAgendamentoViaUrl() {
+    const id = Number(new URLSearchParams(window.location.search).get('agendamento') || 0);
+    if (!id) return;
+
+    const url = new URL(window.location.href);
+    url.searchParams.delete('agendamento');
+    window.history.replaceState({}, '', url);
+
+    await abrirDetalhe(id);
+}

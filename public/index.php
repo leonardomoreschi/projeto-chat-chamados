@@ -231,6 +231,7 @@ $app->group('/api', function ($group) {
     $group->delete('/chamados/{id}/comentarios/{comentarioId}', [ChamadoController::class, 'removerComentario']);
     $group->get('/chamados/relatorio', [ChamadoController::class, 'relatorio']);
     $group->get('/chamados/relatorio/csv', [ChamadoController::class, 'exportarRelatorioCsv']);
+    $group->post('/chamados/{id}/chamar-setor', [ChamadoController::class, 'chamarSetor']);
     $group->patch('/chamados/{id}/status', [ChamadoController::class, 'atualizarStatus']);
     $group->patch('/chamados/{id}/cancelar', [ChamadoController::class, 'cancelarMeuChamado']);
     $group->patch('/chamados/{id}/classificar', [ChamadoController::class, 'classificar']);
@@ -247,6 +248,9 @@ $app->group('/api', function ($group) {
     $group->post('/agendamentos', [AgendamentoController::class, 'solicitar']);
     $group->patch('/agendamentos/{id}/aprovar', [AgendamentoController::class, 'aprovar']);
     $group->patch('/agendamentos/{id}/recusar', [AgendamentoController::class, 'recusar']);
+    $group->patch('/agendamentos/{id}/reagendar', [AgendamentoController::class, 'reagendar']);
+    $group->patch('/agendamentos/{id}/reagendamento/aceitar', [AgendamentoController::class, 'aceitarReagendamento']);
+    $group->patch('/agendamentos/{id}/reagendamento/recusar', [AgendamentoController::class, 'recusarReagendamento']);
     $group->patch('/agendamentos/{id}/cancelar', [AgendamentoController::class, 'cancelar']);
     $group->patch('/agendamentos/{id}/encerrar', [AgendamentoController::class, 'encerrar']);
     $group->get('/servicos-agendamento', [AgendamentoController::class, 'listarServicos']);
