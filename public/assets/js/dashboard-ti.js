@@ -139,6 +139,33 @@ function popularFiltroSubcategorias() {
     renderizarTudo();
 }
 
+// Zera os filtros da aba "Chamados Documentados". popularFiltroSubcategorias()
+// já repopula a subcategoria e chama renderizarTudo() no fim.
+function limparFiltrosDocumentados() {
+    const filtroSetor = document.getElementById('filtro-setor');
+    const filtroSub = document.getElementById('filtro-subcategoria');
+    const filtroOrdenacao = document.getElementById('filtro-ordenacao');
+
+    if (filtroSetor) filtroSetor.value = '';
+    if (filtroSub) filtroSub.value = '';
+    if (filtroOrdenacao) filtroOrdenacao.value = '';
+
+    popularFiltroSubcategorias();
+}
+
+// Zera os filtros do painel de histórico (categoria, subcategoria e data).
+function limparFiltrosHistorico() {
+    const filtroCat = document.getElementById('filtro-historico-categoria');
+    const filtroSub = document.getElementById('filtro-historico-subcategoria');
+    const filtroData = document.getElementById('filtro-historico-data');
+
+    if (filtroCat) filtroCat.value = '';
+    if (filtroSub) filtroSub.value = '';
+    if (filtroData) filtroData.value = '';
+
+    popularFiltroHistoricoSubcategorias();
+}
+
 function popularFiltroHistoricoCategorias() {
     const filtro = document.getElementById('filtro-historico-categoria');
     if (!filtro) return;
