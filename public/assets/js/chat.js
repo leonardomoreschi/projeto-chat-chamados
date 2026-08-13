@@ -1062,11 +1062,17 @@ function fecharEmergencia() {
     document.getElementById('modal-emergencia').classList.add('hidden');
     // Fechar o modal descarta os anexos pendentes (estado, input e previews).
     if (anexosChamado) anexosChamado.limpar();
+    const selPrioridade = document.getElementById('chamado-prioridade');
+    if (selPrioridade) selPrioridade.value = 'media';
 }
 
 async function enviarChamado() {
     const titulo = document.getElementById('chamado-titulo').value.trim();
     const descricao = document.getElementById('chamado-descricao').value.trim();
+    // Pré-triagem do solicitante: vai para chamados.prioridade e ordena a fila
+    // de triagem. Quem valida é a TI no modal de classificação.
+    const selPrioridade = document.getElementById('chamado-prioridade');
+    const prioridade = selPrioridade ? selPrioridade.value : 'media';
     if (!titulo) { alert('Informe o título do problema.'); return; }
 
     const btnEnviar = document.getElementById('btn-enviar-chamado');
@@ -1077,6 +1083,7 @@ async function enviarChamado() {
         const formData = new FormData();
         formData.append('titulo', titulo);
         formData.append('descricao', descricao);
+        formData.append('prioridade', prioridade);
         if (anexosChamado) anexosChamado.anexarEm(formData, 'anexos[]');
 
         const res = await fetch('/api/chamados', { method: 'POST', body: formData });

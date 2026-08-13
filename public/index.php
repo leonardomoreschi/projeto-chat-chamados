@@ -136,7 +136,23 @@ $app->get('/dashboard-ti', function ($request, $response) {
             ORDER BY FIELD(c.prioridade, 'critica','alta','media','baixa'), c.criado_em DESC";
     $stmt = $pdo->query($sql);
     $chamadosBootstrap = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
-    
+
+    // Fila de triagem: mais graves em cima e, dentro da mesma gravidade, na
+    // ordem de abertura (mais antigo primeiro). Mesmo critério de
+    // renderizarTudo() em public/assets/js/dashboard-ti.js.
+    $pesoPrioridade = ['critica' => 1, 'alta' => 2, 'media' => 3, 'baixa' => 4];
+    $triagemBootstrap = array_values(array_filter(
+        $chamadosBootstrap,
+        static fn(array $chamado): bool => ($chamado['status'] ?? '') === 'aberto'
+    ));
+    usort($triagemBootstrap, static function (array $a, array $b) use ($pesoPrioridade): int {
+        $pesoA = $pesoPrioridade[$a['prioridade'] ?? 'media'] ?? 3;
+        $pesoB = $pesoPrioridade[$b['prioridade'] ?? 'media'] ?? 3;
+
+        return $pesoA <=> $pesoB
+            ?: strcmp((string) ($a['criado_em'] ?? ''), (string) ($b['criado_em'] ?? ''));
+    });
+
     // Se não for TI ou Admin, redireciona pro chat
     if (!in_array($userPapel, ['ti', 'admin'], true)) {
         return $response->withHeader('Location', '/chat')->withStatus(302);
@@ -147,6 +163,7 @@ $app->get('/dashboard-ti', function ($request, $response) {
         'userId' => $request->getAttribute('user_id'),
         'userPapel' => $userPapel,
         'chamadosBootstrap' => $chamadosBootstrap,
+        'triagemBootstrap' => $triagemBootstrap,
         'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $request->getAttribute('user_id')),
     ]);
 })->add(new AuthMiddleware());

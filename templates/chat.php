@@ -292,6 +292,17 @@
                           class="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition resize-none"></textarea>
             </div>
             <div>
+                <label for="chamado-prioridade" class="block text-sm font-medium text-gray-300 mb-2">Gravidade do problema</label>
+                <select id="chamado-prioridade"
+                        class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition">
+                    <option value="critica">Crítica — parou tudo, ninguém consegue trabalhar</option>
+                    <option value="alta">Alta — impede o meu trabalho agora</option>
+                    <option value="media" selected>Média — atrapalha, mas consigo continuar</option>
+                    <option value="baixa">Baixa — pode ser resolvido com calma</option>
+                </select>
+                <p class="text-[11px] text-gray-500 mt-1.5">A TI confirma ou ajusta essa gravidade na triagem.</p>
+            </div>
+            <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">Anexar arquivos</label>
                 <label class="flex items-center gap-3 bg-gray-800 border border-dashed border-gray-600 rounded-xl px-4 py-3 cursor-pointer hover:border-gray-500 transition">
                     <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">

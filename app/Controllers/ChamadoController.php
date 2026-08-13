@@ -14,6 +14,14 @@ class ChamadoController
 
     private const PRIORIDADES_VALIDAS = ['baixa', 'media', 'alta', 'critica'];
 
+    // Espelha os rótulos de prioridade em public/assets/js/config.js
+    private const ROTULOS_PRIORIDADE = [
+        'baixa' => 'Baixa',
+        'media' => 'Média',
+        'alta' => 'Alta',
+        'critica' => 'Crítica',
+    ];
+
     // Espelha os rótulos de status em public/assets/js/config.js
     private const ROTULOS_STATUS_CHAMADO = [
         'aberto' => 'aberto',
@@ -78,7 +86,10 @@ class ChamadoController
             'entidade_id' => $chamadoId,
             'chave_evento' => 'chamado:novo:' . $chamadoId,
             'titulo' => 'Novo chamado de emergência',
-            'mensagem' => '#' . $chamadoId . ' — ' . $titulo,
+            // A prioridade aqui é a pré-triagem do solicitante; a TI confirma
+            // ou ajusta ao classificar.
+            'mensagem' => '#' . $chamadoId . ' — ' . $titulo
+                . ' (gravidade indicada: ' . (self::ROTULOS_PRIORIDADE[$prioridade] ?? $prioridade) . ')',
             'url' => '/dashboard-ti',
             'status_destino' => 'aberto',
             'metadados' => [
@@ -988,8 +999,9 @@ class ChamadoController
                 'evento' => 'classificado',
                 'chave_base' => 'chamado:classificado:' . $id,
                 'titulo' => 'Chamado classificado',
-                'mensagem_dono' => 'Seu chamado #' . $id . ' foi classificado como ' . $categoria
-                    . ' / ' . $subcategoria . ' (prioridade ' . $prioridade . ').',
+                // O solicitante não vê categoria/subcategoria/prioridade: essa
+                // taxonomia é interna da TI e só vai na mensagem do gestor.
+                'mensagem_dono' => 'Seu chamado #' . $id . ' foi classificado pela equipe de TI e já entrou na fila de atendimento.',
                 'mensagem_gestor' => 'Chamado #' . $id . ' classificado como ' . $categoria
                     . ' / ' . $subcategoria . ' (prioridade ' . $prioridade . ').',
                 'autor_id' => (int) $request->getAttribute('user_id'),
@@ -1050,8 +1062,8 @@ class ChamadoController
                 'evento' => 'classificacao_atualizada',
                 'chave_base' => 'chamado:classificacao:' . $id . ':' . $prioridade . ':' . $categoria . ':' . $subcategoria,
                 'titulo' => 'Classificação atualizada',
-                'mensagem_dono' => 'A classificação do seu chamado #' . $id . ' mudou para ' . $categoria
-                    . ' / ' . $subcategoria . ' (prioridade ' . $prioridade . ').',
+                // Mesma regra do evento 'classificado': o dono não vê a taxonomia interna.
+                'mensagem_dono' => 'A equipe de TI revisou a classificação do seu chamado #' . $id . '.',
                 'mensagem_gestor' => 'Chamado #' . $id . ' reclassificado para ' . $categoria
                     . ' / ' . $subcategoria . ' (prioridade ' . $prioridade . ').',
                 'autor_id' => (int) $request->getAttribute('user_id'),

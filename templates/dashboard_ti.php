@@ -66,8 +66,20 @@
         </div>
     </header>
 
+    <?php
+        // Espelha CONFIG.prioridades de public/assets/js/config.js — o primeiro
+        // paint vem daqui e é substituído por carregarDados() logo em seguida.
+        // 'borda_esquerda' é usada no card de triagem, que mantém a borda cinza
+        // nos outros lados e só colore a lateral esquerda.
+        $coresPrioridade = [
+            'critica' => ['label' => 'Crítica', 'badge' => 'bg-red-500', 'borda' => 'border-red-500', 'borda_esquerda' => 'border-l-red-500'],
+            'alta'    => ['label' => 'Alta',    'badge' => 'bg-orange-500', 'borda' => 'border-orange-500', 'borda_esquerda' => 'border-l-orange-500'],
+            'media'   => ['label' => 'Média',   'badge' => 'bg-yellow-500', 'borda' => 'border-yellow-500', 'borda_esquerda' => 'border-l-yellow-500'],
+            'baixa'   => ['label' => 'Baixa',   'badge' => 'bg-blue-500', 'borda' => 'border-blue-500', 'borda_esquerda' => 'border-l-blue-500'],
+        ];
+    ?>
     <main class="flex-1 flex flex-col lg:flex-row overflow-auto p-3 md:p-6 gap-4 md:gap-6">
-        
+
         <section class="w-full lg:w-96 flex flex-col shrink-0 min-h-[260px] lg:min-h-0">
             <div class="flex items-center justify-between mb-4 px-2">
                 <h3 class="text-sm font-black text-gray-500 uppercase tracking-widest flex items-center gap-2">
@@ -78,15 +90,19 @@
             </div>
             
             <div id="container-triagem" class="flex-1 overflow-y-auto space-y-4 pr-2">
-                <?php foreach ($chamadosBootstrap as $chamado): ?>
-                    <?php if (($chamado['status'] ?? '') !== 'aberto') continue; ?>
-                    <div class="bg-gray-900 border border-gray-800 p-5 rounded-2xl card-anim group">
+                <?php foreach (($triagemBootstrap ?? []) as $chamado): ?>
+                    <?php $prio = $coresPrioridade[$chamado['prioridade'] ?? 'media'] ?? $coresPrioridade['media']; ?>
+                    <div class="bg-gray-900 border border-gray-800 border-l-4 <?= $prio['borda_esquerda'] ?> p-5 rounded-2xl card-anim group">
                         <div class="flex justify-between items-center mb-3">
                             <div class="flex items-center gap-2">
                                 <div class="w-6 h-6 bg-gray-800 rounded-lg flex items-center justify-center text-[10px] font-bold text-indigo-500 border border-gray-700"><?= htmlspecialchars(strtoupper(substr((string)($chamado['usuario_nome'] ?? 'U'), 0, 1))) ?></div>
                                 <span class="text-[10px] text-gray-400 font-bold"><?= htmlspecialchars((string)($chamado['usuario_nome'] ?? 'Usuário')) ?></span>
                             </div>
                             <span class="text-[10px] text-gray-600 font-bold"><?= htmlspecialchars(date('d/m/Y', strtotime((string)($chamado['criado_em'] ?? 'now')))) ?></span>
+                        </div>
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="<?= $prio['badge'] ?> text-[9px] font-black text-black px-2 py-0.5 rounded uppercase"><?= $prio['label'] ?></span>
+                            <span class="text-[9px] text-gray-600 font-bold uppercase tracking-wide">indicada pelo solicitante</span>
                         </div>
                         <h4 class="text-white font-bold text-sm mb-2 group-hover:text-indigo-400 transition-colors">#<?= (int)($chamado['id'] ?? 0) ?> - <?= htmlspecialchars((string)($chamado['titulo'] ?? '')) ?></h4>
                         <p class="text-gray-500 text-xs line-clamp-2 mb-4 leading-relaxed"><?= htmlspecialchars((string)($chamado['descricao_rich'] ?? '')) ?></p>
@@ -138,9 +154,10 @@
             <div id="container-documentados" class="flex-1 overflow-y-auto grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 content-start pr-2">
                 <?php foreach ($chamadosBootstrap as $chamado): ?>
                     <?php if (($chamado['status'] ?? '') !== 'classificado') continue; ?>
-                    <div class="bg-gray-900 border-l-4 border-indigo-500 p-5 rounded-r-2xl shadow-xl card-anim flex flex-col h-full relative group">
+                    <?php $prio = $coresPrioridade[$chamado['prioridade'] ?? 'media'] ?? $coresPrioridade['media']; ?>
+                    <div class="bg-gray-900 border-l-4 <?= $prio['borda'] ?> p-5 rounded-r-2xl shadow-xl card-anim flex flex-col h-full relative group">
                         <div class="flex justify-between items-start mb-3">
-                            <span class="bg-yellow-500 text-[9px] font-black text-black px-2 py-0.5 rounded uppercase"><?= htmlspecialchars(strtoupper((string)($chamado['prioridade'] ?? 'MÉDIA'))) ?></span>
+                            <span class="<?= $prio['badge'] ?> text-[9px] font-black text-black px-2 py-0.5 rounded uppercase"><?= $prio['label'] ?></span>
                             <span class="text-[10px] text-indigo-400 font-bold uppercase"><?= htmlspecialchars((string)($chamado['categoria'] ?? '')) ?></span>
                         </div>
                         <h4 class="text-white font-bold text-sm mb-1">#<?= (int)($chamado['id'] ?? 0) ?> - <?= htmlspecialchars((string)($chamado['titulo'] ?? '')) ?></h4>
@@ -231,7 +248,10 @@
                     <input type="hidden" id="classificar-id-input">
                     
                     <div>
-                        <label class="block text-[10px] font-black text-gray-500 uppercase mb-2 tracking-widest">Definir Prioridade</label>
+                        <div class="flex items-center justify-between gap-3 mb-2 flex-wrap">
+                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest">Confirmar Prioridade</label>
+                            <span id="classificar-prioridade-solicitada" class="text-[10px] font-bold text-gray-500"></span>
+                        </div>
                         <select id="sel-prioridade" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500">
                             <option value="baixa">Baixa</option>
                             <option value="media" selected>Média</option>

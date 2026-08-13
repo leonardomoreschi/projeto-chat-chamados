@@ -272,7 +272,13 @@ function renderizarTudo() {
     const ordem = { critica: 1, alta: 2, media: 3, baixa: 4 };
     chamadosCache.sort((a, b) => ordem[a.prioridade] - ordem[b.prioridade]);
 
-    const pendentes = chamadosCache.filter(c => c.status === 'aberto');
+    // Fila de triagem: gravidade indicada pelo solicitante em cima e, dentro da
+    // mesma gravidade, na ordem de abertura (mais antigo primeiro). O mesmo
+    // critério monta o primeiro paint na rota /dashboard-ti.
+    const pendentes = chamadosCache
+        .filter(c => c.status === 'aberto')
+        .sort((a, b) => (ordem[a.prioridade] || 3) - (ordem[b.prioridade] || 3)
+            || new Date(a.criado_em) - new Date(b.criado_em));
     pendentes.forEach(c => triagem.innerHTML += cardTriagem(c));
 
     const countTriagem = document.getElementById('count-triagem');
@@ -326,15 +332,24 @@ function renderizarTudo() {
 function cardTriagem(c) {
     const nome = c.usuario_nome || 'Usuário';
     const inicial = nome.charAt(0).toUpperCase();
+    // Antes da triagem, c.prioridade é a pré-triagem feita pelo solicitante.
+    const p = CONFIG.prioridades[c.prioridade] || CONFIG.prioridades['media'];
+    // border-red-500 → border-l-red-500: o card mantém a borda cinza nos outros
+    // lados, então só a lateral esquerda pode receber a cor da prioridade.
+    const bordaEsquerda = p.border.replace('border-', 'border-l-');
 
     return `
-            <div class="bg-gray-900 border border-gray-800 p-5 rounded-2xl card-anim group">
+            <div class="bg-gray-900 border border-gray-800 border-l-4 ${bordaEsquerda} p-5 rounded-2xl card-anim group">
                 <div class="flex justify-between items-center mb-3">
                     <div class="flex items-center gap-2">
                         <div class="w-6 h-6 bg-gray-800 rounded-lg flex items-center justify-center text-[10px] font-bold text-indigo-500 border border-gray-700">${inicial}</div>
                         <span class="text-[10px] text-gray-400 font-bold">${nome}</span>
                     </div>
                     <span class="text-[10px] text-gray-600 font-bold">${formatarDataCurta(c.criado_em)}</span>
+                </div>
+                <div class="flex items-center gap-2 mb-2">
+                    <span class="${p.color} text-[9px] font-black text-black px-2 py-0.5 rounded uppercase">${p.label}</span>
+                    <span class="text-[9px] text-gray-600 font-bold uppercase tracking-wide">indicada pelo solicitante</span>
                 </div>
                 <h4 class="text-white font-bold text-sm mb-2 group-hover:text-indigo-400 transition-colors">#${c.id} - ${c.titulo}</h4>
                 <p class="text-gray-500 text-xs line-clamp-2 mb-4 leading-relaxed">${c.descricao_rich}</p>
@@ -518,6 +533,22 @@ async function abrirModalClassificar(id) {
     document.getElementById('classificar-id-badge').innerText = "#" + c.id;
     document.getElementById('classificar-titulo').innerText = c.titulo;
     document.getElementById('classificar-descricao').innerHTML = c.descricao_rich;
+
+    // O chamado chega na triagem com a gravidade que o solicitante indicou:
+    // deixamos ela pré-selecionada para a TI apenas confirmar ou corrigir.
+    const prioridadeSolicitada = CONFIG.prioridades[c.prioridade] ? c.prioridade : 'media';
+    const selPrioridade = document.getElementById('sel-prioridade');
+    if (selPrioridade) selPrioridade.value = prioridadeSolicitada;
+
+    const avisoPrioridade = document.getElementById('classificar-prioridade-solicitada');
+    if (avisoPrioridade) {
+        const rotulo = (CONFIG.prioridades[prioridadeSolicitada] || {}).label || prioridadeSolicitada;
+        // Só faz sentido chamar de "indicada pelo solicitante" antes da triagem;
+        // depois disso a prioridade já é a que a própria TI definiu.
+        avisoPrioridade.innerText = c.status === 'aberto'
+            ? `Solicitante indicou: ${rotulo}`
+            : `Prioridade atual: ${rotulo}`;
+    }
 
     const anexoContainer = document.getElementById('classificar-anexo-container');
     let anexos = await carregarAnexosChamado(c.id);
