@@ -110,6 +110,22 @@ function statusClasses(s) {
     return b + ' bg-indigo-600';
 }
 
+// ── Passado x aberto no calendário ──────────────────────────────────────────
+// Agendamento passado continua visível, mas em cinza; só os abertos (em curso
+// ou futuros) mantêm a cor do serviço. A visibilidade por papel já vem da API:
+// admin/ti recebem todos, o usuário comum só os dele.
+const COR_AGENDAMENTO_PASSADO = '#4b5563';
+
+function agendamentoPassado(item) {
+    if (['encerrado', 'em_avaliacao'].includes(item.status)) return true;
+    const fim = parseDataServidorBrasilia(item.data_fim || item.data_inicio);
+    return !!fim && fim.getTime() < Date.now();
+}
+
+function corAgendamento(item) {
+    return agendamentoPassado(item) ? COR_AGENDAMENTO_PASSADO : (item.cor_hex || '#4f46e5');
+}
+
 // ── Range da API por modo de visão ──────────────────────────────────────────
 function rangeVisivel() {
     if (tabAtiva === 'kanban' || tabAtiva === 'meus-agendamentos') {
@@ -270,7 +286,7 @@ function renderizarMensal() {
     for (let dia = 1; dia <= totalDias; dia++) {
         const data = new Date(dataAtual.getFullYear(), dataAtual.getMonth(), dia, 12, 0, 0);
         const chave = chaveDia(data);
-        const itens = agendamentosCache.filter(item => !['encerrado', 'em_avaliacao'].includes(item.status) && agendamentoCobreDia(item, data));
+        const itens = agendamentosCache.filter(item => agendamentoCobreDia(item, data));
         const sel = diaSelecionado === chave;
         const isHoje = chave === hoje;
 
@@ -282,8 +298,8 @@ function renderizarMensal() {
                 </div>
                 <div class="space-y-0.5 overflow-hidden flex-1">
                     ${itens.slice(0, 3).map(item => `
-                        <div class="h-4 rounded-full overflow-hidden flex items-center px-2 gap-1" style="background:${escapeHtml(item.cor_hex || '#4f46e5')}">
-                            <span class="text-[9px] font-bold text-white truncate leading-none">${escapeHtml(item.servico_nome)}</span>
+                        <div class="h-4 rounded-full overflow-hidden flex items-center px-2 gap-1" style="background:${escapeHtml(corAgendamento(item))}">
+                            <span class="text-[9px] font-bold ${agendamentoPassado(item) ? 'text-gray-300' : 'text-white'} truncate leading-none">${escapeHtml(item.servico_nome)}</span>
                         </div>
                     `).join('')}
                     ${itens.length > 3 ? `<div class="text-[9px] text-gray-400 font-semibold pl-1">+${itens.length - 3} mais</div>` : ''}
@@ -344,7 +360,7 @@ function renderizarSemanal() {
     const gutter = '52px';
     const bgLinhas = `repeating-linear-gradient(to bottom,transparent 0px,transparent ${PX_HORA - 1}px,#1f2937 ${PX_HORA - 1}px,#1f2937 ${PX_HORA}px)`;
 
-    const agsDaSemana = agendamentosCache.filter(ag => !['encerrado', 'em_avaliacao'].includes(ag.status) && dias.some(d => agendamentoCobreDia(ag, d)));
+    const agsDaSemana = agendamentosCache.filter(ag => dias.some(d => agendamentoCobreDia(ag, d)));
     const allDayAgs = agsDaSemana.filter(ehMultiDia);
     const timedAgs = agsDaSemana.filter(ag => !ehMultiDia(ag));
 
@@ -369,7 +385,7 @@ function renderizarSemanal() {
             const isFirst = iniChave === chaveDia(dia) || idx === 0;
             const isLast = fimChave === chaveDia(dia) || idx === 6;
             const br = `${isFirst ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isFirst ? '9999px' : '0'}`;
-            return `<button data-agendamento-id="${ag.id}" style="display:block;width:100%;height:18px;border-radius:${br};background:${ag.cor_hex || '#4f46e5'};border:none;padding:0 ${isFirst ? 6 : 0}px;color:#fff;font-size:9px;font-weight:700;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;cursor:pointer;">${isFirst ? escapeHtml(ag.servico_nome) : ''}</button>`;
+            return `<button data-agendamento-id="${ag.id}" style="display:block;width:100%;height:18px;border-radius:${br};background:${corAgendamento(ag)};border:none;padding:0 ${isFirst ? 6 : 0}px;color:#fff;font-size:9px;font-weight:700;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;cursor:pointer;">${isFirst ? escapeHtml(ag.servico_nome) : ''}</button>`;
         }).join('');
         return `<div style="flex:1;border-left:1px solid #1f2937;min-height:28px;padding:3px 2px;" data-date="${chaveDia(dia)}">${html}</div>`;
     }).join('');
@@ -389,7 +405,7 @@ function renderizarSemanal() {
             const small = height < 34;
             const lPct = (col / totalCols * 100).toFixed(2);
             const wPct = (100 / totalCols).toFixed(2);
-            return `<button data-agendamento-id="${ag.id}" style="position:absolute;top:${top}px;height:${height}px;left:calc(${lPct}% + 2px);width:calc(${wPct}% - 4px);background:${ag.cor_hex || '#4f46e5'};border-radius:5px;overflow:hidden;z-index:2;cursor:pointer;border:none;text-align:left;box-shadow:0 1px 4px rgba(0,0,0,.3);">
+            return `<button data-agendamento-id="${ag.id}" style="position:absolute;top:${top}px;height:${height}px;left:calc(${lPct}% + 2px);width:calc(${wPct}% - 4px);background:${corAgendamento(ag)};border-radius:5px;overflow:hidden;z-index:2;cursor:pointer;border:none;text-align:left;box-shadow:0 1px 4px rgba(0,0,0,.3);">
                 <div style="padding:${small ? '1px' : '3px'} 5px;color:#fff;height:100%;display:flex;flex-direction:column;justify-content:flex-start;gap:1px;overflow:hidden;">
                     <div style="font-size:${small ? 9 : 10}px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2;">${escapeHtml(ag.servico_nome)}</div>
                     ${!small ? `<div style="font-size:9px;opacity:.85;white-space:nowrap;overflow:hidden;">${formatarHoraAgendamento(ag.data_inicio)}–${formatarHoraAgendamento(ag.data_fim)}</div>` : ''}
@@ -446,7 +462,7 @@ function renderizarDiario() {
     container.style.cssText = '';
 
     const chave = chaveDia(dataAtual);
-    const agsDia = agendamentosCache.filter(ag => !['encerrado', 'em_avaliacao'].includes(ag.status) && agendamentoCobreDia(ag, dataAtual));
+    const agsDia = agendamentosCache.filter(ag => agendamentoCobreDia(ag, dataAtual));
     const timedAgs = agsDia.filter(ag => !ehMultiDia(ag));
     const allDayAgs = agsDia.filter(ehMultiDia);
     const totalH = (HORA_FIM - HORA_INICIO) * PX_HORA;
@@ -468,7 +484,7 @@ function renderizarDiario() {
         const height = Math.max(24, (fimH - iniH) * PX_HORA);
         const lPct = (col / totalCols * 100).toFixed(2);
         const wPct = (100 / totalCols).toFixed(2);
-        return `<button data-agendamento-id="${ag.id}" style="position:absolute;top:${top}px;height:${height}px;left:calc(${lPct}% + 4px);width:calc(${wPct}% - 8px);background:${ag.cor_hex || '#4f46e5'};border-radius:8px;overflow:hidden;z-index:2;cursor:pointer;border:none;text-align:left;box-shadow:0 2px 8px rgba(0,0,0,.3);">
+        return `<button data-agendamento-id="${ag.id}" style="position:absolute;top:${top}px;height:${height}px;left:calc(${lPct}% + 4px);width:calc(${wPct}% - 8px);background:${corAgendamento(ag)};border-radius:8px;overflow:hidden;z-index:2;cursor:pointer;border:none;text-align:left;box-shadow:0 2px 8px rgba(0,0,0,.3);">
             <div style="padding:6px 10px;color:#fff;height:100%;display:flex;flex-direction:column;gap:2px;overflow:hidden;">
                 <div style="font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escapeHtml(ag.servico_nome)}</div>
                 <div style="font-size:10px;opacity:.9;">${formatarHoraAgendamento(ag.data_inicio)} – ${formatarHoraAgendamento(ag.data_fim)}</div>
@@ -479,7 +495,7 @@ function renderizarDiario() {
     }).join('');
 
     const allDayHtml = allDayAgs.map(ag => `
-        <button data-agendamento-id="${ag.id}" class="w-full text-left rounded-xl overflow-hidden cursor-pointer border-none mb-2" style="background:${ag.cor_hex || '#4f46e5'};">
+        <button data-agendamento-id="${ag.id}" class="w-full text-left rounded-xl overflow-hidden cursor-pointer border-none mb-2" style="background:${corAgendamento(ag)};">
             <div style="padding:5px 10px;color:#fff;">
                 <div style="font-size:11px;font-weight:700;">${escapeHtml(ag.servico_nome)}</div>
                 <div style="font-size:10px;opacity:.85;">${formatarDataCurtaAgendamento(ag.data_inicio)} – ${formatarDataCurtaAgendamento(ag.data_fim)}</div>
@@ -726,14 +742,7 @@ async function abrirDetalhe(id) {
     set('detalhe-fim', formatarDataAgendamento(data.data_fim));
     set('detalhe-observacoes', data.observacoes || 'Sem observações');
 
-    const blocoInfo = document.getElementById('bloco-fechamento-info');
-    if (data.status === 'encerrado' && (data.realizado !== null && data.realizado !== undefined || data.observacao_fechamento)) {
-        blocoInfo?.classList.remove('hidden');
-        set('detalhe-realizado', data.realizado === null || data.realizado === undefined ? 'Não informado' : (Number(data.realizado) === 1 ? 'Sim' : 'Não'));
-        set('detalhe-observacao-fechamento', data.observacao_fechamento || '');
-    } else {
-        blocoInfo?.classList.add('hidden');
-    }
+    renderizarRegistroAgendamento(data);
 
     const checkRealizado = document.getElementById('fechamento-realizado');
     if (checkRealizado) checkRealizado.checked = true;
@@ -742,6 +751,66 @@ async function abrirDetalhe(id) {
 
     configurarAcoesDetalhe(data);
     abrirModal('modal-detalhe');
+}
+
+// ── Registro (histórico) do agendamento ─────────────────────────────────────
+// Motivo de cancelamento e parecer de encerramento ficam registrados aqui, com
+// autor e data, logo abaixo das observações do solicitante — que continuam
+// intactas, com o texto original de quem abriu a solicitação.
+function itemRegistro(rotulo, autor, quando, corpo, cor) {
+    const meta = [autor ? 'por ' + escapeHtml(autor) : '', quando ? escapeHtml(formatarDataAgendamento(quando)) : '']
+        .filter(Boolean).join(' • ');
+
+    return `<div class="border-l-2 ${cor} pl-3">
+        <p class="text-xs font-bold text-white">${escapeHtml(rotulo)}</p>
+        ${meta ? `<p class="text-[11px] text-gray-500">${meta}</p>` : ''}
+        ${corpo ? `<p class="text-sm text-gray-300 whitespace-pre-wrap mt-1">${escapeHtml(corpo)}</p>` : ''}
+    </div>`;
+}
+
+function renderizarRegistroAgendamento(data) {
+    const bloco = document.getElementById('bloco-registro');
+    const lista = document.getElementById('detalhe-registro');
+    if (!bloco || !lista) return;
+
+    const entradas = [];
+
+    entradas.push(itemRegistro('Solicitado', data.solicitante_nome, data.criado_em, '', 'border-gray-600'));
+
+    if (data.aprovado_em || data.aprovado_por_nome) {
+        entradas.push(itemRegistro('Aprovado', data.aprovado_por_nome, data.aprovado_em, '', 'border-green-500'));
+    }
+
+    if (data.status === 'cancelado' || data.cancelado_em) {
+        // A recusa de uma solicitação também termina em 'cancelado', mas grava
+        // o texto em motivo_recusa.
+        const recusa = (data.motivo_recusa || '').trim();
+        const motivo = recusa || (data.motivo_cancelamento || '').trim();
+        entradas.push(itemRegistro(
+            recusa ? 'Recusado' : 'Cancelado',
+            data.cancelado_por_nome,
+            data.cancelado_em,
+            motivo ? 'Motivo: ' + motivo : 'Motivo não informado.',
+            'border-red-500'
+        ));
+    }
+
+    if (data.status === 'encerrado' || data.encerrado_em) {
+        const realizado = data.realizado === null || data.realizado === undefined
+            ? 'Serviço realizado: não informado'
+            : 'Serviço realizado: ' + (Number(data.realizado) === 1 ? 'sim' : 'não');
+        const parecer = (data.observacao_fechamento || '').trim();
+        entradas.push(itemRegistro(
+            'Encerrado',
+            data.encerrado_por_nome,
+            data.encerrado_em,
+            realizado + (parecer ? '\nParecer: ' + parecer : ''),
+            'border-indigo-500'
+        ));
+    }
+
+    lista.innerHTML = entradas.join('');
+    bloco.classList.remove('hidden');
 }
 
 function configurarAcoesDetalhe(data) {
@@ -907,12 +976,25 @@ function prepararAgenda() {
     );
 
     const detalheAcoes = {
-        'btn-detalhe-cancelar': async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'cancelar'),
+        // Motivo e parecer são obrigatórios: eles são o corpo da notificação que
+        // o solicitante recebe. O backend recusa o envio sem eles.
+        'btn-detalhe-cancelar': async () => {
+            if (!agendamentoAtual) return;
+            const motivo = prompt('Informe o motivo do cancelamento (o solicitante será avisado):') || '';
+            if (!motivo.trim()) return;
+            await alterarStatus(agendamentoAtual.id, 'cancelar', { motivo: motivo.trim() });
+        },
         'btn-detalhe-aprovar': async () => agendamentoAtual && await alterarStatus(agendamentoAtual.id, 'aprovar'),
         'btn-detalhe-encerrar': async () => {
             if (!agendamentoAtual) return;
+            const campoObservacao = document.getElementById('fechamento-observacao');
+            const observacao_fechamento = campoObservacao?.value.trim() || '';
+            if (!observacao_fechamento) {
+                alert('Informe o parecer de encerramento — ele vai na notificação do solicitante.');
+                campoObservacao?.focus();
+                return;
+            }
             const realizado = document.getElementById('fechamento-realizado')?.checked ? '1' : '0';
-            const observacao_fechamento = document.getElementById('fechamento-observacao')?.value.trim() || '';
             await alterarStatus(agendamentoAtual.id, 'encerrar', { realizado, observacao_fechamento });
         },
         'btn-detalhe-recusar': async () => {

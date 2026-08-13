@@ -302,10 +302,9 @@ $agendamentosBootstrap = [
                 <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold mb-2">Observações</p>
                 <p id="detalhe-observacoes" class="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed"></p>
             </div>
-            <div id="bloco-fechamento-info" class="hidden bg-gray-800/70 border border-gray-700/60 rounded-xl p-3">
-                <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold mb-2">Fechamento</p>
-                <p class="text-sm text-gray-300">Serviço realizado: <span id="detalhe-realizado" class="text-white font-semibold"></span></p>
-                <p id="detalhe-observacao-fechamento" class="text-sm text-gray-300 whitespace-pre-wrap mt-1"></p>
+            <div id="bloco-registro" class="hidden bg-gray-800/70 border border-gray-700/60 rounded-xl p-3">
+                <p class="text-[10px] uppercase tracking-wide text-gray-500 font-bold mb-2">Registro do agendamento</p>
+                <div id="detalhe-registro" class="space-y-2"></div>
             </div>
             <div id="bloco-fechamento-form" class="hidden bg-gray-800/70 border border-indigo-700/50 rounded-xl p-4 space-y-3">
                 <p class="text-[10px] uppercase tracking-wide text-indigo-400 font-bold">Fechar agendamento</p>
@@ -313,7 +312,8 @@ $agendamentosBootstrap = [
                     <input id="fechamento-realizado" type="checkbox" checked class="accent-indigo-500 w-4 h-4">
                     Serviço foi realizado
                 </label>
-                <textarea id="fechamento-observacao" rows="2" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm resize-none focus:outline-none focus:border-indigo-500 transition" placeholder="Observações do fechamento (opcional)"></textarea>
+                <textarea id="fechamento-observacao" rows="2" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-white text-sm resize-none focus:outline-none focus:border-indigo-500 transition" placeholder="Parecer do encerramento (obrigatório) — este texto vai na notificação do solicitante" required></textarea>
+                <p class="text-[11px] text-gray-500">O parecer é obrigatório e será enviado ao solicitante junto com o aviso de encerramento.</p>
             </div>
         </div>
 <div class="flex gap-3 px-6 pb-6 flex-shrink-0 flex-wrap">

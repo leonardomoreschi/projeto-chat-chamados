@@ -223,12 +223,14 @@ class AgendamentoController
                 $agendamentoAtualizado,
                 'cancelado',
                 'Agendamento cancelado',
-                'Sua solicitação para "' . (string) $agendamentoAtualizado['servico_nome'] . '" foi recusada.',
+                'Sua solicitação para "' . (string) $agendamentoAtualizado['servico_nome'] . '" foi recusada por '
+                    . (string) ($agendamentoAtualizado['cancelado_por_nome'] ?? 'um responsável') . '. Motivo: ' . $motivo,
                 'cancelado',
                 $statusAnterior,
                 [
                     'motivo_recusa' => $motivo,
                     'servico_nome' => (string) $agendamentoAtualizado['servico_nome'],
+                    'detalhe_equipe' => 'Motivo da recusa: ' . $motivo,
                 ],
                 (int) $request->getAttribute('user_id')
             );
@@ -252,11 +254,16 @@ class AgendamentoController
 
         $data = (array) $request->getParsedBody();
         $motivo = trim((string) ($data['motivo'] ?? ''));
+        // Obrigatório: o motivo é o conteúdo da notificação que o solicitante recebe.
+        if ($motivo === '') {
+            return Json::erro($response, 'Informe o motivo do cancelamento');
+        }
+
         $statusAnterior = (string) ($agendamento['status'] ?? '');
 
         $this->atualizarAgendamento((int) $agendamento['id'], [
             'status' => 'cancelado',
-            'motivo_cancelamento' => $motivo !== '' ? $motivo : null,
+            'motivo_cancelamento' => $motivo,
             'cancelado_por_id' => $userId,
             'cancelado_em' => date('Y-m-d H:i:s'),
         ]);
@@ -268,12 +275,14 @@ class AgendamentoController
                 $agendamentoAtualizado,
                 'cancelado',
                 'Agendamento cancelado',
-                'O agendamento "' . (string) $agendamentoAtualizado['servico_nome'] . '" foi cancelado.',
+                'O agendamento "' . (string) $agendamentoAtualizado['servico_nome'] . '" foi cancelado por '
+                    . (string) ($agendamentoAtualizado['cancelado_por_nome'] ?? 'um responsável') . '. Motivo: ' . $motivo,
                 'cancelado',
                 $statusAnterior,
                 [
-                    'motivo_cancelamento' => $motivo !== '' ? $motivo : null,
+                    'motivo_cancelamento' => $motivo,
                     'servico_nome' => (string) $agendamentoAtualizado['servico_nome'],
+                    'detalhe_equipe' => 'Motivo: ' . $motivo,
                 ],
                 $userId
             );
@@ -295,6 +304,11 @@ class AgendamentoController
 
         $data = (array) $request->getParsedBody();
         $observacaoFechamento = trim((string) ($data['observacao_fechamento'] ?? ''));
+        // Obrigatório: é o parecer que vai na notificação do solicitante.
+        if ($observacaoFechamento === '') {
+            return Json::erro($response, 'Informe o parecer de encerramento');
+        }
+
         $realizadoBruto = $data['realizado'] ?? null;
         $realizado = ($realizadoBruto === null || $realizadoBruto === '')
             ? null
@@ -306,23 +320,28 @@ class AgendamentoController
             'encerrado_por_id' => (int) $request->getAttribute('user_id'),
             'encerrado_em' => date('Y-m-d H:i:s'),
             'realizado' => $realizado,
-            'observacao_fechamento' => $observacaoFechamento !== '' ? $observacaoFechamento : null,
+            'observacao_fechamento' => $observacaoFechamento,
         ]);
 
         $agendamentoAtualizado = $this->buscarAgendamentoPorId(getDbConnection(), (int) $agendamento['id']);
         if ($agendamentoAtualizado) {
+            $situacao = $realizado === null ? '' : ($realizado === 1 ? ' O serviço foi realizado.' : ' O serviço não foi realizado.');
+
             $this->registrarNotificacaoAgendamento(
                 getDbConnection(),
                 $agendamentoAtualizado,
                 'encerrado',
                 'Agendamento encerrado',
-                'O agendamento "' . (string) $agendamentoAtualizado['servico_nome'] . '" foi encerrado pela equipe.',
+                'O agendamento "' . (string) $agendamentoAtualizado['servico_nome'] . '" foi encerrado por '
+                    . (string) ($agendamentoAtualizado['encerrado_por_nome'] ?? 'um responsável') . '.'
+                    . $situacao . ' Parecer: ' . $observacaoFechamento,
                 'encerrado',
                 $statusAnterior,
                 [
                     'realizado' => $realizado,
-                    'observacao_fechamento' => $observacaoFechamento !== '' ? $observacaoFechamento : null,
+                    'observacao_fechamento' => $observacaoFechamento,
                     'servico_nome' => (string) $agendamentoAtualizado['servico_nome'],
+                    'detalhe_equipe' => 'Parecer: ' . $observacaoFechamento,
                 ],
                 (int) $request->getAttribute('user_id')
             );
@@ -626,6 +645,10 @@ class AgendamentoController
 
         $this->notificarEquipeAgendamento($pdo, $agendamento, $evento, $titulo, $statusDestino, $statusOrigem, $metadados, $autorId);
 
+        // 'detalhe_equipe' só serve para montar a mensagem do painel; o
+        // solicitante já recebe o motivo/parecer no corpo da própria mensagem.
+        unset($metadados['detalhe_equipe']);
+
         NotificationCenter::registrar($pdo, [
             'usuario_id' => $solicitanteId,
             'tipo' => 'agendamento',
@@ -677,6 +700,12 @@ class AgendamentoController
         $mensagem = 'Agendamento #' . $agendamentoId . ' de '
             . (string) ($agendamento['solicitante_nome'] ?? 'solicitante')
             . ' — "' . (string) ($agendamento['servico_nome'] ?? '') . '" foi ' . $rotulo . '.';
+
+        // Motivo do cancelamento / parecer de encerramento, quando o evento tem um.
+        $detalhe = trim((string) ($metadados['detalhe_equipe'] ?? ''));
+        if ($detalhe !== '') {
+            $mensagem .= ' ' . $detalhe;
+        }
 
         NotificationCenter::registrarParaPapeis($pdo, ['ti', 'admin'], [
             'tipo' => 'agendamento',
