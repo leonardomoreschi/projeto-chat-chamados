@@ -42,7 +42,7 @@
     </div>
 
     <!-- Card do formulário -->
-    <div class="rounded-2xl p-8 shadow-2xl" style="background:rgba(10,10,18,0.72);border:1px solid rgba(255,255,255,0.07);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)">
+    <div id="login-card" class="rounded-2xl p-8 shadow-2xl" style="background:rgba(10,10,18,0.72);border:1px solid rgba(255,255,255,0.07);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)">
 
         <?php if (!empty($_SESSION['flash_error'])): ?>
         <div class="bg-red-500/10 border border-red-500/30 text-red-400 text-sm rounded-xl px-4 py-3 mb-6 flex items-center gap-2">
@@ -85,9 +85,23 @@
 <script type="module">
 import { NeatGradient } from "https://esm.sh/@firecms/neat@latest";
 
+// O gradiente é desenhado em WebGL, então a cor não vem do CSS: escolhemos a
+// paleta pelo mesmo critério do theme.js (preferência salva ou do sistema).
+const temaSalvo = localStorage.getItem('ui_theme');
+const ehClaro = temaSalvo === 'light'
+    || (!temaSalvo && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches);
+
+const paletaClara = [
+    { color: '#eef2ff', enabled: true },
+    { color: '#dbeafe', enabled: true },
+    { color: '#e0e7ff', enabled: true },
+    { color: '#f8fafc', enabled: true },
+    { color: '#c7d2fe', enabled: true },
+];
+
 const gradient = new NeatGradient({
     ref: document.getElementById("neat-gradient"),
-    colors: [
+    colors: ehClaro ? paletaClara : [
         { color: '#000000', enabled: true },
         { color: '#001129', enabled: true },
         { color: '#0F0025', enabled: true },
@@ -103,10 +117,10 @@ const gradient = new NeatGradient({
     shadows: 2,
     highlights: 6,
     colorBrightness: 1,
-    colorSaturation: -2,
+    colorSaturation: ehClaro ? 2 : -2,
     wireframe: false,
     colorBlending: 7,
-    backgroundColor: '#010101',
+    backgroundColor: ehClaro ? '#f8fafc' : '#010101',
     backgroundAlpha: 0.8,
     grainScale: 0,
     grainSparsity: 0,

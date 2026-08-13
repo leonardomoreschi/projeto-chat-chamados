@@ -1,4 +1,79 @@
 /* Centralized light theme styles for all pages */
+
+/* ── Paleta da agenda (grade semanal/diária e kanban) ────────────────────────
+   Esses trechos são desenhados com style inline no JS, então a cor não pode
+   vir de uma classe do Tailwind: cada valor é uma variável que troca junto com
+   o tema. Ver renderizarSemanal/renderizarDiario/renderizarKanban em
+   public/assets/js/agendamentos.js. */
+:root {
+    --ag-linha: #1f2937;
+    --ag-linha-forte: #374151;
+    --ag-superficie: #111827;
+    --ag-superficie-suave: #0f172a;
+    --ag-texto-fraco: #4b5563;
+    --ag-passado: #4b5563;
+    --ag-kanban-board: #030712;
+    --ag-kanban-borda: rgba(255, 255, 255, .06);
+    --ag-col-solicitado: #451a03;
+    --ag-col-agendado: #052e16;
+    --ag-col-avaliacao: #2e1065;
+    --ag-col-cancelado: #450a0a;
+    --ag-col-encerrado: #0f172a;
+    --ag-texto: #f9fafb;
+    --ag-texto-medio: #6b7280;
+    --ag-destaque: #818cf8;
+    --ag-head-solicitado: #b45309;
+    --ag-head-agendado: #15803d;
+    --ag-head-avaliacao: #6d28d9;
+    --ag-head-cancelado: #b91c1c;
+    --ag-head-encerrado: #334155;
+    --ag-head-solicitado-texto: #ffffff;
+    --ag-head-agendado-texto: #ffffff;
+    --ag-head-avaliacao-texto: #ffffff;
+    --ag-head-cancelado-texto: #ffffff;
+    --ag-head-encerrado-texto: #ffffff;
+    --ag-head-texto: #ffffff;
+    --ag-head-contagem-bg: rgba(0, 0, 0, .28);
+    --ag-head-contagem-texto: rgba(255, 255, 255, .85);
+    --ag-head-botao: rgba(255, 255, 255, .18);
+}
+
+body.theme-light {
+    --ag-linha: #e2e8f0;
+    --ag-linha-forte: #cbd5e1;
+    --ag-superficie: #ffffff;
+    --ag-superficie-suave: #f8fafc;
+    --ag-texto-fraco: #64748b;
+    --ag-passado: #94a3b8;
+    --ag-kanban-board: #eef2f8;
+    --ag-kanban-borda: rgba(15, 23, 42, .08);
+    --ag-col-solicitado: #fff7ed;
+    --ag-col-agendado: #ecfdf5;
+    --ag-col-avaliacao: #f5f3ff;
+    --ag-col-cancelado: #fef2f2;
+    --ag-col-encerrado: #eef2ff;
+    --ag-texto: #0f172a;
+    --ag-texto-medio: #64748b;
+    --ag-destaque: #4f46e5;
+    /* Cabeçalhos coloridos, um tom abaixo do escuro (400 no lugar de 700) e
+       com texto escuro da mesma família: mantém a identidade de cada coluna
+       sem pesar ao lado do corpo, que é quase branco. */
+    --ag-head-solicitado: #fdba74;
+    --ag-head-agendado: #6ee7b7;
+    --ag-head-avaliacao: #c4b5fd;
+    --ag-head-cancelado: #fca5a5;
+    --ag-head-encerrado: #a5b4fc;
+    --ag-head-solicitado-texto: #7c2d12;
+    --ag-head-agendado-texto: #065f46;
+    --ag-head-avaliacao-texto: #4c1d95;
+    --ag-head-cancelado-texto: #7f1d1d;
+    --ag-head-encerrado-texto: #312e81;
+    --ag-head-texto: #1f2937;
+    --ag-head-contagem-bg: rgba(15, 23, 42, .10);
+    --ag-head-contagem-texto: #334155;
+    --ag-head-botao: rgba(15, 23, 42, .10);
+}
+
 body.theme-light {
     --lm-bg-top: #eaf1ff;
     --lm-bg-bottom: #f8fafc;
@@ -230,12 +305,14 @@ body.theme-light .border-green-500\/20 {
 
 /* Hero/header panels that were still too dark in light mode */
 body.page-meus-chamados.theme-light .bg-gradient-to-br.from-gray-900.via-gray-900.to-indigo-950,
+body.page-notificacoes.theme-light .bg-gradient-to-br.from-gray-900.via-gray-900.to-indigo-950,
 body.page-relatorio-chamados.theme-light .bg-gradient-to-br.from-gray-900.via-gray-900.to-indigo-950 {
     background-image: linear-gradient(135deg, #e8efff 0%, #eef4ff 45%, #f3f7ff 100%) !important;
     border-color: #c7d2fe !important;
 }
 
 body.page-meus-chamados.theme-light .bg-gradient-to-br.from-gray-900.via-gray-900.to-indigo-950 .absolute.inset-0.opacity-30,
+body.page-notificacoes.theme-light .bg-gradient-to-br.from-gray-900.via-gray-900.to-indigo-950 .absolute.inset-0.opacity-30,
 body.page-relatorio-chamados.theme-light .bg-gradient-to-br.from-gray-900.via-gray-900.to-indigo-950 .absolute.inset-0.opacity-40 {
     background:
         radial-gradient(circle at top right, rgba(79, 70, 229, 0.16), transparent 42%),
@@ -569,4 +646,368 @@ body.page-login.theme-light .text-gray-300 {
 
 body.page-login.theme-light .focus\:ring-indigo-500:focus {
     --tw-ring-color: rgba(109, 40, 217, 0.4) !important;
+}
+/* ═══════════════════════════════════════════════════════════════════════════
+   VARREDURA DE HARMONIZAÇÃO DO TEMA CLARO
+   As regras acima cobriam classe a classe; o que faltava aparecia escuro (ou
+   com texto escuro sobre cor saturada) em cards, botões e modais. Este bloco
+   fecha as lacunas encontradas no inventário de utilitários usados na app.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* 1. Superfícies — variações de opacidade que não tinham contrapartida clara.
+      É o que deixava os blocos do modal de agendamento (bg-gray-800/70) e os
+      cards de comentário/anexo escuros no tema claro. */
+body.theme-light .bg-gray-800\/60,
+body.theme-light .bg-gray-800\/70,
+body.theme-light .bg-gray-900\/60,
+body.theme-light .bg-gray-900\/80,
+body.theme-light .bg-gray-900\/90,
+body.theme-light .bg-gray-950\/70,
+body.theme-light .bg-black\/40 {
+    background-color: var(--lm-surface) !important;
+}
+
+/* Controles neutros (botões "Voltar", chips) ficam um degrau acima do papel
+   para continuarem legíveis como elemento clicável, com texto escuro — são os
+   secundários ao lado dos botões de ação coloridos. */
+body.theme-light .bg-gray-700 {
+    background-color: #e2e8f0 !important;
+    color: var(--lm-text) !important;
+    border-color: var(--lm-border);
+}
+
+body.theme-light .bg-gray-700 .text-white {
+    color: var(--lm-text) !important;
+}
+
+body.theme-light .hover\:bg-gray-600:hover {
+    background-color: #cfd8e8 !important;
+}
+
+/* 2. Bordas ainda em tons escuros */
+body.theme-light .border-gray-600,
+body.theme-light .border-gray-700\/60,
+body.theme-light .border-gray-800\/60 {
+    border-color: var(--lm-border) !important;
+}
+
+/* Anel de destaque de badges: no claro o "furo" é o papel, não o cinza escuro */
+body.theme-light .border-gray-900 {
+    border-color: var(--lm-surface) !important;
+}
+
+body.theme-light .divide-gray-800>:not([hidden])~:not([hidden]) {
+    border-color: var(--lm-border) !important;
+}
+
+/* Bordas de destaque dos formulários de ação (cancelar/recusar/encerrar/reagendar) */
+body.theme-light .border-red-700\/50 {
+    border-color: #fca5a5 !important;
+}
+
+body.theme-light .border-amber-700\/50,
+body.theme-light .border-amber-500\/40 {
+    border-color: #fcd34d !important;
+}
+
+body.theme-light .border-indigo-700\/50 {
+    border-color: #c7d2fe !important;
+}
+
+body.theme-light .text-gray-100 {
+    color: var(--lm-text) !important;
+}
+
+/* 3. Fundos sólidos coloridos.
+      `.text-white` vira texto escuro no tema claro, e só uma lista curta de
+      fundos restaurava o branco — as variantes com opacidade (bg-red-600/90 e
+      companhia, usadas nos botões dos modais) ficavam com texto escuro sobre
+      cor saturada. Aqui a lista cobre todos os fundos sólidos em uso, com a
+      cor equivalente da paleta clara. */
+body.theme-light .bg-indigo-500,
+body.theme-light .bg-indigo-600\/90 {
+    background-color: var(--lm-primary) !important;
+}
+
+body.theme-light .bg-green-400,
+body.theme-light .bg-green-500,
+body.theme-light .bg-green-600\/90,
+body.theme-light .bg-emerald-500,
+body.theme-light .bg-emerald-600,
+body.theme-light .bg-emerald-700 {
+    background-color: var(--lm-success) !important;
+}
+
+body.theme-light .bg-red-500,
+body.theme-light .bg-red-600\/90,
+body.theme-light .bg-rose-500,
+body.theme-light .bg-rose-600 {
+    background-color: var(--lm-danger) !important;
+}
+
+body.theme-light .bg-amber-500,
+body.theme-light .bg-amber-500\/90,
+body.theme-light .bg-amber-600,
+body.theme-light .bg-amber-600\/90,
+body.theme-light .bg-amber-700,
+body.theme-light .bg-orange-500 {
+    background-color: var(--lm-warning) !important;
+}
+
+body.theme-light .bg-purple-600,
+body.theme-light .bg-purple-700 {
+    background-color: #6d28d9 !important;
+}
+
+body.theme-light .bg-blue-500,
+body.theme-light .bg-blue-700 {
+    background-color: #1d4ed8 !important;
+}
+
+body.theme-light .bg-pink-700 {
+    background-color: #be185d !important;
+}
+
+/* Texto branco garantido sobre qualquer um desses fundos — inclusive nos
+   filhos, que é onde ficam os rótulos dos botões e selos. */
+body.theme-light .bg-indigo-500,
+body.theme-light .bg-indigo-600\/90,
+body.theme-light .bg-green-400,
+body.theme-light .bg-green-500,
+body.theme-light .bg-green-600\/90,
+body.theme-light .bg-emerald-500,
+body.theme-light .bg-emerald-600,
+body.theme-light .bg-emerald-700,
+body.theme-light .bg-red-500,
+body.theme-light .bg-red-600\/90,
+body.theme-light .bg-rose-500,
+body.theme-light .bg-rose-600,
+body.theme-light .bg-amber-500,
+body.theme-light .bg-amber-500\/90,
+body.theme-light .bg-amber-600,
+body.theme-light .bg-amber-600\/90,
+body.theme-light .bg-amber-700,
+body.theme-light .bg-orange-500,
+body.theme-light .bg-purple-600,
+body.theme-light .bg-purple-700,
+body.theme-light .bg-blue-500,
+body.theme-light .bg-blue-700,
+body.theme-light .bg-pink-700,
+body.theme-light .bg-indigo-500 .text-white,
+body.theme-light .bg-indigo-600\/90 .text-white,
+body.theme-light .bg-green-600\/90 .text-white,
+body.theme-light .bg-red-600\/90 .text-white,
+body.theme-light .bg-amber-500\/90 .text-white,
+body.theme-light .bg-amber-600\/90 .text-white,
+body.theme-light .bg-emerald-700 .text-white,
+body.theme-light .bg-purple-700 .text-white,
+body.theme-light .bg-blue-700 .text-white,
+body.theme-light .bg-pink-700 .text-white {
+    color: #ffffff !important;
+}
+
+/* Selo de prioridade média mantém texto escuro sobre amarelo (contraste) */
+body.theme-light .bg-yellow-500,
+body.theme-light .bg-yellow-500 .text-black,
+body.theme-light .text-black {
+    color: #111827 !important;
+}
+
+/* 4. Hovers dos botões coloridos, seguindo a mesma paleta */
+body.theme-light .hover\:bg-indigo-600:hover {
+    background-color: var(--lm-primary-hover) !important;
+}
+
+body.theme-light .hover\:bg-purple-600:hover {
+    background-color: #5b21b6 !important;
+}
+
+/* 5. Washes translúcidos: no claro precisam clarear em vez de escurecer */
+body.theme-light .bg-indigo-500\/15,
+body.theme-light .bg-indigo-500\/20,
+body.theme-light .bg-indigo-600\/20 {
+    background-color: rgba(79, 70, 229, 0.12) !important;
+}
+
+body.theme-light .bg-green-500\/20,
+body.theme-light .bg-emerald-500\/15 {
+    background-color: rgba(21, 128, 61, 0.12) !important;
+}
+
+body.theme-light .bg-red-500\/10,
+body.theme-light .bg-red-500\/20 {
+    background-color: rgba(220, 38, 38, 0.1) !important;
+}
+
+body.theme-light .bg-amber-500\/10,
+body.theme-light .bg-orange-500\/10 {
+    background-color: rgba(180, 83, 9, 0.1) !important;
+}
+
+body.theme-light .bg-purple-500\/20 {
+    background-color: rgba(109, 40, 217, 0.12) !important;
+}
+
+/* Selo/ponto "offline" e papel neutro (admin.js) */
+body.theme-light .bg-gray-500\/20 {
+    background-color: rgba(100, 116, 139, 0.16) !important;
+}
+
+body.theme-light .bg-gray-500 {
+    background-color: #94a3b8 !important;
+}
+
+body.theme-light .hover\:border-gray-500:hover {
+    border-color: #94a3b8 !important;
+}
+
+body.theme-light .bg-blue-500\/20 {
+    background-color: rgba(29, 78, 216, 0.12) !important;
+}
+
+/* 6. Barras de rolagem acompanham o tema (antes ficavam pretas no claro) */
+body.theme-light ::-webkit-scrollbar-track {
+    background: var(--lm-surface-soft);
+}
+
+body.theme-light ::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+}
+
+body.theme-light ::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* 7. Modais: o véu escuro continua (é o padrão em ambos os temas), mas mais
+   leve no claro, e a caixa em si vira papel branco com sombra suave. */
+body.theme-light .bg-black\/70,
+body.theme-light .bg-black\/75,
+body.theme-light .bg-black\/80 {
+    background-color: rgba(15, 23, 42, 0.45) !important;
+}
+
+body.theme-light .bg-black\/50 {
+    background-color: rgba(15, 23, 42, 0.35) !important;
+}
+
+body.theme-light .shadow-2xl {
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.18) !important;
+}
+
+/* 8. Agenda: campos e blocos dos formulários de ação dentro do modal */
+body.page-agendamentos.theme-light input[type="datetime-local"],
+body.page-painel-agendamentos.theme-light input[type="datetime-local"],
+body.page-agendamentos.theme-light textarea,
+body.page-painel-agendamentos.theme-light textarea {
+    background-color: var(--lm-surface-soft) !important;
+    border-color: var(--lm-border) !important;
+    color: var(--lm-text) !important;
+}
+
+body.page-agendamentos.theme-light .kanban-col,
+body.page-painel-agendamentos.theme-light .kanban-col {
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.06);
+}
+
+/* ── Ajustes finos do tema claro ─────────────────────────────────────────────
+   Tons pálidos (300/200) foram desenhados para fundo escuro: sobre papel
+   branco eles somem. Aqui cada um vira a versão escura da mesma família. */
+body.theme-light .text-emerald-300,
+body.theme-light .text-emerald-400,
+body.theme-light .text-green-300 {
+    color: #15803d !important;
+}
+
+body.theme-light .text-red-300,
+body.theme-light .text-red-200 {
+    color: #b91c1c !important;
+}
+
+body.theme-light .text-indigo-200,
+body.theme-light .text-indigo-500 {
+    color: #3730a3 !important;
+}
+
+body.theme-light .text-blue-400 {
+    color: #1d4ed8 !important;
+}
+
+body.theme-light .text-purple-400 {
+    color: #6d28d9 !important;
+}
+
+body.theme-light .text-orange-500 {
+    color: #b45309 !important;
+}
+
+body.theme-light .hover\:text-indigo-200:hover {
+    color: #312e81 !important;
+}
+
+body.theme-light .hover\:text-red-200:hover {
+    color: #7f1d1d !important;
+}
+
+/* Exceção: dentro de um balão/botão sólido o texto claro é o legível */
+body.theme-light .bg-indigo-600 .text-red-300,
+body.theme-light .bg-indigo-500 .text-red-300,
+body.theme-light .bg-indigo-600 .text-indigo-200,
+body.theme-light .bg-indigo-600 .text-white {
+    color: #ffffff !important;
+}
+
+body.theme-light .bg-indigo-600 .text-red-300 {
+    color: #fecaca !important;
+}
+
+/* Faixa colorida na lateral esquerda dos cards (prioridade do chamado).
+   A regra genérica de `border-gray-800` pintava também a lateral esquerda e
+   apagava a cor da prioridade nos cards de triagem. */
+body.theme-light .border-l-red-500 {
+    border-left-color: #dc2626 !important;
+}
+
+body.theme-light .border-l-orange-500 {
+    border-left-color: #ea580c !important;
+}
+
+body.theme-light .border-l-yellow-500 {
+    border-left-color: #eab308 !important;
+}
+
+body.theme-light .border-l-blue-500 {
+    border-left-color: #2563eb !important;
+}
+
+body.theme-light .border-l-green-500 {
+    border-left-color: #16a34a !important;
+}
+
+body.theme-light .border-l-indigo-500 {
+    border-left-color: var(--lm-primary) !important;
+}
+
+/* ── Login ───────────────────────────────────────────────────────────────────
+   O <body> e o card do formulário têm cor inline (preto e um vidro escuro),
+   e só um !important vence estilo inline. Sem isso a página ficava preta no
+   tema claro, com apenas os campos brancos. */
+body.page-login.theme-light {
+    background: linear-gradient(180deg, var(--lm-bg-top) 0%, var(--lm-bg-bottom) 100%) !important;
+}
+
+body.page-login.theme-light #login-card {
+    background: rgba(255, 255, 255, 0.86) !important;
+    border: 1px solid rgba(15, 23, 42, 0.08) !important;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.12) !important;
+}
+
+body.page-login.theme-light #login-card input {
+    background-color: var(--lm-surface-soft) !important;
+    border-color: var(--lm-border) !important;
+    color: var(--lm-text) !important;
+}
+
+body.page-login.theme-light .text-gray-600,
+body.page-login.theme-light .text-gray-400 {
+    color: #475569 !important;
 }

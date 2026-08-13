@@ -114,7 +114,7 @@ function statusClasses(s) {
 // Agendamento passado continua visível, mas em cinza; só os abertos (em curso
 // ou futuros) mantêm a cor do serviço. A visibilidade por papel já vem da API:
 // admin/ti recebem todos, o usuário comum só os dele.
-const COR_AGENDAMENTO_PASSADO = '#4b5563';
+const COR_AGENDAMENTO_PASSADO = 'var(--ag-passado)';
 
 // O calendário mostra só o que já foi aprovado (e o que veio depois disso).
 // Enquanto está em 'solicitado', o agendamento vive apenas na triagem — kanban
@@ -384,7 +384,7 @@ function renderizarSemanal() {
     const hoje = chaveDia(new Date());
     const totalH = (HORA_FIM - HORA_INICIO) * PX_HORA;
     const gutter = '52px';
-    const bgLinhas = `repeating-linear-gradient(to bottom,transparent 0px,transparent ${PX_HORA - 1}px,#1f2937 ${PX_HORA - 1}px,#1f2937 ${PX_HORA}px)`;
+    const bgLinhas = `repeating-linear-gradient(to bottom,transparent 0px,transparent ${PX_HORA - 1}px,var(--ag-linha) ${PX_HORA - 1}px,var(--ag-linha) ${PX_HORA}px)`;
 
     const agsDaSemana = agendamentosCache.filter(ag => apareceNoCalendario(ag) && dias.some(d => agendamentoCobreDia(ag, d)));
     const allDayAgs = agsDaSemana.filter(ehMultiDia);
@@ -394,9 +394,9 @@ function renderizarSemanal() {
         const chave = chaveDia(dia);
         const isHoje = chave === hoje;
         const abrev = dia.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
-        return `<div style="flex:1;border-left:1px solid #1f2937;text-align:center;padding:8px 4px 6px;">
-            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:${isHoje ? '#818cf8' : '#6b7280'};">${escapeHtml(abrev)}</div>
-            <div style="font-size:20px;font-weight:900;line-height:1.1;color:${isHoje ? '#fff' : '#d1d5db'};">
+        return `<div style="flex:1;border-left:1px solid var(--ag-linha);text-align:center;padding:8px 4px 6px;">
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.12em;color:${isHoje ? 'var(--ag-destaque)' : 'var(--ag-texto-medio)'};">${escapeHtml(abrev)}</div>
+            <div style="font-size:20px;font-weight:900;line-height:1.1;color:${isHoje ? 'var(--ag-texto)' : 'var(--ag-texto-medio)'};">
                 ${isHoje ? `<span style="display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:50%;background:#4f46e5;color:#fff;">${dia.getDate()}</span>` : dia.getDate()}
             </div>
         </div>`;
@@ -404,7 +404,7 @@ function renderizarSemanal() {
 
     const allDayCols = dias.map((dia, idx) => {
         const evsAqui = allDayAgs.filter(ag => agendamentoCobreDia(ag, dia));
-        if (!evsAqui.length) return `<div style="flex:1;border-left:1px solid #1f2937;min-height:28px;padding:3px 2px;" data-date="${chaveDia(dia)}"></div>`;
+        if (!evsAqui.length) return `<div style="flex:1;border-left:1px solid var(--ag-linha);min-height:28px;padding:3px 2px;" data-date="${chaveDia(dia)}"></div>`;
         const html = evsAqui.map(ag => {
             const iniChave = chaveDia(parseDataServidorBrasilia(ag.data_inicio));
             const fimChave = chaveDia(parseDataServidorBrasilia(ag.data_fim || ag.data_inicio));
@@ -413,7 +413,7 @@ function renderizarSemanal() {
             const br = `${isFirst ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isLast ? '9999px' : '0'} ${isFirst ? '9999px' : '0'}`;
             return `<button data-agendamento-id="${ag.id}" style="display:block;width:100%;height:18px;border-radius:${br};background:${corAgendamento(ag)};border:none;padding:0 ${isFirst ? 6 : 0}px;color:#fff;font-size:9px;font-weight:700;text-align:left;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:2px;cursor:pointer;">${isFirst ? escapeHtml(ag.servico_nome) : ''}</button>`;
         }).join('');
-        return `<div style="flex:1;border-left:1px solid #1f2937;min-height:28px;padding:3px 2px;" data-date="${chaveDia(dia)}">${html}</div>`;
+        return `<div style="flex:1;border-left:1px solid var(--ag-linha);min-height:28px;padding:3px 2px;" data-date="${chaveDia(dia)}">${html}</div>`;
     }).join('');
 
     const eventCols = dias.map(dia => {
@@ -438,22 +438,22 @@ function renderizarSemanal() {
                 </div>
             </button>`;
         }).join('');
-        return `<div style="flex:1;border-left:1px solid #1f2937;height:${totalH}px;position:relative;background-image:${bgLinhas};cursor:pointer;" data-date="${chave}">${evHtml}</div>`;
+        return `<div style="flex:1;border-left:1px solid var(--ag-linha);height:${totalH}px;position:relative;background-image:${bgLinhas};cursor:pointer;" data-date="${chave}">${evHtml}</div>`;
     }).join('');
 
     let horaLabels = '';
     for (let h = HORA_INICIO; h <= HORA_FIM; h++) {
-        horaLabels += `<div style="height:${PX_HORA}px;padding-right:8px;text-align:right;font-size:10px;color:#4b5563;line-height:1;padding-top:3px;">${String(h).padStart(2, '0')}:00</div>`;
+        horaLabels += `<div style="height:${PX_HORA}px;padding-right:8px;text-align:right;font-size:10px;color:var(--ag-texto-fraco);line-height:1;padding-top:3px;">${String(h).padStart(2, '0')}:00</div>`;
     }
 
     container.innerHTML = `
         <div style="min-width:480px;display:flex;flex-direction:column;overflow:hidden;">
-            <div style="display:flex;background:#111827;border-bottom:2px solid #374151;">
+            <div style="display:flex;background:var(--ag-superficie);border-bottom:2px solid var(--ag-linha-forte);">
                 <div style="width:${gutter};flex-shrink:0;"></div>
                 ${headerCols}
             </div>
-            <div style="display:flex;background:#0f172a;border-bottom:1px solid #374151;">
-                <div style="width:${gutter};flex-shrink:0;font-size:9px;color:#4b5563;text-align:right;padding-right:6px;padding-top:6px;">dia int.</div>
+            <div style="display:flex;background:var(--ag-superficie-suave);border-bottom:1px solid var(--ag-linha-forte);">
+                <div style="width:${gutter};flex-shrink:0;font-size:9px;color:var(--ag-texto-fraco);text-align:right;padding-right:6px;padding-top:6px;">dia int.</div>
                 ${allDayCols}
             </div>
             <div style="overflow-y:auto;max-height:520px;overflow-x:hidden;">
@@ -492,11 +492,11 @@ function renderizarDiario() {
     const timedAgs = agsDia.filter(ag => !ehMultiDia(ag));
     const allDayAgs = agsDia.filter(ehMultiDia);
     const totalH = (HORA_FIM - HORA_INICIO) * PX_HORA;
-    const bgLinhas = `repeating-linear-gradient(to bottom,transparent 0px,transparent ${PX_HORA - 1}px,#1f2937 ${PX_HORA - 1}px,#1f2937 ${PX_HORA}px)`;
+    const bgLinhas = `repeating-linear-gradient(to bottom,transparent 0px,transparent ${PX_HORA - 1}px,var(--ag-linha) ${PX_HORA - 1}px,var(--ag-linha) ${PX_HORA}px)`;
 
     let horaLabels = '';
     for (let h = HORA_INICIO; h <= HORA_FIM; h++) {
-        horaLabels += `<div style="height:${PX_HORA}px;padding-right:8px;text-align:right;font-size:10px;color:#4b5563;line-height:1;padding-top:3px;">${String(h).padStart(2, '0')}:00</div>`;
+        horaLabels += `<div style="height:${PX_HORA}px;padding-right:8px;text-align:right;font-size:10px;color:var(--ag-texto-fraco);line-height:1;padding-top:3px;">${String(h).padStart(2, '0')}:00</div>`;
     }
 
     const layoutDia = calcularLayoutEventos(timedAgs);
@@ -532,17 +532,17 @@ function renderizarDiario() {
     container.innerHTML = `
         <div style="display:flex;flex-direction:column;min-width:220px;">
             ${allDayAgs.length ? `
-                <div style="padding:8px 8px 4px 60px;background:#0f172a;border-bottom:1px solid #1f2937;">
-                    <div style="font-size:9px;color:#4b5563;text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">Dia inteiro</div>
+                <div style="padding:8px 8px 4px 60px;background:var(--ag-superficie-suave);border-bottom:1px solid var(--ag-linha);">
+                    <div style="font-size:9px;color:var(--ag-texto-fraco);text-transform:uppercase;letter-spacing:.1em;margin-bottom:4px;">Dia inteiro</div>
                     ${allDayHtml}
                 </div>` : ''}
             <div style="overflow-y:auto;max-height:580px;">
                 <div style="display:flex;">
                     <div style="width:52px;flex-shrink:0;">${horaLabels}</div>
-                    <div style="flex:1;position:relative;border-left:1px solid #374151;height:${totalH}px;background-image:${bgLinhas};cursor:pointer;" data-date="${chave}">
+                    <div style="flex:1;position:relative;border-left:1px solid var(--ag-linha-forte);height:${totalH}px;background-image:${bgLinhas};cursor:pointer;" data-date="${chave}">
                         ${evHtml}
                         ${!timedAgs.length && !allDayAgs.length ? `
-                            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:#4b5563;">
+                            <div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;color:var(--ag-texto-fraco);">
                                 <div style="font-size:14px;">Nenhum agendamento neste dia</div>
                                 <button onclick="abrirModalSolicitacao('${chave}')" style="padding:8px 18px;background:#4f46e5;color:#fff;border:none;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600;">Solicitar serviço</button>
                             </div>` : ''}
@@ -604,11 +604,11 @@ function renderizarAdminQueues() {
 
 // ── Kanban ───────────────────────────────────────────────────────────────────
 const KANBAN_COLUNAS = [
-    { key: 'solicitado', label: 'Solicitado', cor: '#b45309', corBg: '#451a03' },
-    { key: 'agendado', label: 'Confirmado', cor: '#15803d', corBg: '#052e16' },
-    { key: 'em_avaliacao', label: 'Em Avaliação', cor: '#6d28d9', corBg: '#2e1065' },
-    { key: 'cancelado', label: 'Cancelado', cor: '#b91c1c', corBg: '#450a0a' },
-    { key: 'encerrado', label: 'Encerrado', cor: '#334155', corBg: '#0f172a' },
+    { key: 'solicitado', label: 'Solicitado', cor: 'var(--ag-head-solicitado)', corTexto: 'var(--ag-head-solicitado-texto)', corBg: 'var(--ag-col-solicitado)' },
+    { key: 'agendado', label: 'Confirmado', cor: 'var(--ag-head-agendado)', corTexto: 'var(--ag-head-agendado-texto)', corBg: 'var(--ag-col-agendado)' },
+    { key: 'em_avaliacao', label: 'Em Avaliação', cor: 'var(--ag-head-avaliacao)', corTexto: 'var(--ag-head-avaliacao-texto)', corBg: 'var(--ag-col-avaliacao)' },
+    { key: 'cancelado', label: 'Cancelado', cor: 'var(--ag-head-cancelado)', corTexto: 'var(--ag-head-cancelado-texto)', corBg: 'var(--ag-col-cancelado)' },
+    { key: 'encerrado', label: 'Encerrado', cor: 'var(--ag-head-encerrado)', corTexto: 'var(--ag-head-encerrado-texto)', corBg: 'var(--ag-col-encerrado)' },
 ];
 
 function renderizarKanban() {
@@ -620,20 +620,20 @@ function renderizarKanban() {
         const podeAdicionar = col.key === 'solicitado';
 
         const headerAdd = podeAdicionar
-            ? `<button onclick="abrirModalSolicitacao()" title="Nova solicitação" style="width:24px;height:24px;border-radius:6px;background:rgba(255,255,255,.18);border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">+</button>`
+            ? `<button onclick="abrirModalSolicitacao()" title="Nova solicitação" style="width:24px;height:24px;border-radius:6px;background:var(--ag-head-botao);border:none;color:${col.corTexto};font-size:18px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">+</button>`
             : '';
 
         const cards = itens.length
             ? itens.map(item => cardKanban(item)).join('')
             : `<div style="padding:24px 16px;text-align:center;">
-                 <p style="font-size:14px;color:#374151;min-height:48px;">Nenhum item</p>
+                 <p style="font-size:14px;color:var(--ag-texto-fraco);min-height:48px;">Nenhum item</p>
                 </div>`;
 
-        return `<div class="kanban-col" style="flex-shrink:0;min-width:260px;max-width:340px;flex:1 1 280px;display:flex;flex-direction:column;min-height:0;border-radius:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06);">
+        return `<div class="kanban-col" style="flex-shrink:0;min-width:260px;max-width:340px;flex:1 1 280px;display:flex;flex-direction:column;min-height:0;border-radius:14px;overflow:hidden;border:1px solid var(--ag-kanban-borda);">
                 <div style="padding:11px 14px;background:${col.cor};display:flex;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0;">
                     <div style="display:flex;align-items:center;gap:8px;">
-                        <span style="font-size:11px;font-weight:800;color:#fff;text-transform:uppercase;letter-spacing:.1em;">${col.label}</span>
-                        <span style="font-size:10px;font-weight:700;color:rgba(255,255,255,.85);background:rgba(0,0,0,.28);padding:1px 7px;border-radius:999px;">${itens.length}</span>
+                        <span style="font-size:11px;font-weight:800;color:${col.corTexto};text-transform:uppercase;letter-spacing:.1em;">${col.label}</span>
+                        <span style="font-size:10px;font-weight:700;color:${col.corTexto};background:var(--ag-head-contagem-bg);padding:1px 7px;border-radius:999px;">${itens.length}</span>
                     </div>
                     ${headerAdd}
                 </div>
@@ -659,18 +659,18 @@ function cardKanban(item) {
     const temFim = horaFim && horaFim !== horaIni;
 
     return `<button type="button" data-agendamento-id="${item.id}"
-            style="background:#111827;border:1px solid #1f2937;border-radius:10px;overflow:hidden;cursor:pointer;text-align:left;width:100%;padding:0;display:flex;flex-direction:column;flex:0 0 auto;transition:border-color .15s,box-shadow .15s;min-height:60px;"
+            style="background:var(--ag-superficie);border:1px solid var(--ag-linha);border-radius:10px;overflow:hidden;cursor:pointer;text-align:left;width:100%;padding:0;display:flex;flex-direction:column;flex:0 0 auto;transition:border-color .15s,box-shadow .15s;min-height:60px;"
             onmouseover="this.style.borderColor='#4f46e5';this.style.boxShadow='0 0 0 1px #4f46e5';"
-            onmouseout="this.style.borderColor='#1f2937';this.style.boxShadow='none';">
+            onmouseout="this.style.borderColor='var(--ag-linha)';this.style.boxShadow='none';">
             <div style="height:3px;background:${escapeHtml(item.cor_hex || '#4f46e5')};width:100%;flex-shrink:0;"></div>
             <div style="padding:12px 14px;display:flex;flex-direction:column;gap:6px;">
-                <div style="font-size:14px;font-weight:700;color:#f9fafb;line-height:1.35;word-break:break-word;min-height:36px;">${escapeHtml(item.servico_nome)}</div>
+                <div style="font-size:14px;font-weight:700;color:var(--ag-texto);line-height:1.35;word-break:break-word;min-height:36px;">${escapeHtml(item.servico_nome)}</div>
                 ${AG_EQUIP && item.solicitante_nome ? `
-                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#6b7280;">
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ag-texto-medio);">
                     <svg style="width:12px;height:12px;flex-shrink:0;" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
                     <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.solicitante_nome)}</span>
                 </div>` : ''}
-                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:#4b5563;">
+                <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ag-texto-fraco);">
                     <svg style="width:12px;height:12px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
                     <span>${dataCurta}${horaIni ? ' · ' + horaIni + (temFim ? '–' + horaFim : '') : ''}</span>
                 </div>

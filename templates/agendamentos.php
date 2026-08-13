@@ -30,8 +30,8 @@
         .kanban-col-body::-webkit-scrollbar-track { background: transparent; }
         .kanban-col-body::-webkit-scrollbar-thumb { background: rgba(255,255,255,.1); border-radius: 4px; }
         #kanban-board::-webkit-scrollbar { height: 6px; }
-        #kanban-board::-webkit-scrollbar-track { background: #030712; }
-        #kanban-board::-webkit-scrollbar-thumb { background: #374151; border-radius: 4px; }
+        #kanban-board::-webkit-scrollbar-track { background: var(--ag-kanban-board); }
+        #kanban-board::-webkit-scrollbar-thumb { background: var(--ag-linha-forte); border-radius: 4px; }
     </style>
 </head>
 <?php
@@ -156,7 +156,7 @@ $agendamentosBootstrap = [
             </button>
         </div>
            <div id="kanban-board"
-               style="flex:1;overflow-x:auto;overflow-y:hidden;display:flex;align-items:stretch;gap:10px;padding:14px 16px;background:#030712;min-height:0;">
+               style="flex:1;overflow-x:auto;overflow-y:hidden;display:flex;align-items:stretch;gap:10px;padding:14px 16px;background:var(--ag-kanban-board);min-height:0;">
         </div>
     </div>
 

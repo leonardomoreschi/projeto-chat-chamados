@@ -37,6 +37,9 @@ $naoLidas = (int) ($notificationCount ?? 0);
                         <h1 class="text-2xl md:text-4xl font-black text-white">Notificações</h1>
                         <p class="text-sm text-gray-400 mt-2 max-w-2xl">Suas notificações recentes</p>
                     </div>
+                    <button data-theme-toggle class="self-start w-10 h-10 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 flex items-center justify-center transition border border-gray-700" title="Alternar tema">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m8.66-10h-1M4.34 12h-1m15.02 6.36l-.7-.7M6.34 6.34l-.7-.7m12.02 0l-.7.7M6.34 17.66l-.7.7M12 8a4 4 0 100 8 4 4 0 000-8z"/></svg>
+                    </button>
                 </div>
             </div>
     </div>
@@ -146,6 +149,7 @@ $naoLidas = (int) ($notificationCount ?? 0);
         }
     });
 </script>
+<script src="<?= asset('/assets/js/theme.js') ?>"></script>
 <script src="<?= asset('/assets/js/menu-lateral.js') ?>"></script>
 </body>
 </html>
