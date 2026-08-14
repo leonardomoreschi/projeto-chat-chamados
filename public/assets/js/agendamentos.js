@@ -1147,7 +1147,9 @@ function renderizarServicosAdmin() {
             </div>
             <div class="flex flex-col gap-1 shrink-0">
                 <button type="button" onclick="editarServico(${s.id})" class="text-xs text-indigo-300 hover:text-indigo-200 px-2 py-1 rounded-lg hover:bg-indigo-500/10 transition">Editar</button>
-                <button type="button" onclick="desativarServico(${s.id})" class="text-xs text-red-300 hover:text-red-200 px-2 py-1 rounded-lg hover:bg-red-500/10 transition">Desativar</button>
+                ${Number(s.ativo)
+                    ? `<button type="button" onclick="alternarServico(${s.id}, 0)" class="text-xs text-red-300 hover:text-red-200 px-2 py-1 rounded-lg hover:bg-red-500/10 transition">Desativar</button>`
+                    : `<button type="button" onclick="alternarServico(${s.id}, 1)" class="text-xs text-green-300 hover:text-green-200 px-2 py-1 rounded-lg hover:bg-green-500/10 transition">Ativar</button>`}
             </div>
         </div>
     `).join('');
@@ -1188,11 +1190,26 @@ async function salvarServico() {
     await carregarAgendamentos();
 }
 
-async function desativarServico(id) {
-    if (!confirm('Desativar este serviço?')) return;
-    const res = await fetch('/api/servicos-agendamento/' + id, { method: 'DELETE' });
+/**
+ * Liga/desliga o serviço. Desativar não apaga nada (os agendamentos antigos
+ * continuam apontando para ele), só tira o serviço do formulário de
+ * solicitação — por isso dá para reativar depois pelo mesmo botão.
+ */
+async function alternarServico(id, ativo) {
+    const ligar = Number(ativo) === 1;
+    if (!confirm(ligar ? 'Reativar este serviço?' : 'Desativar este serviço?')) return;
+
+    const res = await fetch('/api/servicos-agendamento/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ ativo: ligar ? 1 : 0 }),
+    });
     const data = await res.json();
-    if (!res.ok) { alert(data.erro || 'Não foi possível desativar'); return; }
+    if (!res.ok) {
+        alert(data.erro || (ligar ? 'Não foi possível reativar' : 'Não foi possível desativar'));
+        return;
+    }
+
     await carregarServicos();
 }
 
