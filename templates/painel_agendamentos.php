@@ -53,9 +53,6 @@ $agendamentosBootstrap = [
 <!-- ── Header ──────────────────────────────────────────────────────────── -->
 <header class="flex-shrink-0 bg-gray-900 border-b border-gray-800 px-4 md:px-6 py-3 flex items-center justify-between gap-3">
     <div class="flex items-center gap-3 min-w-0">
-        <a href="/chat" class="w-10 h-10 rounded-xl bg-gray-800 hover:bg-gray-700 border border-gray-700 flex items-center justify-center text-gray-300 transition flex-shrink-0" title="Voltar ao chat">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-        </a>
         <div class="min-w-0">
             <p class="text-[10px] uppercase tracking-[.18em] text-gray-500 font-bold leading-none mb-0.5">Administração</p>
             <h1 class="text-base md:text-lg font-black text-white leading-tight truncate">Painel de Agendamentos</h1>
