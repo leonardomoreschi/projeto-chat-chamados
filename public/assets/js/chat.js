@@ -312,6 +312,27 @@ async function carregarConversas() {
             itemSelecionado.classList.add('bg-gray-800');
         }
     }
+
+    atualizarBadgeMenuRecolhido();
+}
+
+/**
+ * Soma dos não lidos no ícone de chat que aparece com a sidebar minimizada —
+ * o mesmo badge que o menu-lateral.js mantém nas outras telas.
+ */
+function atualizarBadgeMenuRecolhido() {
+    const badge = document.getElementById('menu-badge-conversas');
+    if (!badge) return;
+
+    let total = 0;
+    document.querySelectorAll('#lista-conversas .badge-nao-lidas').forEach(function (el) {
+        if (!el.classList.contains('hidden')) {
+            total += parseInt(el.textContent, 10) || 0;
+        }
+    });
+
+    badge.textContent = total > 0 ? String(total) : '';
+    badge.classList.toggle('hidden', total === 0);
 }
 
 function toggleSidebarMobile(forceOpen) {
@@ -344,6 +365,8 @@ function atualizarPreviewSidebar(msg) {
             badge.classList.remove('hidden');
         }
     }
+
+    atualizarBadgeMenuRecolhido();
 }
 
 function limparBadge(conversaId) {
@@ -351,6 +374,7 @@ function limparBadge(conversaId) {
     if (!btn) return;
     const badge = btn.querySelector('.badge-nao-lidas');
     if (badge) { badge.textContent = ''; badge.classList.add('hidden'); }
+    atualizarBadgeMenuRecolhido();
 }
 
 function atualizarUrlConversa(conversaId) {

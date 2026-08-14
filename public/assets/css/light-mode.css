@@ -634,11 +634,6 @@ body.page-chat.theme-light .hover\:border-indigo-500:hover {
     border-color: #7c3aed !important;
 }
 
-body.page-chat.theme-light #btn-painel-chamados,
-body.page-chat.theme-light #btn-painel-chamados * {
-    color: #ffffff !important;
-}
-
 /* Login specific */
 body.page-login.theme-light .text-gray-300 {
     color: #111827 !important;

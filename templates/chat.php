@@ -41,9 +41,10 @@
 <body class="page-chat bg-gray-950 text-white h-screen flex overflow-hidden">
 
 <!-- ═══ SIDEBAR ═══ -->
-<aside id="chat-sidebar" class="w-72 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0">
+<aside id="chat-sidebar" data-menu-lateral
+       class="w-72 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 transition-all duration-200">
 
-    <div class="md:hidden p-3 border-b border-gray-800 flex justify-end">
+    <div class="md:hidden p-3 border-b border-gray-800 flex justify-end" data-menu-conteudo>
         <button onclick="toggleSidebarMobile(false)" class="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 flex items-center justify-center" title="Fechar menu">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -51,90 +52,9 @@
         </button>
     </div>
 
-    <div class="p-4 border-b border-gray-800 flex items-center justify-between">
-        <div class="flex items-center gap-3">
-            <div class="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-sm font-bold">
-                <?= strtoupper(substr($userName, 0, 1)) ?>
-            </div>
-            <div>
-                <p class="text-sm font-semibold text-white"><?= htmlspecialchars($userName) ?></p>
-                <?php $rotulosPapel = ['admin' => 'Admin', 'ti' => 'TI', 'usuario' => 'Usuário']; ?>
-                <p class="text-xs text-gray-400"><?= htmlspecialchars($rotulosPapel[$userPapel] ?? 'Usuário') ?></p>
-            </div>
-        </div>
-        <div class="flex items-center gap-1">
-            <?php if ($userPapel === 'admin'): ?>
-            <a href="/admin" title="Painel Admin"
-               class="text-gray-500 hover:text-indigo-400 transition p-1.5 rounded-lg hover:bg-gray-800">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/>
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"/>
-                </svg>
-            </a>
-            <?php endif; ?>
-            <a href="/notificacoes" title="Central de notificações"
-               class="relative text-gray-500 hover:text-indigo-400 transition p-1.5 rounded-lg hover:bg-gray-800">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"/>
-                </svg>
-                <span data-notification-badge class="<?= (($notificationCount ?? 0) > 0) ? '' : 'hidden' ?> absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-indigo-500 border border-gray-900 text-[10px] font-black text-white text-center leading-3"><?= (int) ($notificationCount ?? 0) ?></span>
-            </a>
-            <a href="/logout" title="Sair"
-               class="text-gray-500 hover:text-red-400 transition p-1.5 rounded-lg hover:bg-gray-800">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                          d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/>
-                </svg>
-            </a>
-        </div>
-    </div>
+    <?php $paginaAtual = 'chat'; include __DIR__ . '/partials/menu-lateral-cabecalho.php'; ?>
 
-    <div class="p-3">
-        <button onclick="abrirEmergencia()"
-                class="w-full bg-red-600 hover:bg-red-500 text-white text-sm font-semibold rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                      d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
-            </svg>
-            Chamar TI — Emergência
-        </button>
-    </div>
-
-    <div class="p-3 pt-0">
-        <a href="/meus-chamados"
-           class="w-full bg-gray-800 hover:bg-indigo-600 text-white text-sm font-semibold rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 transition-colors border border-gray-700">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2" />
-            </svg>
-            Meus Chamados
-        </a>
-    </div>
-
-    <div class="p-3 pt-0">
-        <a href="/agendamentos"
-           class="w-full bg-gray-800 hover:bg-indigo-600 text-white text-sm font-semibold rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 transition-colors border border-gray-700">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7H3v12a2 2 0 002 2z" />
-            </svg>
-            Agendamentos
-        </a>
-    </div>
-
-    <?php if (in_array($userPapel, ['ti', 'admin'])): ?>
-    <div class="p-3 pt-0">
-        <button id="btn-painel-chamados" onclick="window.location.href='/dashboard-ti'"
-                class="relative w-full bg-indigo-600 hover:bg-indigo-500 text-white text-sm font-semibold rounded-xl py-2.5 px-4 flex items-center justify-center gap-2 transition-colors">
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2" />
-            </svg>
-            Painel de Chamados
-            <span id="badge-novos-chamados" class="hidden absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full border border-gray-900"></span>
-        </button>
-    </div>
-    <?php endif; ?>
-
-    <div class="p-3 flex items-center gap-2">
+    <div class="p-3 pt-0 flex items-center gap-2" data-menu-conteudo>
         <div class="relative flex-1">
             <svg class="w-4 h-4 text-gray-500 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
@@ -150,12 +70,15 @@
         </button>
     </div>
 
-    <nav class="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5">
+    <nav class="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5 min-h-0" data-menu-conteudo>
         <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 pt-3 pb-2">Conversas</p>
         <div id="lista-conversas" class="space-y-0.5"></div>
         <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 pt-4 pb-2">Usuários</p>
         <div id="lista-usuarios" class="space-y-0.5"></div>
     </nav>
+
+    <!-- Só aparece com o menu minimizado -->
+    <?php include __DIR__ . '/partials/menu-lateral-recolhido.php'; ?>
 </aside>
 
 <!-- ═══ ÁREA PRINCIPAL ═══ -->
@@ -175,11 +98,6 @@
             </div>
         </div>
         <div class="flex items-center gap-2">
-            <button data-theme-toggle class="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 flex items-center justify-center transition" title="Alternar tema">
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m8.66-10h-1M4.34 12h-1m15.02 6.36l-.7-.7M6.34 6.34l-.7-.7m12.02 0l-.7.7M6.34 17.66l-.7.7M12 8a4 4 0 100 8 4 4 0 000-8z"/>
-                </svg>
-            </button>
             <button id="btn-info-grupo" onclick="abrirModalInfoGrupo()" class="hidden px-3 py-1.5 text-xs font-semibold rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 transition">
                 Informações do Grupo
             </button>
@@ -522,6 +440,7 @@ window.APP_USER = <?= json_encode([
 <script src="<?= asset('/assets/js/som-notificacoes.js') ?>"></script>
 <script src="<?= asset('/assets/js/notificacoes.js') ?>"></script>
 <script src="<?= asset('/assets/js/chat.js') ?>"></script>
+<script src="<?= asset('/assets/js/menu-lateral.js') ?>"></script>
 
 </body>
 </html>

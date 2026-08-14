@@ -1,9 +1,13 @@
 /**
- * Menu lateral fixo das telas fora do chat.
+ * Menu lateral fixo.
  *
- * Mantém a lista de conversas viva sem sair da tela atual: carrega por HTTP e
- * atualiza pelo WebSocket (mesma conexão que traz as notificações). Clicar em
- * uma conversa leva para /chat?conversa=ID.
+ * Fora do chat, mantém a lista de conversas viva sem sair da tela atual:
+ * carrega por HTTP e atualiza pelo WebSocket (mesma conexão que traz as
+ * notificações). Clicar em uma conversa leva para /chat?conversa=ID.
+ *
+ * No /chat a sidebar é a do próprio chat.js (com busca e lista de usuários),
+ * então aqui só entra a parte de minimizar — a lista e o socket ficam de fora,
+ * detectados pela ausência de `#menu-lista-conversas`.
  *
  * O estado minimizado fica no localStorage, então acompanha o usuário de uma
  * tela para outra.
@@ -245,6 +249,9 @@
 
         const botao = elMenu().querySelector('[data-menu-toggle]');
         if (botao) botao.addEventListener('click', alternarRecolhido);
+
+        // No /chat quem cuida das conversas (e do socket) é o chat.js.
+        if (!document.getElementById('menu-lista-conversas')) return;
 
         carregarConversas();
         conectar();
