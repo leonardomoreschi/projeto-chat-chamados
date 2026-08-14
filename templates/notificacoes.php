@@ -97,18 +97,32 @@ $naoLidas = (int) ($notificationCount ?? 0);
                     <?php
                         $ehLida = !empty($notificacao['lida_em']);
                         $tagCor = $notificacao['tipo'] === 'agendamento' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-indigo-500/15 text-indigo-300 border-indigo-500/30';
+
+                        // Aviso que espera uma resposta (aprovar, aceitar/recusar,
+                        // refazer o pedido) ganha borda âmbar — some da massa dos
+                        // avisos só informativos. Quem define é o `exige_acao`
+                        // gravado por NotificationCenter::registrar.
+                        $exigeAcao = !empty($notificacao['exige_acao']);
+                        $classesCartao = $exigeAcao
+                            ? 'border-amber-400/70 bg-amber-500/[0.07] hover:border-amber-300'
+                            : ($ehLida
+                                ? 'border-gray-800 bg-gray-900 hover:border-indigo-500/50'
+                                : 'border-indigo-500/30 bg-gray-900/90 hover:border-indigo-500/50');
                     ?>
                     <button
                         type="button"
                         onclick="abrirNotificacao(<?= (int) $notificacao['id'] ?>, '<?= htmlspecialchars((string) ($notificacao['url'] ?? '/notificacoes'), ENT_QUOTES) ?>')"
-                        class="w-full text-left rounded-2xl border <?= $ehLida ? 'border-gray-800 bg-gray-900' : 'border-indigo-500/30 bg-gray-900/90' ?> p-5 shadow-lg transition hover:border-indigo-500/50">
+                        class="w-full text-left rounded-2xl border <?= $classesCartao ?> p-5 shadow-lg transition">
                         <div class="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                             <div class="flex gap-4 min-w-0">
-                                <div class="mt-0.5 h-10 w-10 shrink-0 rounded-2xl bg-indigo-600/20 border border-indigo-500/20 flex items-center justify-center text-indigo-300 font-black">
+                                <div class="mt-0.5 h-10 w-10 shrink-0 rounded-2xl <?= $exigeAcao ? 'bg-amber-500/20 border border-amber-400/40 text-amber-300' : 'bg-indigo-600/20 border border-indigo-500/20 text-indigo-300' ?> flex items-center justify-center font-black">
                                     <?= strtoupper(substr((string) $notificacao['tipo'], 0, 1)) ?>
                                 </div>
                                 <div class="min-w-0">
                                     <div class="flex flex-wrap items-center gap-2 mb-2">
+                                        <?php if ($exigeAcao): ?>
+                                        <span class="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-amber-400/60 bg-amber-500/20 text-amber-200">Requer ação</span>
+                                        <?php endif; ?>
                                         <span class="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border <?= $tagCor ?>"><?= htmlspecialchars((string) $notificacao['tipo']) ?></span>
                                         <span class="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border border-gray-700 text-gray-400"><?= htmlspecialchars((string) $notificacao['evento']) ?></span>
                                         <span class="text-[10px] font-black uppercase tracking-widest px-2 py-0.5 rounded border <?= $ehLida ? 'border-gray-700 text-gray-500' : 'border-amber-500/30 text-amber-300' ?>"><?= $ehLida ? 'Lida' : 'Nova' ?></span>

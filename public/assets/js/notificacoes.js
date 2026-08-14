@@ -101,17 +101,22 @@
         const titulo = String(notificacao.titulo || 'Nova notificação');
         const mensagem = String(notificacao.mensagem || '');
         const url = String(notificacao.url || '');
+        // Mesma distinção da central: aviso que espera resposta vem em âmbar.
+        const exigeAcao = Boolean(notificacao.exige_acao);
 
         const toast = document.createElement('div');
-        toast.className = 'fixed bottom-6 right-6 z-50 w-[min(100vw-2rem,24rem)] rounded-2xl border border-indigo-500/30 bg-gray-900 text-white shadow-2xl shadow-black/30 overflow-hidden';
+        toast.className = 'fixed bottom-6 right-6 z-50 w-[min(100vw-2rem,24rem)] rounded-2xl border '
+            + (exigeAcao ? 'border-amber-400/70' : 'border-indigo-500/30')
+            + ' bg-gray-900 text-white shadow-2xl shadow-black/30 overflow-hidden';
         toast.innerHTML =
             '<div class="px-4 py-3 flex items-start gap-3">' +
-            '<div class="mt-0.5 h-8 w-8 shrink-0 rounded-xl bg-indigo-600 flex items-center justify-center text-white text-sm font-black">!</div>' +
+            '<div class="mt-0.5 h-8 w-8 shrink-0 rounded-xl ' + (exigeAcao ? 'bg-amber-500' : 'bg-indigo-600') + ' flex items-center justify-center text-white text-sm font-black">!</div>' +
             '<div class="min-w-0 flex-1">' +
-            '<p class="text-sm font-semibold text-indigo-300 truncate">' + escapeHtml(titulo) + '</p>' +
+            (exigeAcao ? '<p class="text-[10px] font-black uppercase tracking-widest text-amber-300 mb-0.5">Requer ação</p>' : '') +
+            '<p class="text-sm font-semibold ' + (exigeAcao ? 'text-amber-200' : 'text-indigo-300') + ' truncate">' + escapeHtml(titulo) + '</p>' +
             '<p class="mt-1 text-xs leading-relaxed text-gray-300">' + escapeHtml(mensagem) + '</p>' +
             '</div>' +
-            (url ? '<a href="' + url + '" class="text-xs font-bold text-indigo-300 hover:text-indigo-200 shrink-0">Abrir</a>' : '') +
+            (url ? '<a href="' + url + '" class="text-xs font-bold ' + (exigeAcao ? 'text-amber-300 hover:text-amber-200' : 'text-indigo-300 hover:text-indigo-200') + ' shrink-0">Abrir</a>' : '') +
             '</div>';
         document.body.appendChild(toast);
         setTimeout(function () { toast.remove(); }, 5000);

@@ -169,6 +169,8 @@ class AgendamentoController
                         . (string) $agendamento['servico_nome'] . '".',
                     'url' => '/painel-agendamentos',
                     'status_destino' => 'solicitado',
+                    // Fica pendente até a equipe aprovar, recusar ou sugerir outro horário.
+                    'exige_acao' => true,
                     'metadados' => [
                         'agendamento_id' => $id,
                         'servico_nome' => (string) $agendamento['servico_nome'],
@@ -234,6 +236,8 @@ class AgendamentoController
                     'motivo_recusa' => $motivo,
                     'servico_nome' => (string) $agendamentoAtualizado['servico_nome'],
                     'detalhe_equipe' => 'Motivo da recusa: ' . $motivo,
+                    // Pedido recusado: cabe ao solicitante refazer com outra data.
+                    'exige_acao_solicitante' => true,
                 ],
                 (int) $request->getAttribute('user_id')
             );
@@ -310,6 +314,8 @@ class AgendamentoController
                     'reagendamento_fim' => $fim->format('Y-m-d H:i:s'),
                     'reagendamento_motivo' => $motivo !== '' ? $motivo : null,
                     'detalhe_equipe' => 'Novo período sugerido: ' . $periodo . '. Aguardando resposta do solicitante.',
+                    // O solicitante precisa aceitar ou recusar a sugestão.
+                    'exige_acao_solicitante' => true,
                 ],
                 $userId,
                 '/agendamentos?agendamento=' . (int) $agendamento['id'],
@@ -452,6 +458,8 @@ class AgendamentoController
                     'conversa_id' => $conversaId,
                     'detalhe_equipe' => 'O solicitante recusou o período ' . $periodoSugerido
                         . ' e vai combinar outra data pelo chat.',
+                    // A equipe é quem precisa propor o próximo horário.
+                    'exige_acao_equipe' => true,
                 ],
                 $userId
             );
@@ -918,7 +926,13 @@ class AgendamentoController
             return;
         }
 
-        $this->notificarEquipeAgendamento($pdo, $agendamento, $evento, $titulo, $statusDestino, $statusOrigem, $metadados, $autorId, $chaveSufixo);
+        // Marcadores de "este lado precisa responder": viajam em $metadados como
+        // as demais chaves de controle e não são gravados na notificação.
+        $exigeAcaoSolicitante = !empty($metadados['exige_acao_solicitante']);
+        $exigeAcaoEquipe = !empty($metadados['exige_acao_equipe']);
+        unset($metadados['exige_acao_solicitante'], $metadados['exige_acao_equipe']);
+
+        $this->notificarEquipeAgendamento($pdo, $agendamento, $evento, $titulo, $statusDestino, $statusOrigem, $metadados, $autorId, $chaveSufixo, $exigeAcaoEquipe);
 
         // 'detalhe_equipe' só serve para montar a mensagem do painel; o
         // solicitante já recebe o motivo/parecer no corpo da própria mensagem.
@@ -938,6 +952,7 @@ class AgendamentoController
             'url' => $urlSolicitante ?? '/agendamentos',
             'status_origem' => $statusOrigem,
             'status_destino' => $statusDestino,
+            'exige_acao' => $exigeAcaoSolicitante,
             'metadados' => array_merge([
                 'agendamento_id' => (int) ($agendamento['id'] ?? 0),
                 'servico_nome' => (string) ($agendamento['servico_nome'] ?? ''),
@@ -962,7 +977,8 @@ class AgendamentoController
         ?string $statusOrigem,
         array $metadados,
         ?int $autorId,
-        ?string $chaveSufixo = null
+        ?string $chaveSufixo = null,
+        bool $exigeAcao = false
     ): void {
         if ($evento === 'solicitado') {
             return;
@@ -997,6 +1013,7 @@ class AgendamentoController
             'url' => '/painel-agendamentos',
             'status_origem' => $statusOrigem,
             'status_destino' => $statusDestino,
+            'exige_acao' => $exigeAcao,
             'metadados' => array_merge([
                 'agendamento_id' => $agendamentoId,
                 'servico_nome' => (string) ($agendamento['servico_nome'] ?? ''),

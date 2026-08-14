@@ -92,6 +92,8 @@ class ChamadoController
                 . ' (gravidade indicada: ' . (self::ROTULOS_PRIORIDADE[$prioridade] ?? $prioridade) . ')',
             'url' => '/dashboard-ti',
             'status_destino' => 'aberto',
+            // Chamado novo fica parado até alguém da TI triar/classificar.
+            'exige_acao' => true,
             'metadados' => [
                 'chamado_id' => $chamadoId,
                 'titulo' => $titulo,
@@ -164,7 +166,9 @@ class ChamadoController
      * é notificado dela, e o dono nunca recebe a via da equipe em duplicidade.
      *
      * Chaves aceitas em $dados: evento, titulo, mensagem_dono, mensagem_gestor,
-     * autor_id, status_origem, status_destino, metadados, chave_base.
+     * autor_id, status_origem, status_destino, metadados, chave_base,
+     * exige_acao_dono, exige_acao_gestor (destacam o aviso de quem precisa
+     * responder alguma coisa).
      */
     private function notificarMovimentacaoChamado(\PDO $pdo, int $chamadoId, array $dados): void
     {
@@ -202,6 +206,7 @@ class ChamadoController
                     'chave_evento' => $chaveBase . ':' . $donoId,
                     'mensagem' => (string) $dados['mensagem_dono'],
                     'url' => '/meus-chamados',
+                    'exige_acao' => !empty($dados['exige_acao_dono']),
                 ]));
             }
 
@@ -210,6 +215,7 @@ class ChamadoController
                     'chave_evento' => $chaveBase . ':gestor',
                     'mensagem' => (string) $dados['mensagem_gestor'],
                     'url' => '/dashboard-ti',
+                    'exige_acao' => !empty($dados['exige_acao_gestor']),
                 ]), [$autorId, $donoId]);
             }
         } catch (\Throwable $e) {
@@ -383,6 +389,9 @@ class ChamadoController
                 'autor_id' => $userId,
                 'status_origem' => $statusAnterior !== '' ? $statusAnterior : null,
                 'status_destino' => $novoStatus,
+                // Chamado recusado/cancelado pela equipe: o solicitante precisa
+                // decidir se reabre o pedido.
+                'exige_acao_dono' => $novoStatus === 'cancelado',
             ]);
         }
 

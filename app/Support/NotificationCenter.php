@@ -31,6 +31,15 @@ class NotificationCenter
         $metadados = $dados['metadados'] ?? [];
         $chaveEvento = trim((string) ($dados['chave_evento'] ?? ''));
 
+        // `exige_acao` viaja dentro de metadados (sem coluna nova) e sai de novo
+        // no topo da linha em normalizarLinha(). Marca o aviso que espera uma
+        // resposta de quem recebe — aprovar, aceitar/recusar, refazer o pedido —
+        // para a tela destacar a borda. Quem decide é sempre quem registra.
+        if (!empty($dados['exige_acao'])) {
+            $metadados = is_array($metadados) ? $metadados : [];
+            $metadados['exige_acao'] = true;
+        }
+
         if ($evento === '' || $entidade === '' || $entidadeId <= 0 || $titulo === '' || $mensagem === '') {
             return null;
         }
@@ -242,6 +251,9 @@ class NotificationCenter
         } else {
             $linha['metadados'] = [];
         }
+
+        // Campo de leitura fácil para o front (central, template e toast).
+        $linha['exige_acao'] = !empty($linha['metadados']['exige_acao']);
 
         return $linha;
     }
