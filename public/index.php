@@ -185,6 +185,7 @@ $app->get('/notificacoes', function ($request, $response) {
 
 $app->get('/dashboard-ti/relatorio', function ($request, $response) {
     $userName  = $request->getAttribute('user_nome');
+    $userId    = (int) $request->getAttribute('user_id');
     $userPapel = $request->getAttribute('user_papel');
 
     if (!in_array($userPapel, ['ti', 'admin'], true)) {
@@ -194,6 +195,7 @@ $app->get('/dashboard-ti/relatorio', function ($request, $response) {
     return TemplateRenderer::render($response, __DIR__ . '/../templates/relatorio_chamados.php', [
         'userName' => $userName,
         'userPapel' => $userPapel,
+        'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), $userId),
     ]);
 })->add(new AuthMiddleware());
 

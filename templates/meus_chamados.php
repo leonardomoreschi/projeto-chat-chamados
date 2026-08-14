@@ -34,14 +34,18 @@
                     <h1 class="text-2xl md:text-4xl font-black text-white">Meus Chamados</h1>
                     <p class="text-sm text-gray-400 mt-2 max-w-2xl">Acompanhe seus chamados abertos, em andamento e resolvidos.</p>
                 </div>
+                <!-- Ordem padrão de todas as telas: ações da página,
+                     notificações e o "Olá, fulano" sempre encostado na direita
+                     (o botão de tema desta tela fica no menu lateral). -->
                 <div class="flex gap-3 flex-wrap items-center">
-                    <a href="/notificacoes" class="relative px-4 py-2 rounded-xl bg-gray-800 text-gray-300 text-sm font-bold border border-gray-700 hover:bg-gray-700 transition">Notificações
-                        <span data-notification-badge class="<?= (($notificationCount ?? 0) > 0) ? '' : 'hidden' ?> absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-indigo-500 border border-gray-900 text-[10px] font-black text-white text-center leading-4"><?= (int) ($notificationCount ?? 0) ?></span>
-                    </a>
                     <button data-tab="abertos" class="tab-btn px-4 py-2 rounded-xl bg-indigo-600 text-white text-sm font-bold">Abertos</button>
                     <button data-tab="resolvidos" class="tab-btn px-4 py-2 rounded-xl bg-gray-800 text-gray-300 text-sm font-bold border border-gray-700">Resolvidos</button>
                     <button data-tab="cancelados" class="tab-btn px-4 py-2 rounded-xl bg-gray-800 text-gray-300 text-sm font-bold border border-gray-700">Cancelados</button>
                     <button data-tab="todos" class="tab-btn px-4 py-2 rounded-xl bg-gray-800 text-gray-300 text-sm font-bold border border-gray-700">Todos</button>
+                    <a href="/notificacoes" class="relative px-4 py-2 rounded-xl bg-gray-800 text-gray-300 text-sm font-bold border border-gray-700 hover:bg-gray-700 transition">Notificações
+                        <span data-notification-badge class="<?= (($notificationCount ?? 0) > 0) ? '' : 'hidden' ?> absolute -top-2 -right-2 min-w-5 h-5 px-1 rounded-full bg-indigo-500 border border-gray-900 text-[10px] font-black text-white text-center leading-4"><?= (int) ($notificationCount ?? 0) ?></span>
+                    </a>
+                    <span class="hidden sm:block text-sm text-gray-500">Olá, <span class="text-white font-medium"><?= htmlspecialchars($userName) ?></span></span>
                 </div>
             </div>
 
