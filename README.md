@@ -35,7 +35,7 @@ Plataforma interna com chat corporativo em tempo real e gestão de chamados de T
 Na inicialização:
 
 - o bootstrap roda automaticamente na aplicação HTTP e no serviço WebSocket;
-- setores padrão são garantidos de forma idempotente;
+- setores padrão são semeados uma única vez por banco (marcador `setores_padrao` em `bootstrap_marcadores`), para que setores excluídos pelo admin não voltem;
 - usuário admin inicial é criado automaticamente (se não existir);
 - setores duplicados são deduplicados com reassociação de usuários;
 - chave única de nome de setor é garantida para evitar duplicação futura.

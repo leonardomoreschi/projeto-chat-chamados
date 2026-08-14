@@ -327,7 +327,7 @@ class AdminController
     {
         $pdo  = getDbConnection();
         $stmt = $pdo->query("
-            SELECT s.id, s.nome, s.descricao,
+            SELECT s.id, s.nome,
                    COUNT(u.id) AS total_usuarios
             FROM setores s
             LEFT JOIN usuarios u ON u.setor_id = s.id AND u.ativo = 1
@@ -340,17 +340,16 @@ class AdminController
     // POST /api/admin/setores
     public function criarSetor(Request $request, Response $response): Response
     {
-        $data     = (array) $request->getParsedBody();
-        $nome     = trim($data['nome'] ?? '');
-        $descricao = trim($data['descricao'] ?? '');
+        $data = (array) $request->getParsedBody();
+        $nome = trim($data['nome'] ?? '');
 
         if (!$nome) {
             return Json::erro($response, 'Nome do setor é obrigatório');
         }
 
         $pdo  = getDbConnection();
-        $stmt = $pdo->prepare("INSERT INTO setores (nome, descricao) VALUES (?, ?)");
-        $stmt->execute([$nome, $descricao]);
+        $stmt = $pdo->prepare("INSERT INTO setores (nome) VALUES (?)");
+        $stmt->execute([$nome]);
 
         return Json::json($response, [
             'id'   => (int) $pdo->lastInsertId(),
@@ -373,6 +372,10 @@ class AdminController
 
         $stmt = $pdo->prepare("DELETE FROM setores WHERE id = ?");
         $stmt->execute([$id]);
+
+        if ($stmt->rowCount() === 0) {
+            return Json::erro($response, 'Setor não encontrado', 404);
+        }
 
         return Json::json($response, ['ok' => true]);
     }

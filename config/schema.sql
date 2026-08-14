@@ -1,21 +1,29 @@
 SET FOREIGN_KEY_CHECKS = 0;
 SET NAMES utf8mb4;
 
+-- Marcadores de seed ja aplicado; evita que o bootstrap (roda a cada request)
+-- reinsira registros padrao que o admin excluiu de proposito.
+CREATE TABLE IF NOT EXISTS bootstrap_marcadores (
+    chave     VARCHAR(100) NOT NULL PRIMARY KEY,
+    criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE setores (
     id        INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     nome      VARCHAR(100) NOT NULL,
-    descricao TEXT,
     criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uniq_setores_nome (nome)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-INSERT IGNORE INTO setores (nome, descricao) VALUES
-('TI', 'Setor de tecnologia da informacao'),
-('Administrativo', 'Setor administrativo'),
-('Engenharia', 'Setor de engenharia'),
-('Financeiro', 'Setor financeiro'),
-('Operacional', 'Setor operacional'),
-('Vendas', 'Setor comercial e vendas');
+INSERT IGNORE INTO setores (nome) VALUES
+('TI'),
+('Administrativo'),
+('Engenharia'),
+('Financeiro'),
+('Operacional'),
+('Vendas');
+
+INSERT IGNORE INTO bootstrap_marcadores (chave) VALUES ('setores_padrao');
 
 CREATE TABLE usuarios (
     id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,

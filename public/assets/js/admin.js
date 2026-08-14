@@ -370,7 +370,6 @@ async function carregarSetores() {
         <div class="bg-gray-900 border border-gray-800 rounded-2xl p-5 flex items-start justify-between gap-3">
             <div>
                 <p class="font-semibold text-white">${s.nome}</p>
-                <p class="text-xs text-gray-400 mt-1">${s.descricao ?? 'Sem descrição'}</p>
                 <p class="text-xs text-indigo-400 mt-2">${s.total_usuarios} usuário(s)</p>
             </div>
             <button onclick="deletarSetor(${s.id}, '${s.nome}')"
@@ -464,7 +463,6 @@ function configurarFiltrosUsuarios() {
 
 function abrirModalSetor() {
     document.getElementById('setor-nome').value = '';
-    document.getElementById('setor-descricao').value = '';
     document.getElementById('modal-setor').classList.remove('hidden');
 }
 
@@ -474,13 +472,12 @@ function fecharModalSetor() {
 
 async function salvarSetor() {
     const nome = document.getElementById('setor-nome').value.trim();
-    const descricao = document.getElementById('setor-descricao').value.trim();
     if (!nome) { alert('Informe o nome do setor.'); return; }
 
     const res = await fetch('/api/admin/setores', {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams({ nome, descricao }),
+        body: new URLSearchParams({ nome }),
     });
     const data = await res.json();
     if (!res.ok) { alert(data.erro); return; }

@@ -11,7 +11,9 @@ function bootstrapDefaultData(): void
     $lockAcquired = (int) $lockStmt->fetchColumn() === 1;
 
     try {
+        ensureBootstrapMarkersTable($pdo);
         ensureUniqueSectorNames($pdo);
+        ensureSectorDescriptionRemoved($pdo);
         ensureSessionVersionColumn($pdo);
         ensureNotificationsSchema($pdo);
         ensureParticipantsSchema($pdo);
@@ -24,6 +26,77 @@ function bootstrapDefaultData(): void
             $unlockStmt = $pdo->prepare('SELECT RELEASE_LOCK(?)');
             $unlockStmt->execute([$lockName]);
         }
+    }
+}
+
+/**
+ * bootstrap_marcadores — registra que uma rotina de seed ja rodou neste banco.
+ *
+ * O bootstrap roda a cada request HTTP, entao um seed "INSERT ... WHERE NOT
+ * EXISTS" ressuscita eternamente o que o admin apagou de proposito. Gravando um
+ * marcador, o seed acontece uma unica vez na vida do banco. Espelha a tabela em
+ * config/schema.sql (instalacao nova).
+ */
+function ensureBootstrapMarkersTable(PDO $pdo): void
+{
+    static $alreadyChecked = false;
+    if ($alreadyChecked) {
+        return;
+    }
+
+    $alreadyChecked = true;
+
+    $pdo->exec(
+        'CREATE TABLE IF NOT EXISTS bootstrap_marcadores (
+            chave     VARCHAR(100) NOT NULL PRIMARY KEY,
+            criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci'
+    );
+}
+
+function bootstrapMarcadorAplicado(PDO $pdo, string $chave): bool
+{
+    $stmt = $pdo->prepare('SELECT 1 FROM bootstrap_marcadores WHERE chave = ? LIMIT 1');
+    $stmt->execute([$chave]);
+
+    return (bool) $stmt->fetchColumn();
+}
+
+function marcarBootstrapAplicado(PDO $pdo, string $chave): void
+{
+    $stmt = $pdo->prepare('INSERT IGNORE INTO bootstrap_marcadores (chave) VALUES (?)');
+    $stmt->execute([$chave]);
+}
+
+/**
+ * setores.descricao nao era exibida nem usada em lugar nenhum — o campo saiu do
+ * formulario do admin e a coluna sai junto. Espelha config/schema.sql.
+ */
+function ensureSectorDescriptionRemoved(PDO $pdo): void
+{
+    static $alreadyChecked = false;
+    if ($alreadyChecked) {
+        return;
+    }
+
+    $alreadyChecked = true;
+
+    $stmt = $pdo->query(
+        "SELECT COUNT(*)
+         FROM information_schema.columns
+         WHERE table_schema = DATABASE()
+           AND table_name = 'setores'
+           AND column_name = 'descricao'"
+    );
+
+    if ((int) $stmt->fetchColumn() === 0) {
+        return;
+    }
+
+    try {
+        $pdo->exec('ALTER TABLE setores DROP COLUMN descricao');
+    } catch (\PDOException $e) {
+        error_log('Nao foi possivel remover setores.descricao: ' . $e->getMessage());
     }
 }
 
@@ -130,28 +203,39 @@ function deduplicateSectors(PDO $pdo): void
     }
 }
 
+/**
+ * Semeia os setores padrao uma unica vez por banco (marcador
+ * `setores_padrao`). Sem o marcador, cada request HTTP reinseria a lista e o
+ * setor que o admin acabara de excluir voltava sozinho na tela.
+ */
 function seedDefaultSectors(PDO $pdo): void
 {
+    if (bootstrapMarcadorAplicado($pdo, 'setores_padrao')) {
+        return;
+    }
+
     $defaultSectors = [
-        ['TI', 'Setor de tecnologia da informacao'],
-        ['Administrativo', 'Setor administrativo'],
-        ['Engenharia', 'Setor de engenharia'],
-        ['Financeiro', 'Setor financeiro'],
-        ['Operacional', 'Setor operacional'],
-        ['Vendas', 'Setor comercial e vendas'],
+        'TI',
+        'Administrativo',
+        'Engenharia',
+        'Financeiro',
+        'Operacional',
+        'Vendas',
     ];
 
     $stmt = $pdo->prepare(
-        'INSERT INTO setores (nome, descricao)
-         SELECT ?, ?
+        'INSERT INTO setores (nome)
+         SELECT ?
          WHERE NOT EXISTS (
              SELECT 1 FROM setores WHERE nome = ? LIMIT 1
          )'
     );
 
-    foreach ($defaultSectors as [$name, $description]) {
-        $stmt->execute([$name, $description, $name]);
+    foreach ($defaultSectors as $name) {
+        $stmt->execute([$name, $name]);
     }
+
+    marcarBootstrapAplicado($pdo, 'setores_padrao');
 }
 
 function seedDefaultAdminUser(PDO $pdo): void
