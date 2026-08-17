@@ -511,7 +511,7 @@ function renderizarListaAnexos(containerId, anexos) {
     if (!container) return;
 
     if (!anexos || anexos.length === 0) {
-        container.innerHTML = '';
+        container.innerHTML = '<p class="text-xs text-gray-500">Nenhum anexo enviado.</p>';
         return;
     }
 
@@ -625,12 +625,15 @@ async function abrirModalDetalhes(id) {
         }];
     }
 
-    if (anexos && anexos.length > 0 && anexoContainer) {
-        renderizarListaAnexos('detalhes-anexos-lista', anexos);
-        anexoContainer.classList.remove('hidden');
-    } else {
-        renderizarListaAnexos('detalhes-anexos-lista', []);
-        if (anexoContainer) anexoContainer.classList.add('hidden');
+    // A coluna fica sempre visível: some-la deixava metade do modal em branco e
+    // dava a impressão de que o anexo não tinha carregado.
+    if (anexoContainer) anexoContainer.classList.remove('hidden');
+    renderizarListaAnexos('detalhes-anexos-lista', anexos);
+
+    const contadorAnexos = document.getElementById('detalhes-anexos-contador');
+    if (contadorAnexos) {
+        const total = anexos ? anexos.length : 0;
+        contadorAnexos.textContent = total ? total + (total === 1 ? ' arquivo' : ' arquivos') : '';
     }
 
     const btnChamar = document.getElementById('detalhes-btn-chamar');

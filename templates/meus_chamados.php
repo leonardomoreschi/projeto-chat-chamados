@@ -83,10 +83,12 @@
     </section>
 </div>
 
+<!-- max-w-6xl + flex-col: o cabeçalho fica fixo e só o corpo rola, para as três
+     colunas (dados, anexos e comentários) caberem lado a lado sem espremer. -->
 <div id="modal-detalhes" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm p-4 flex items-center justify-center">
-    <div class="w-full max-w-4xl max-h-[90vh] overflow-y-auto bg-gray-900 border border-gray-800 rounded-3xl shadow-2xl">
-        <div class="p-5 md:p-6 border-b border-gray-800 flex items-start justify-between gap-4">
-            <div>
+    <div class="w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden bg-gray-900 border border-gray-800 rounded-3xl shadow-2xl">
+        <div class="shrink-0 p-5 md:p-6 border-b border-gray-800 flex items-start justify-between gap-4">
+            <div class="min-w-0">
                 <div class="flex items-center gap-2 mb-2">
                     <span id="detalhes-badge-id" class="text-[10px] font-black uppercase tracking-widest bg-indigo-500/20 text-indigo-300 px-2 py-0.5 rounded"></span>
                     <span id="detalhes-status" class="text-[10px] font-black uppercase tracking-widest bg-gray-800 text-gray-300 px-2 py-0.5 rounded"></span>
@@ -94,15 +96,15 @@
                 <h3 id="detalhes-titulo" class="text-xl font-black text-white"></h3>
                 <p id="detalhes-subtitulo" class="text-sm text-gray-400 mt-2"></p>
             </div>
-            <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3 shrink-0">
                 <button id="btn-cancelar-chamado" onclick="cancelarChamadoAtual()" class="hidden px-3 py-2 rounded-lg bg-red-600 hover:bg-red-500 text-xs font-bold text-white border border-red-500 transition">Cancelar chamado</button>
                 <button onclick="fecharModal('modal-detalhes')" class="text-gray-500 hover:text-white text-2xl leading-none">×</button>
             </div>
         </div>
 
-        <div class="p-5 md:p-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4 text-sm">
+        <div class="flex-1 min-h-0 overflow-y-auto p-5 md:p-6 grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+            <div class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
                     <div class="bg-black/20 border border-gray-800 rounded-xl p-3"><p class="text-xs text-gray-500 uppercase font-bold">Categoria</p><p id="detalhes-categoria" class="text-white mt-1"></p></div>
                     <div class="bg-black/20 border border-gray-800 rounded-xl p-3"><p class="text-xs text-gray-500 uppercase font-bold">Subcategoria</p><p id="detalhes-subcategoria" class="text-white mt-1"></p></div>
                     <div class="bg-black/20 border border-gray-800 rounded-xl p-3"><p class="text-xs text-gray-500 uppercase font-bold">Abertura</p><p id="detalhes-criado" class="text-white mt-1"></p></div>
@@ -113,6 +115,16 @@
                     <p class="text-xs font-bold uppercase tracking-widest text-gray-500 mb-3">Descrição</p>
                     <div id="detalhes-descricao" class="text-sm text-gray-300 whitespace-pre-wrap leading-relaxed"></div>
                 </div>
+            </div>
+
+            <!-- Anexos do próprio chamado (as mídias enviadas na abertura). Vêm
+                 de /api/chamados/{id}/anexos, que o solicitante pode ler. -->
+            <div>
+                <div class="flex items-center justify-between mb-3">
+                    <p class="text-xs font-black uppercase tracking-widest text-gray-500">Anexos</p>
+                    <span id="detalhes-anexos-contador" class="text-xs text-gray-500"></span>
+                </div>
+                <div id="detalhes-anexos-lista" class="space-y-3 max-h-[60vh] overflow-y-auto pr-1"></div>
             </div>
 
             <div>

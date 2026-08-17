@@ -194,8 +194,64 @@ async function abrirDetalhes(id) {
         }
     }
 
-    await carregarComentarios(chamado.id);
     document.getElementById('modal-detalhes').classList.remove('hidden');
+    await Promise.all([
+        carregarAnexosDoChamado(chamado.id),
+        carregarComentarios(chamado.id)
+    ]);
+}
+
+// Mídias enviadas na abertura do chamado. Ficam numa tabela separada dos
+// comentários, então precisam da própria chamada — era o que faltava aqui e
+// fazia o modal do solicitante não mostrar nenhum anexo.
+async function carregarAnexosDoChamado(chamadoId) {
+    const lista = document.getElementById('detalhes-anexos-lista');
+    const contador = document.getElementById('detalhes-anexos-contador');
+    if (!lista) return;
+
+    lista.innerHTML = '<div class="text-xs text-gray-500">Carregando anexos...</div>';
+    if (contador) contador.textContent = '';
+
+    try {
+        const res = await fetch(`/api/chamados/${chamadoId}/anexos`);
+        if (!res.ok) {
+            lista.innerHTML = '<div class="text-xs text-red-300">Não foi possível carregar os anexos.</div>';
+            return;
+        }
+
+        const anexos = await res.json();
+        if (!Array.isArray(anexos) || anexos.length === 0) {
+            lista.innerHTML = '<div class="text-xs text-gray-500">Nenhum anexo enviado.</div>';
+            return;
+        }
+
+        if (contador) {
+            contador.textContent = anexos.length + (anexos.length === 1 ? ' arquivo' : ' arquivos');
+        }
+        lista.innerHTML = anexos.map(cardAnexoChamado).join('');
+    } catch (e) {
+        console.error(e);
+        lista.innerHTML = '<div class="text-xs text-red-300">Erro ao carregar os anexos.</div>';
+    }
+}
+
+function cardAnexoChamado(anexo) {
+    const url = `/uploads/${anexo.arquivo_path || ''}`;
+    const nome = escapeHtml(anexo.arquivo_nome || 'anexo');
+    const isImagem = /\.(png|jpe?g|gif|webp|bmp|svg)$/i.test(anexo.arquivo_nome || anexo.arquivo_path || '')
+        || String(anexo.mime_type || '').startsWith('image/');
+    const visual = isImagem
+        ? `<a href="${url}" target="_blank" class="block"><img src="${url}" alt="${nome}" class="w-full max-h-48 object-contain bg-black/30 border border-gray-800 rounded-xl p-2"></a>`
+        : `<p class="text-xs text-gray-300 truncate" title="${nome}">${nome}</p>`;
+
+    return `
+        <div class="bg-black/20 border border-gray-800 rounded-2xl p-3 space-y-2">
+            ${visual}
+            <div class="flex flex-wrap gap-2">
+                <a href="${url}" target="_blank" class="inline-flex items-center px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-[11px] text-white font-bold rounded-lg transition">Visualizar</a>
+                <a href="${url}" target="_blank" download="${nome}" class="inline-flex items-center px-3 py-1.5 bg-gray-800 hover:bg-gray-700 text-[11px] text-indigo-300 font-bold rounded-lg border border-gray-700 transition">Baixar</a>
+            </div>
+        </div>`;
 }
 
 function podeCancelarChamado(chamado) {

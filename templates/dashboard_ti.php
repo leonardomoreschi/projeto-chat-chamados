@@ -236,7 +236,7 @@
     </main>
 
     <div id="modal-classificar" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             
             <div class="p-6 bg-gray-800/50 border-b border-gray-800 shrink-0">
                 <div class="flex items-center gap-3 mb-1">
@@ -258,23 +258,25 @@
                     <div id="classificar-anexos-lista" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1"></div>
                 </div>
 
+                <!-- Os três campos da triagem numa linha só: com o modal em 3xl
+                     cabem lado a lado e o formulário deixa de ser uma coluna
+                     estreita e alta. -->
                 <form id="form-classificar" class="space-y-5 border-t border-gray-800 pt-6">
                     <input type="hidden" id="classificar-id-input">
-                    
-                    <div>
-                        <div class="flex items-center justify-between gap-3 mb-2 flex-wrap">
-                            <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest">Confirmar Prioridade</label>
-                            <span id="classificar-prioridade-solicitada" class="text-[10px] font-bold text-gray-500"></span>
-                        </div>
-                        <select id="sel-prioridade" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500">
-                            <option value="baixa">Baixa</option>
-                            <option value="media" selected>Média</option>
-                            <option value="alta">Alta</option>
-                            <option value="critica">Crítica</option>
-                        </select>
-                    </div>
 
-                    <div class="grid grid-cols-2 gap-4">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                            <label class="block text-[10px] font-black text-gray-500 uppercase mb-2 tracking-widest">Confirmar Prioridade</label>
+                            <select id="sel-prioridade" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="baixa">Baixa</option>
+                                <option value="media" selected>Média</option>
+                                <option value="alta">Alta</option>
+                                <option value="critica">Crítica</option>
+                            </select>
+                            <!-- Abaixo do select (e não ao lado do label) para os
+                                 três campos da linha ficarem alinhados. -->
+                            <span id="classificar-prioridade-solicitada" class="block text-[10px] font-bold text-gray-500 mt-1.5"></span>
+                        </div>
                         <div>
                             <label class="block text-[10px] font-black text-gray-500 uppercase mb-2 tracking-widest">Categoria</label>
                             <select id="sel-categoria" onchange="atualizarSubcategorias()" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 text-sm font-medium outline-none focus:ring-2 focus:ring-indigo-500">
@@ -298,23 +300,32 @@
         </div>
     </div>
 
+    <!-- Cabeçalho e rodapé fixos, corpo rolável: com muitos anexos os botões de
+         ação continuam à vista. A coluna de anexos não some mais quando o
+         chamado não tem arquivo — mostra "Nenhum anexo enviado". -->
     <div id="modal-detalhes" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-4xl shadow-2xl p-6 relative max-h-[90vh] overflow-y-auto">
-            <button onclick="fecharModal('modal-detalhes')" class="absolute top-4 right-12 z-20 rounded-full bg-gray-950/70 backdrop-blur p-1 text-gray-500 hover:text-white">
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-            </button>
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div>
+        <div class="bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-6xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            <div class="shrink-0 flex items-start justify-between gap-4 p-6 border-b border-gray-800">
+                <div class="min-w-0">
                     <div class="flex items-center gap-3 mb-2">
                         <span id="detalhes-id-badge" class="bg-gray-800 text-gray-400 px-2 py-0.5 rounded text-xs font-mono font-bold"></span>
                         <span id="detalhes-prioridade" class="text-[10px] font-black px-2 py-0.5 rounded uppercase"></span>
                     </div>
-                    <h3 id="detalhes-titulo" class="text-xl font-bold text-white mb-4"></h3>
+                    <h3 id="detalhes-titulo" class="text-xl font-bold text-white"></h3>
+                </div>
+                <button onclick="fecharModal('modal-detalhes')" class="shrink-0 rounded-full p-1 text-gray-500 hover:text-white transition">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                </button>
+            </div>
 
-                    <label class="block text-[10px] font-black text-gray-500 uppercase mb-1 tracking-widest">Descrição</label>
-                    <div id="detalhes-descricao" class="text-sm text-gray-300 bg-black/30 p-4 rounded-xl border border-gray-800/50 mb-4 max-h-56 overflow-y-auto"></div>
+            <div class="flex-1 min-h-0 overflow-y-auto p-6 grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-[10px] font-black text-gray-500 uppercase mb-2 tracking-widest">Descrição</label>
+                        <div id="detalhes-descricao" class="text-sm text-gray-300 bg-black/30 p-4 rounded-xl border border-gray-800/50 max-h-56 overflow-y-auto"></div>
+                    </div>
 
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 mb-4">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <p id="detalhes-meta-categoria" class="text-xs text-gray-400"></p>
                         <p id="detalhes-meta-subcategoria" class="text-xs text-gray-400"></p>
                         <p id="detalhes-meta-data-abertura" class="text-xs text-gray-400"></p>
@@ -325,22 +336,26 @@
                     <p id="detalhes-resolvido-por" class="text-xs text-gray-500"></p>
                 </div>
 
-                <div id="detalhes-anexo-container" class="hidden">
-                    <div id="detalhes-anexos-lista" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-72 overflow-y-auto pr-1"></div>
+                <div id="detalhes-anexo-container">
+                    <div class="flex items-center justify-between mb-2">
+                        <label class="block text-[10px] font-black text-gray-500 uppercase tracking-widest">Anexos</label>
+                        <span id="detalhes-anexos-contador" class="text-[11px] text-gray-500"></span>
+                    </div>
+                    <div id="detalhes-anexos-lista" class="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[55vh] overflow-y-auto pr-1"></div>
                 </div>
             </div>
 
-            <div class="pt-4 border-t border-gray-800 flex gap-3 mt-6">
-                <button id="detalhes-btn-comentarios" class="flex-1 bg-gray-800 hover:bg-indigo-600 text-gray-300 hover:text-white text-xs font-bold py-2.5 rounded-lg transition">COMENTÁRIOS</button>
-                <button id="detalhes-btn-editar" class="flex-1 bg-gray-800 hover:bg-amber-600 text-gray-300 hover:text-white text-xs font-bold py-2.5 rounded-lg transition">EDITAR CLASSIFICAÇÃO</button>
-                <button id="detalhes-btn-chamar" class="flex-1 bg-gray-800 hover:bg-indigo-600 text-gray-300 hover:text-white text-xs font-bold py-2.5 rounded-lg transition">CHAMAR SETOR</button>
-                <button id="detalhes-btn-finalizar" class="flex-1 bg-gray-800 hover:bg-green-600 text-gray-300 hover:text-white text-xs font-bold py-2.5 rounded-lg transition">FINALIZAR</button>
+            <div class="shrink-0 px-6 py-4 border-t border-gray-800 flex flex-wrap gap-3">
+                <button id="detalhes-btn-comentarios" class="flex-1 min-w-[9rem] bg-gray-800 hover:bg-indigo-600 text-gray-300 hover:text-white text-xs font-bold py-2.5 rounded-lg transition">COMENTÁRIOS</button>
+                <button id="detalhes-btn-editar" class="flex-1 min-w-[9rem] bg-gray-800 hover:bg-amber-600 text-gray-300 hover:text-white text-xs font-bold py-2.5 rounded-lg transition">EDITAR CLASSIFICAÇÃO</button>
+                <button id="detalhes-btn-chamar" class="flex-1 min-w-[9rem] bg-gray-800 hover:bg-indigo-600 text-gray-300 hover:text-white text-xs font-bold py-2.5 rounded-lg transition">CHAMAR SETOR</button>
+                <button id="detalhes-btn-finalizar" class="flex-1 min-w-[9rem] bg-gray-800 hover:bg-green-600 text-gray-300 hover:text-white text-xs font-bold py-2.5 rounded-lg transition">FINALIZAR</button>
             </div>
         </div>
     </div>
 
     <div id="modal-comentarios" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-        <div class="bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+        <div class="bg-gray-900 border border-gray-800 rounded-3xl w-full max-w-4xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div class="p-5 border-b border-gray-800 flex items-center justify-between">
                 <div>
                     <h3 class="text-lg font-bold text-white">Comentários do Chamado</h3>

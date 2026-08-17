@@ -176,9 +176,12 @@
 <div id="sidebar-overlay" class="hidden md:hidden fixed inset-0 bg-black/50 z-40" onclick="toggleSidebarMobile(false)"></div>
 
 <!-- ═══ MODAL EMERGÊNCIA ═══ -->
+<!-- max-h-[90vh] + flex-col: o corpo rola por dentro e o cabeçalho (com o X) e
+     o rodapé (com o botão de abrir) ficam sempre visíveis, por mais anexos que
+     a pessoa adicione. -->
 <div id="modal-emergencia" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-    <div class="bg-gray-900 border border-red-500/30 rounded-2xl w-full max-w-2xl shadow-2xl">
-        <div class="flex items-center justify-between p-6 border-b border-gray-800">
+    <div class="bg-gray-900 border border-red-500/30 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+        <div class="shrink-0 flex items-center justify-between p-6 border-b border-gray-800">
             <div class="flex items-center gap-3">
                 <div class="w-10 h-10 bg-red-600 rounded-xl flex items-center justify-center">
                     <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -197,7 +200,7 @@
                 </svg>
             </button>
         </div>
-        <div class="p-6 space-y-4">
+        <div class="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
             <div>
                 <label class="block text-sm font-medium text-gray-300 mb-2">Título do problema</label>
                 <input type="text" id="chamado-titulo" placeholder="Ex: Impressora do 2º andar não funciona"
@@ -209,31 +212,39 @@
                           placeholder="Descreva o problema: o que aconteceu, quando começou, quais equipamentos afetados..."
                           class="w-full bg-gray-800 border border-gray-700 text-white placeholder-gray-500 rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition resize-none"></textarea>
             </div>
-            <div>
-                <label for="chamado-prioridade" class="block text-sm font-medium text-gray-300 mb-2">Gravidade do problema</label>
-                <select id="chamado-prioridade"
-                        class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition">
-                    <option value="critica">Crítica — parou tudo, ninguém consegue trabalhar</option>
-                    <option value="alta">Alta — impede o meu trabalho agora</option>
-                    <option value="media" selected>Média — atrapalha, mas consigo continuar</option>
-                    <option value="baixa">Baixa — pode ser resolvido com calma</option>
-                </select>
-                <p class="text-[11px] text-gray-500 mt-1.5">A TI confirma ou ajusta essa gravidade na triagem.</p>
+            <!-- Gravidade e anexo dividem a linha: aproveita a largura do modal e
+                 encurta o formulário, deixando a lista de mídias mais perto do
+                 rodapé. -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                <div>
+                    <label for="chamado-prioridade" class="block text-sm font-medium text-gray-300 mb-2">Gravidade do problema</label>
+                    <select id="chamado-prioridade"
+                            class="w-full bg-gray-800 border border-gray-700 text-white rounded-xl px-4 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-red-500 transition">
+                        <option value="critica">Crítica — parou tudo, ninguém consegue trabalhar</option>
+                        <option value="alta">Alta — impede o meu trabalho agora</option>
+                        <option value="media" selected>Média — atrapalha, mas consigo continuar</option>
+                        <option value="baixa">Baixa — pode ser resolvido com calma</option>
+                    </select>
+                    <p class="text-[11px] text-gray-500 mt-1.5">A TI confirma ou ajusta essa gravidade na triagem.</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-300 mb-2">Anexar arquivos</label>
+                    <label class="flex items-center gap-3 bg-gray-800 border border-dashed border-gray-600 rounded-xl px-4 py-2.5 cursor-pointer hover:border-gray-500 transition">
+                        <svg class="w-5 h-5 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+                        </svg>
+                        <span id="label-anexo-chamado" class="text-sm text-gray-400 truncate">Clique para selecionar arquivos</span>
+                        <input id="input-anexo-chamado" type="file" multiple class="hidden" accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.heif,.pdf,.doc,.docx,.txt,.step,.stp,.exe">
+                    </label>
+                    <p class="text-[11px] text-gray-500 mt-1.5">Imagens, PDF e documentos — até 10 MB cada.</p>
+                </div>
             </div>
-            <div>
-                <label class="block text-sm font-medium text-gray-300 mb-2">Anexar arquivos</label>
-                <label class="flex items-center gap-3 bg-gray-800 border border-dashed border-gray-600 rounded-xl px-4 py-3 cursor-pointer hover:border-gray-500 transition">
-                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-                              d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
-                    </svg>
-                    <span id="label-anexo-chamado" class="text-sm text-gray-400">Clique para selecionar arquivos</span>
-                    <input id="input-anexo-chamado" type="file" multiple class="hidden" accept=".jpg,.jpeg,.png,.webp,.gif,.heic,.heif,.pdf,.doc,.docx,.txt,.step,.stp,.exe">
-                </label>
-                <div id="chamado-anexos-lista" class="hidden mt-3 space-y-2"></div>
-            </div>
+            <!-- Lista em largura cheia e com rolagem própria: sem isso, cada mídia
+                 acrescentava ~64px e empurrava o rodapé para fora da tela. -->
+            <div id="chamado-anexos-lista" class="hidden space-y-2 max-h-56 overflow-y-auto pr-1"></div>
         </div>
-        <div class="flex gap-3 px-6 pb-6">
+        <div class="shrink-0 flex gap-3 px-6 py-4 border-t border-gray-800">
             <button onclick="fecharEmergencia()"
                     class="flex-1 bg-gray-800 hover:bg-gray-700 text-gray-300 rounded-xl py-2.5 text-sm font-medium transition">
                 Cancelar
@@ -378,27 +389,28 @@
     </div>
 </div>
 
+<!-- Mesma estrutura do modal de triagem do /dashboard-ti: 3xl, cabeçalho fixo,
+     corpo rolável e os três campos numa linha só. -->
 <div id="modal-classificar" class="hidden fixed inset-0 bg-black/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
-    <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-lg shadow-2xl">
-        <div class="p-6 border-b border-gray-800">
+    <div class="bg-gray-900 border border-gray-800 rounded-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+        <div class="shrink-0 p-6 border-b border-gray-800">
             <h3 class="text-xl font-bold text-white">Classificar Chamado</h3>
             <p id="classificar-titulo-orig" class="text-sm text-gray-400 mt-1"></p>
         </div>
-        
-        <form id="form-classificar" class="p-6 space-y-4">
-            <input type="hidden" id="classificar-id">
-            
-            <div>
-                <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Prioridade</label>
-                <select id="sel-prioridade" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white">
-                    <option value="baixa">Baixa</option>
-                    <option value="media" selected>Média</option>
-                    <option value="alta">Alta</option>
-                    <option value="critica">Crítica</option>
-                </select>
-            </div>
 
-            <div class="grid grid-cols-2 gap-4">
+        <form id="form-classificar" class="flex-1 min-h-0 overflow-y-auto p-6 space-y-4">
+            <input type="hidden" id="classificar-id">
+
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Prioridade</label>
+                    <select id="sel-prioridade" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white">
+                        <option value="baixa">Baixa</option>
+                        <option value="media" selected>Média</option>
+                        <option value="alta">Alta</option>
+                        <option value="critica">Crítica</option>
+                    </select>
+                </div>
                 <div>
                     <label class="block text-xs font-semibold text-gray-500 uppercase mb-2">Categoria</label>
                     <select id="sel-categoria" onchange="atualizarSubcategorias()" class="w-full bg-gray-800 border border-gray-700 rounded-xl px-4 py-2 text-white">

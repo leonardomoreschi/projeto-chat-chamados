@@ -184,15 +184,9 @@ document.addEventListener('DOMContentLoaded', async function () {
                 atualizarBadgePainelChamados();
             }
         });
-        document.getElementById('modal-emergencia').addEventListener('click', function (e) {
-            if (e.target === this) fecharEmergencia();
-        });
-        document.getElementById('modal-nova-conversa').addEventListener('click', function (e) {
-            if (e.target === this) fecharModalNovaConversa();
-        });
-        document.getElementById('modal-editar-grupo').addEventListener('click', function (e) {
-            if (e.target === this) fecharModalEditarGrupo();
-        });
+        fecharAoClicarNoFundo('modal-emergencia', fecharEmergencia);
+        fecharAoClicarNoFundo('modal-nova-conversa', fecharModalNovaConversa);
+        fecharAoClicarNoFundo('modal-editar-grupo', fecharModalEditarGrupo);
         const inputWrapper = document.getElementById('msg-input-wrapper');
         if (inputWrapper) {
             inputWrapper.addEventListener('click', function (e) {
@@ -1076,6 +1070,29 @@ function aplicarFormatacaoTexto(tipo) {
 
     input.focus();
     autoResize(input);
+}
+
+// Fecha o modal ao clicar no fundo, mas só quando o clique NASCEU no fundo.
+// Com `e.target === modal` no click puro, o alvo do evento é o ancestral comum
+// entre o mousedown e o mouseup: arrastar para selecionar um texto do campo e
+// soltar o botão fora da caixa entregava o fundo como alvo e fechava o modal no
+// meio do preenchimento (levando junto os anexos, que fecharEmergencia() limpa).
+function fecharAoClicarNoFundo(idModal, aoFechar) {
+    const modal = document.getElementById(idModal);
+    if (!modal) return;
+
+    let pressionouNoFundo = false;
+
+    modal.addEventListener('mousedown', function (e) {
+        pressionouNoFundo = e.target === modal;
+    });
+    // mouseup (e não click) porque aqui interessa o elemento exato sob o cursor
+    // nas duas pontas do gesto: só fecha se apertou e soltou no fundo.
+    modal.addEventListener('mouseup', function (e) {
+        const noFundo = pressionouNoFundo && e.target === modal;
+        pressionouNoFundo = false;
+        if (noFundo) aoFechar();
+    });
 }
 
 // ── Emergência ────────────────────────────────

@@ -1006,3 +1006,68 @@ body.page-login.theme-light .text-gray-600,
 body.page-login.theme-light .text-gray-400 {
     color: #475569 !important;
 }
+
+/* ── Autopreenchimento do navegador ──────────────────────────────────────────
+   Ao aceitar uma sugestão salva, o Chrome/Edge pinta o campo com um branco
+   azulado próprio e ignora `background-color` — o campo escuro ficava branco e
+   o texto sumia. A cor do autofill só cede a uma sombra interna gigante, e o
+   texto só cede a -webkit-text-fill-color. Os valores espelham o fundo real do
+   input em cada contexto: gray-800 no escuro, e no claro o que as regras de
+   cima já aplicam (#e2e8f0 em geral, --lm-surface-soft no card do login).
+   `:-webkit-autofill` e `:autofill` ficam em blocos separados de propósito:
+   num seletor único, o navegador que não conhece um dos dois descarta a regra
+   inteira. */
+input:-webkit-autofill,
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
+input:-webkit-autofill:active,
+textarea:-webkit-autofill,
+select:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px #1f2937 inset !important;
+    box-shadow: 0 0 0 1000px #1f2937 inset !important;
+    -webkit-text-fill-color: #f9fafb !important;
+    caret-color: #f9fafb;
+    /* Segura a animação de fundo que o Chrome dispara logo após preencher. */
+    transition: background-color 600000s 0s;
+}
+
+input:autofill,
+textarea:autofill,
+select:autofill {
+    box-shadow: 0 0 0 1000px #1f2937 inset !important;
+    caret-color: #f9fafb;
+}
+
+body.theme-light input:-webkit-autofill,
+body.theme-light input:-webkit-autofill:hover,
+body.theme-light input:-webkit-autofill:focus,
+body.theme-light input:-webkit-autofill:active,
+body.theme-light textarea:-webkit-autofill,
+body.theme-light select:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 1000px #e2e8f0 inset !important;
+    box-shadow: 0 0 0 1000px #e2e8f0 inset !important;
+    -webkit-text-fill-color: #1e293b !important;
+    caret-color: #1e293b;
+}
+
+body.theme-light input:autofill,
+body.theme-light textarea:autofill,
+body.theme-light select:autofill {
+    box-shadow: 0 0 0 1000px #e2e8f0 inset !important;
+    caret-color: #1e293b;
+}
+
+body.page-login.theme-light #login-card input:-webkit-autofill,
+body.page-login.theme-light #login-card input:-webkit-autofill:hover,
+body.page-login.theme-light #login-card input:-webkit-autofill:focus,
+body.page-login.theme-light #login-card input:-webkit-autofill:active {
+    -webkit-box-shadow: 0 0 0 1000px var(--lm-surface-soft) inset !important;
+    box-shadow: 0 0 0 1000px var(--lm-surface-soft) inset !important;
+    -webkit-text-fill-color: var(--lm-text) !important;
+    caret-color: var(--lm-text);
+}
+
+body.page-login.theme-light #login-card input:autofill {
+    box-shadow: 0 0 0 1000px var(--lm-surface-soft) inset !important;
+    caret-color: var(--lm-text);
+}
