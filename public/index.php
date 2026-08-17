@@ -127,10 +127,12 @@ $app->get('/dashboard-ti', function ($request, $response) {
 
     $pdo = getDbConnection();
     $sql = "SELECT c.*, u.nome AS usuario_nome,
+                   su.nome AS usuario_setor,
                    a.nome AS atribuido_nome,
                    COALESCE(r.nome, a.nome) AS resolvido_por_nome
             FROM chamados c
             INNER JOIN usuarios u ON u.id = c.usuario_id
+            LEFT JOIN setores su ON su.id = u.setor_id
             LEFT JOIN usuarios a ON a.id = c.atribuido_a
             LEFT JOIN usuarios r ON r.id = c.resolvido_por
             ORDER BY FIELD(c.prioridade, 'critica','alta','media','baixa'), c.criado_em DESC";

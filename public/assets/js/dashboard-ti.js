@@ -145,10 +145,12 @@ function limparFiltrosDocumentados() {
     const filtroSetor = document.getElementById('filtro-setor');
     const filtroSub = document.getElementById('filtro-subcategoria');
     const filtroOrdenacao = document.getElementById('filtro-ordenacao');
+    const filtroSolicitante = document.getElementById('filtro-solicitante');
 
     if (filtroSetor) filtroSetor.value = '';
     if (filtroSub) filtroSub.value = '';
     if (filtroOrdenacao) filtroOrdenacao.value = '';
+    if (filtroSolicitante) filtroSolicitante.value = '';
 
     popularFiltroSubcategorias();
 }
@@ -254,6 +256,8 @@ function renderizarTudo() {
     const filtroSub = filtroSubEl ? filtroSubEl.value : '';
     const filtroOrdenacaoEl = document.getElementById('filtro-ordenacao');
     const filtroOrdenacao = filtroOrdenacaoEl ? filtroOrdenacaoEl.value : '';
+    const filtroSolicitanteEl = document.getElementById('filtro-solicitante');
+    const filtroSolicitante = normalizarTexto(filtroSolicitanteEl ? filtroSolicitanteEl.value : '');
     const filtroHistCatEl = document.getElementById('filtro-historico-categoria');
     const filtroHistCat = filtroHistCatEl ? filtroHistCatEl.value : '';
     const filtroHistSubEl = document.getElementById('filtro-historico-subcategoria');
@@ -289,8 +293,9 @@ function renderizarTudo() {
 
         const matchCategoria = !filtro || filtro === 'Todos' || c.categoria === filtro;
         const matchSubcategoria = !filtroSub || c.subcategoria === filtroSub;
+        const matchSolicitante = !filtroSolicitante || textoSolicitante(c).includes(filtroSolicitante);
 
-        return matchCategoria && matchSubcategoria;
+        return matchCategoria && matchSubcategoria && matchSolicitante;
     });
 
     // Aplicar ordenação: se não há filtro de data, ordena por urgência
@@ -327,6 +332,12 @@ function renderizarTudo() {
             historico.innerHTML = '<p class="text-xs text-gray-600">Nenhum chamado finalizado ainda.</p>';
         }
     }
+}
+
+// Alvo da busca livre por quem abriu o chamado: nome + cargo (o setor do
+// usuário — Engenharia, Financeiro…, que vem como usuario_setor da API).
+function textoSolicitante(c) {
+    return normalizarTexto([c.usuario_nome || '', c.usuario_setor || ''].join(' '));
 }
 
 function cardTriagem(c) {
@@ -379,8 +390,9 @@ function cardDocumentado(c) {
                 </div>
                 
                 <div class="flex items-center gap-2 pt-3 border-t border-gray-800 mt-auto mb-4">
-                    <div class="w-6 h-6 bg-gray-800 rounded-lg flex items-center justify-center text-[10px] font-bold text-indigo-500 border border-gray-700">${inicial}</div>
-                    <span class="text-[10px] text-gray-400">${nome}</span>
+                    <div class="w-6 h-6 bg-gray-800 rounded-lg flex items-center justify-center text-[10px] font-bold text-indigo-500 border border-gray-700 shrink-0">${inicial}</div>
+                    <span class="text-[10px] text-gray-400 truncate min-w-0">${nome}</span>
+                    ${c.usuario_setor ? `<span class="text-[9px] font-bold uppercase tracking-wide text-gray-500 bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 shrink-0">${escapeHtml(c.usuario_setor)}</span>` : ''}
                 </div>
 
                 <div class="flex gap-2" onclick="event.stopPropagation()">

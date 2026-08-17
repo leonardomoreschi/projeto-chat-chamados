@@ -26,19 +26,22 @@
 
 <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
 
-    <header class="h-16 bg-gray-900 border-b border-gray-800 flex items-center justify-between px-4 md:px-8 shrink-0">
-        <div class="flex items-center gap-4">
-            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20">
+    <!-- Altura fixa h-16: mesma barra superior do /agendamentos e do /painel-agendamentos. -->
+    <header class="h-16 shrink-0 bg-gray-900 border-b border-gray-800 px-4 md:px-6 flex items-center justify-between gap-3">
+        <div class="flex items-center gap-4 min-w-0">
+            <div class="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-indigo-500/20 shrink-0">
                 <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 002 2h2a2 2 0 002-2" /></svg>
             </div>
-            <div>
-                <h1 class="text-lg font-bold leading-none">Painel de Chamados</h1>
+            <div class="min-w-0">
+                <h1 class="text-lg font-bold leading-none truncate">Painel de Chamados</h1>
             </div>
         </div>
 
         <!-- Ordem padrão de todas as telas: ações da página, tema, notificações e
-             o "Olá, fulano" sempre encostado na direita. -->
-        <div class="flex items-center gap-3 md:gap-4">
+             o "Olá, fulano" sempre encostado na direita. O ml-auto garante o
+             encosto mesmo quando o título é curto e o menu lateral está aberto;
+             gap-2 é o mesmo espaçamento das barras de /agendamentos. -->
+        <div class="flex items-center gap-2 ml-auto flex-shrink-0">
             <button onclick="abrirModalTaxonomias()" class="bg-gray-800 border border-gray-700 text-xs font-bold text-indigo-300 rounded-xl px-3 py-2 hover:bg-gray-700 transition">
                 Gerenciar Categorias
             </button>
@@ -112,8 +115,24 @@
                     <h3 class="text-sm font-black text-gray-500 uppercase tracking-widest">Chamados Documentados</h3>
                 </div>
                 
-                <div class="flex flex-col gap-1.5">
-                    <div class="flex flex-wrap gap-2">
+                <!-- Fileira de filtros sempre encostada à direita (justify-end
+                     no wrap e items-end na coluna). Com o menu lateral aberto a
+                     seção estreita e a fileira quebra em duas linhas — sem o
+                     justify-end a segunda linha voltava para a esquerda e o
+                     bloco ficava jogado no meio do espaço vazio. -->
+                <div class="flex flex-col items-end gap-1.5 min-w-0">
+                    <div class="flex flex-wrap justify-end gap-2">
+                        <!-- Busca livre por quem abriu o chamado: nome ou cargo
+                             (setor do usuário, ex. Engenharia/Financeiro). -->
+                        <div class="relative w-56">
+                            <svg class="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>
+                            </svg>
+                            <input id="filtro-solicitante" type="search" autocomplete="off"
+                                   oninput="renderizarTudo()" onsearch="renderizarTudo()"
+                                   placeholder="Buscar por nome ou cargo"
+                                   class="w-full bg-gray-800 border border-gray-700 text-xs font-bold text-gray-300 placeholder:font-medium placeholder:text-gray-500 rounded-lg pl-8 pr-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500" />
+                        </div>
                         <select id="filtro-setor" onchange="popularFiltroSubcategorias()" class="bg-gray-800 border border-gray-700 text-xs font-bold text-gray-300 rounded-lg px-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500">
                             <option value="">TODOS OS SETORES</option>
                             <option value="ERP">ERP</option>
@@ -158,8 +177,11 @@
                             <span class="text-[10px] text-gray-500 font-bold"><?= htmlspecialchars(date('d/m/Y', strtotime((string)($chamado['criado_em'] ?? 'now')))) ?></span>
                         </div>
                         <div class="flex items-center gap-2 pt-3 border-t border-gray-800 mt-auto mb-4">
-                            <div class="w-6 h-6 bg-gray-800 rounded-lg flex items-center justify-center text-[10px] font-bold text-indigo-500 border border-gray-700"><?= htmlspecialchars(strtoupper(substr((string)($chamado['usuario_nome'] ?? 'U'), 0, 1))) ?></div>
-                            <span class="text-[10px] text-gray-400"><?= htmlspecialchars((string)($chamado['usuario_nome'] ?? 'Usuário')) ?></span>
+                            <div class="w-6 h-6 bg-gray-800 rounded-lg flex items-center justify-center text-[10px] font-bold text-indigo-500 border border-gray-700 shrink-0"><?= htmlspecialchars(strtoupper(substr((string)($chamado['usuario_nome'] ?? 'U'), 0, 1))) ?></div>
+                            <span class="text-[10px] text-gray-400 truncate min-w-0"><?= htmlspecialchars((string)($chamado['usuario_nome'] ?? 'Usuário')) ?></span>
+                            <?php if (!empty($chamado['usuario_setor'])): ?>
+                            <span class="text-[9px] font-bold uppercase tracking-wide text-gray-500 bg-gray-800 border border-gray-700 rounded px-1.5 py-0.5 shrink-0"><?= htmlspecialchars((string) $chamado['usuario_setor']) ?></span>
+                            <?php endif; ?>
                         </div>
                         <p class="w-full bg-indigo-600 text-white text-[10px] font-bold py-2 rounded-lg text-center">DOCUMENTADO</p>
                     </div>

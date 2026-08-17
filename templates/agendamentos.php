@@ -48,7 +48,8 @@ $agendamentosBootstrap = [
 <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
 
 <!-- ── Header ──────────────────────────────────────────────────────────── -->
-<header class="flex-shrink-0 bg-gray-900 border-b border-gray-800 px-4 md:px-6 py-3 flex items-center justify-between gap-3">
+<!-- Altura fixa h-16: mesma barra superior do /dashboard-ti e do /painel-agendamentos. -->
+<header class="h-16 flex-shrink-0 bg-gray-900 border-b border-gray-800 px-4 md:px-6 flex items-center justify-between gap-3">
     <div class="flex items-center gap-3 min-w-0">
         <div class="min-w-0">
             <p class="text-[10px] uppercase tracking-[.18em] text-gray-500 font-bold leading-none mb-0.5">Agenda</p>

@@ -51,7 +51,8 @@ $agendamentosBootstrap = [
 <div class="flex-1 min-w-0 flex flex-col overflow-hidden">
 
 <!-- ── Header ──────────────────────────────────────────────────────────── -->
-<header class="flex-shrink-0 bg-gray-900 border-b border-gray-800 px-4 md:px-6 py-3 flex items-center justify-between gap-3">
+<!-- Altura fixa h-16: mesma barra superior do /dashboard-ti e do /agendamentos. -->
+<header class="h-16 flex-shrink-0 bg-gray-900 border-b border-gray-800 px-4 md:px-6 flex items-center justify-between gap-3">
     <div class="flex items-center gap-3 min-w-0">
         <div class="min-w-0">
             <p class="text-[10px] uppercase tracking-[.18em] text-gray-500 font-bold leading-none mb-0.5">Administração</p>
@@ -106,6 +107,31 @@ $agendamentosBootstrap = [
 
     <!-- Tab: Kanban (padrão admin) -->
     <div data-tab-content="kanban" style="position:absolute;inset:0;flex-direction:column;min-height:0;overflow:hidden;">
+        <!-- Barra de busca por quem solicitou: nome ou cargo (setor do usuário,
+             ex. Engenharia/Financeiro). Filtra os cards de todas as colunas e
+             as contagens do cabeçalho. Usa as classes da nav de abas logo acima
+             (bg-gray-900 + border-gray-800) para ler como uma faixa só; o board
+             abaixo é bem mais escuro, então um campo em --ag-superficie
+             desapareceria. -->
+        <div class="flex-shrink-0 bg-gray-900 border-b border-gray-800 px-4 md:px-6 py-2.5 flex items-center gap-3">
+            <div class="relative">
+                <svg class="w-3.5 h-3.5 text-gray-500 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-4.35-4.35M17 11a6 6 0 11-12 0 6 6 0 0112 0z"/>
+                </svg>
+                <input id="filtro-kanban-solicitante" type="search" autocomplete="off"
+                       oninput="renderizarKanban()" onsearch="renderizarKanban()"
+                       placeholder="Buscar por nome ou cargo"
+                       class="w-56 bg-gray-800 border border-gray-700 text-xs font-bold text-gray-300 placeholder:font-medium placeholder:text-gray-500 rounded-lg pl-8 pr-3 py-2 outline-none focus:ring-2 focus:ring-indigo-500" />
+            </div>
+            <span id="kanban-busca-resumo" class="hidden text-[11px] font-bold text-gray-500"></span>
+            <button type="button" id="kanban-busca-limpar" onclick="limparBuscaKanban()"
+                    class="hidden items-center gap-1.5 text-[10px] font-bold text-gray-500 hover:text-indigo-400 uppercase tracking-wide transition py-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                </svg>
+                Limpar busca
+            </button>
+        </div>
         <div id="kanban-board"
              style="flex:1;overflow-x:auto;overflow-y:hidden;display:flex;align-items:stretch;gap:10px;padding:14px 16px;background:var(--ag-kanban-board);min-height:0;">
         </div>

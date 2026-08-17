@@ -287,6 +287,7 @@ class ChamadoController
 
         if (in_array($papel, ['admin', 'ti'], true)) {
             $sql    = "SELECT c.*, u.nome AS usuario_nome,
+                              su.nome AS usuario_setor,
                               a.nome AS atribuido_nome,
                               {$selectResolvido}
                               an.arquivo_path AS anexo_path,
@@ -294,6 +295,7 @@ class ChamadoController
                               an.mime_type AS anexo_mime
                        FROM chamados c
                        INNER JOIN usuarios u ON u.id = c.usuario_id
+                       LEFT JOIN setores su ON su.id = u.setor_id
                        LEFT JOIN usuarios a ON a.id = c.atribuido_a
                        {$joinResolvido}
                        {$joinAnexo}";
@@ -309,6 +311,7 @@ class ChamadoController
                         c.criado_em DESC";
         } else {
             $sql    = "SELECT c.*, u.nome AS usuario_nome,
+                      su.nome AS usuario_setor,
                       a.nome AS atribuido_nome,
                       {$selectResolvido}
                       an.arquivo_path AS anexo_path,
@@ -316,6 +319,7 @@ class ChamadoController
                       an.mime_type AS anexo_mime
                        FROM chamados c
                        INNER JOIN usuarios u ON u.id = c.usuario_id
+                       LEFT JOIN setores su ON su.id = u.setor_id
                        LEFT JOIN usuarios a ON a.id = c.atribuido_a
                        {$joinResolvido}
                   {$joinAnexo}

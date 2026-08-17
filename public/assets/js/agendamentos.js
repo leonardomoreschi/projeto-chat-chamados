@@ -611,12 +611,53 @@ const KANBAN_COLUNAS = [
     { key: 'encerrado', label: 'Encerrado', cor: 'var(--ag-head-encerrado)', corTexto: 'var(--ag-head-encerrado-texto)', corBg: 'var(--ag-col-encerrado)' },
 ];
 
+// Busca livre do kanban: casa nome do solicitante ou cargo (o setor do
+// usuário — Engenharia, Financeiro…, que vem como solicitante_setor da API).
+// Só o painel Admin/TI tem o campo; nas outras telas devolve tudo.
+function filtrarPorSolicitante(itens) {
+    const campo = document.getElementById('filtro-kanban-solicitante');
+    const busca = normalizarTexto(campo ? campo.value : '');
+    if (!busca) return itens;
+
+    return itens.filter(item =>
+        normalizarTexto([item.solicitante_nome || '', item.solicitante_setor || ''].join(' ')).includes(busca)
+    );
+}
+
+// Resumo "N de M" + botão de limpar aparecem só enquanto há busca ativa.
+function atualizarResumoBuscaKanban(visiveis, total) {
+    const campo = document.getElementById('filtro-kanban-solicitante');
+    const resumo = document.getElementById('kanban-busca-resumo');
+    const limpar = document.getElementById('kanban-busca-limpar');
+    const ativo = !!(campo && campo.value.trim());
+
+    if (resumo) {
+        resumo.classList.toggle('hidden', !ativo);
+        resumo.textContent = `${visiveis} de ${total}`;
+    }
+    if (limpar) {
+        limpar.classList.toggle('hidden', !ativo);
+        limpar.classList.toggle('inline-flex', ativo);
+    }
+}
+
+function limparBuscaKanban() {
+    const campo = document.getElementById('filtro-kanban-solicitante');
+    if (campo) campo.value = '';
+    renderizarKanban();
+}
+
 function renderizarKanban() {
     const board = document.getElementById('kanban-board');
     if (!board) return;
 
+    const campoBusca = document.getElementById('filtro-kanban-solicitante');
+    const buscaAtiva = !!(campoBusca && campoBusca.value.trim());
+    const visiveis = filtrarPorSolicitante(agendamentosCache);
+    atualizarResumoBuscaKanban(visiveis.length, agendamentosCache.length);
+
     board.innerHTML = KANBAN_COLUNAS.map(col => {
-        const itens = agendamentosCache.filter(i => i.status === col.key);
+        const itens = visiveis.filter(i => i.status === col.key);
         const podeAdicionar = col.key === 'solicitado';
 
         const headerAdd = podeAdicionar
@@ -626,7 +667,7 @@ function renderizarKanban() {
         const cards = itens.length
             ? itens.map(item => cardKanban(item)).join('')
             : `<div style="padding:24px 16px;text-align:center;">
-                 <p style="font-size:14px;color:var(--ag-texto-fraco);min-height:48px;">Nenhum item</p>
+                 <p style="font-size:14px;color:var(--ag-texto-fraco);min-height:48px;">${buscaAtiva ? 'Nenhum resultado' : 'Nenhum item'}</p>
                 </div>`;
 
         return `<div class="kanban-col" style="flex-shrink:0;min-width:260px;max-width:340px;flex:1 1 280px;display:flex;flex-direction:column;min-height:0;border-radius:14px;overflow:hidden;border:1px solid var(--ag-kanban-borda);">
@@ -668,7 +709,7 @@ function cardKanban(item) {
                 ${AG_EQUIP && item.solicitante_nome ? `
                 <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ag-texto-medio);">
                     <svg style="width:12px;height:12px;flex-shrink:0;" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clip-rule="evenodd"/></svg>
-                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.solicitante_nome)}</span>
+                    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(item.solicitante_nome)}${item.solicitante_setor ? ' · ' + escapeHtml(item.solicitante_setor) : ''}</span>
                 </div>` : ''}
                 <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--ag-texto-fraco);">
                     <svg style="width:12px;height:12px;flex-shrink:0;" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>

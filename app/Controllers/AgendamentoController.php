@@ -51,6 +51,7 @@ class AgendamentoController
         $sql = "SELECT a.id, a.servico_id, s.nome AS servico_nome, s.descricao AS servico_descricao,
                    s.cor_hex, s.ativo AS servico_ativo,
                        a.solicitante_id, u.nome AS solicitante_nome, u.email AS solicitante_email,
+                       su.nome AS solicitante_setor,
                        a.aprovado_por_id, ap.nome AS aprovado_por_nome,
                        a.cancelado_por_id, ca.nome AS cancelado_por_nome,
                        a.encerrado_por_id, en.nome AS encerrado_por_nome,
@@ -63,6 +64,7 @@ class AgendamentoController
                 FROM agendamentos a
                 INNER JOIN servicos_agendamento s ON s.id = a.servico_id
                 INNER JOIN usuarios u ON u.id = a.solicitante_id
+                LEFT JOIN setores su ON su.id = u.setor_id
                 LEFT JOIN usuarios ap ON ap.id = a.aprovado_por_id
                 LEFT JOIN usuarios ca ON ca.id = a.cancelado_por_id
                 LEFT JOIN usuarios en ON en.id = a.encerrado_por_id
