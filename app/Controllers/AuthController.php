@@ -10,6 +10,13 @@ class AuthController
 {
     public function exibirLogin(Request $request, Response $response): Response
     {
+        // Já logado não vê formulário de login: com o cookie de uma semana, um
+        // /login no histórico ou nos favoritos abriria a tela de entrada como se
+        // a sessão tivesse expirado.
+        if (!empty($_SESSION['user_id'])) {
+            return $response->withHeader('Location', '/chat')->withStatus(302);
+        }
+
         return TemplateRenderer::render($response, __DIR__ . '/../../templates/login.php');
     }
 

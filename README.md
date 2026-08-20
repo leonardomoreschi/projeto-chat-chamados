@@ -70,7 +70,8 @@ Serviços esperados:
 
 Com WEB_HOST_PORT=8188:
 
-- Login: http://localhost:8188/login
+- Raiz: http://localhost:8188/ — manda para `/chat` se já houver sessão, senão para `/login`
+- Login: http://localhost:8188/login (com sessão viva, redireciona para `/chat`)
 - Chat: http://localhost:8188/chat
 - Agendamentos: http://localhost:8188/agendamentos
 - Meus chamados: http://localhost:8188/meus-chamados

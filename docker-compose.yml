@@ -18,6 +18,10 @@ volumes:
     driver: local
   uploads_data:
     driver: local
+  # Sessões PHP: fora de um volume elas viviam em /tmp do container e sumiam a
+  # cada `docker compose up --build`, forçando login novo em todo deploy.
+  sessions_data:
+    driver: local
 
 # ============================================
 # SERVICES
@@ -80,6 +84,7 @@ services:
       - ./:/var/www/html:delegated
       - /var/www/html/vendor                     # <-- ADICIONADO: Preserva o vendor interno
       - uploads_data:/var/www/html/public/uploads
+      - sessions_data:/var/lib/php/sessions
       - ./var/logs:/var/www/html/var/logs
     networks:
       chat_network:

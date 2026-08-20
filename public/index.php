@@ -11,7 +11,27 @@ date_default_timezone_set('America/Sao_Paulo');
 $dotenv = Dotenv\Dotenv::createImmutable(__DIR__ . '/../');
 $dotenv->load();
 
-ini_set('session.cookie_httponly', '1');
+// ── Sessão ────────────────────────────────────
+// Sem isto o cookie de sessão é "de navegador" (morre ao fechar) e o PHP ainda
+// recolhe a sessão parada por gc_maxlifetime — dava pra cair na tela de login
+// quase todo dia. Agora a sessão vale SESSION_LIFETIME_DIAS (padrão 7) contados
+// do login, então o normal é entrar uma vez por semana.
+$sessaoDias    = max(1, (int) ($_ENV['SESSION_LIFETIME_DIAS'] ?? 7));
+$sessaoSegundos = $sessaoDias * 86400;
+
+// Cookie `Secure` só quando a página veio por HTTPS (o nginx repassa em
+// X-Forwarded-Proto): marcar sempre quebraria o acesso por http:// interno.
+$viaHttps = (($_SERVER['HTTPS'] ?? '') !== '' && ($_SERVER['HTTPS'] ?? '') !== 'off')
+    || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
+
+ini_set('session.gc_maxlifetime', (string) $sessaoSegundos);
+session_set_cookie_params([
+    'lifetime' => $sessaoSegundos,
+    'path'     => '/',
+    'secure'   => $viaHttps,
+    'httponly' => true,
+    'samesite' => 'Lax',
+]);
 session_start();
 
 bootstrapDefaultData();
@@ -278,8 +298,14 @@ $app->group('/api', function ($group) {
     })->add(new AdminMiddleware());
 })->add(new AuthMiddleware());
 
+// A raiz é o endereço que as pessoas digitam ("localhost:8188"). Mandar todo
+// mundo para /login fazia parecer que a sessão tinha caído, mesmo com o cookie
+// válido — quem já está logado vai direto para o chat. Se a sessão não valer
+// mais, o AuthMiddleware do /chat devolve para o /login com o aviso.
 $app->get('/', function ($request, $response) {
-    return $response->withHeader('Location', '/login')->withStatus(302);
+    $destino = empty($_SESSION['user_id']) ? '/login' : '/chat';
+
+    return $response->withHeader('Location', $destino)->withStatus(302);
 });
 
 $app->run();

@@ -80,8 +80,10 @@ COPY --from=dependencies --chown=www-data:www-data /app .
 RUN mkdir -p \
     public/uploads \
     var/logs \
-    && chown -R www-data:www-data public/uploads var/logs \
-    && chmod -R 775 public/uploads
+    /var/lib/php/sessions \
+    && chown -R www-data:www-data public/uploads var/logs /var/lib/php/sessions \
+    && chmod -R 775 public/uploads \
+    && chmod 700 /var/lib/php/sessions
 
 # Expor porta do PHP-FPM
 EXPOSE 9000
