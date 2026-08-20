@@ -1,8 +1,24 @@
 <?php
 declare(strict_types=1);
 
+/**
+ * Intervalo (segundos) entre duas execucoes completas do bootstrap no mesmo
+ * container quando nada mudou no codigo. Ver bootstrapJaAplicado().
+ */
+const BOOTSTRAP_REVALIDACAO_SEGUNDOS = 600;
+
 function bootstrapDefaultData(): void
 {
+    // A rotina inteira custa ~50ms de information_schema e ainda segura um
+    // GET_LOCK global, o que serializa TODOS os requests HTTP do sistema — e ela
+    // roda a cada request. Como o resultado so muda quando o codigo deste
+    // arquivo muda, um marcador em disco (por container) permite pular tudo nos
+    // requests seguintes; editar/deployar este arquivo troca o hash e a rotina
+    // roda de novo sozinha.
+    if (bootstrapJaAplicado()) {
+        return;
+    }
+
     $pdo = getDbConnection();
 
     $lockName = 'bootstrap_default_data';
@@ -21,12 +37,55 @@ function bootstrapDefaultData(): void
         seedDefaultServices($pdo);
         seedDefaultSectors($pdo);
         seedDefaultAdminUser($pdo);
+        bootstrapMarcarAplicado();
     } finally {
         if ($lockAcquired) {
             $unlockStmt = $pdo->prepare('SELECT RELEASE_LOCK(?)');
             $unlockStmt->execute([$lockName]);
         }
     }
+}
+
+/**
+ * Caminho do marcador de "bootstrap ja rodou neste container com este codigo".
+ * O hash cobre o conteudo deste arquivo + o banco alvo, entao trocar de banco ou
+ * publicar uma versao nova invalida o marcador automaticamente.
+ */
+function bootstrapArquivoMarcador(): string
+{
+    static $caminho = null;
+    if ($caminho !== null) {
+        return $caminho;
+    }
+
+    $assinatura = hash('xxh3', implode('|', [
+        (string) @file_get_contents(__FILE__),
+        (string) ($_ENV['DB_HOST'] ?? getenv('DB_HOST') ?: ''),
+        (string) ($_ENV['DB_NAME'] ?? getenv('DB_NAME') ?: ''),
+    ]));
+
+    return $caminho = sys_get_temp_dir() . '/chat-bootstrap-' . $assinatura;
+}
+
+function bootstrapJaAplicado(): bool
+{
+    static $aplicadoNesteProcesso = false;
+    if ($aplicadoNesteProcesso) {
+        return true;
+    }
+
+    $marcador = bootstrapArquivoMarcador();
+    $mtime = @filemtime($marcador);
+    if ($mtime !== false && (time() - $mtime) < BOOTSTRAP_REVALIDACAO_SEGUNDOS) {
+        return $aplicadoNesteProcesso = true;
+    }
+
+    return false;
+}
+
+function bootstrapMarcarAplicado(): void
+{
+    @touch(bootstrapArquivoMarcador());
 }
 
 /**

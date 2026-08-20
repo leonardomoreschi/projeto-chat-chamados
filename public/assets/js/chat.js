@@ -14,6 +14,10 @@ let ultimoTotalNaoLidas = 0;
 let notificacoesInicializadas = false;
 let conversaAtualTipo = null;
 let paginaMensagensAtual = 1;
+// Conversa cujo histórico está de fato renderizado + token do carregamento em
+// curso: juntos descartam a resposta atrasada de uma conversa já abandonada.
+let conversaCarregadaId = null;
+let carregamentoMensagensToken = 0;
 let podeCarregarMaisMensagens = false;
 let sincronizacaoIntervalId = null;
 let conversasConhecidas = new Set();
@@ -232,57 +236,41 @@ document.addEventListener('DOMContentLoaded', async function () {
 });
 
 // ── Conversas (sidebar) ───────────────────────
+/**
+ * A sincronização leve chama isto a cada 4s. Antes a lista era recriada inteira
+ * (`nav.innerHTML = ''`), o que fazia os nomes piscarem, derrubava o filtro da
+ * busca, perdia o destaque da conversa aberta e — pior — destruía o botão no
+ * meio do clique, fazendo a troca de conversa demorar ou nem acontecer. Agora o
+ * DOM é reaproveitado: cada conversa tem um item fixo, só o que mudou é
+ * reescrito, e a ordem é ajustada movendo os nós existentes.
+ */
 async function carregarConversas() {
     const res = await fetch('/api/conversas');
     const lista = await res.json();
     const nav = document.getElementById('lista-conversas');
-    const conversaSelecionadaAntes = conversaAtualId;
+    if (!nav || !Array.isArray(lista)) return;
 
-    conversaAtualId = null;
-    conversaAtualNome = null;
-    conversaAtualTipo = null;
+    configurarDelegacaoConversas(nav);
 
-    nav.innerHTML = '';
-
-    let itemSelecionado = null;
     const idsAtuais = new Set();
+    const ordenados = [];
 
     lista.forEach(function (c) {
-        idsAtuais.add(Number(c.id));
-        const isGrupo = c.tipo === 'grupo' || c.tipo === 'setor';
-        const icone = isGrupo ? '#' : (c.nome ? c.nome.charAt(0).toUpperCase() : '?');
-        const cor = isGrupo ? 'bg-indigo-700' : 'bg-emerald-700';
-        const badge = c.nao_lidas > 0 ? c.nao_lidas : '';
-        const badgeHidden = c.nao_lidas > 0 ? '' : 'hidden';
+        const id = Number(c.id);
+        idsAtuais.add(id);
+        const wrapper = obterItemConversa(nav, id);
+        atualizarItemConversa(wrapper, c);
+        ordenados.push(wrapper);
+    });
 
-        const wrapper = document.createElement('div');
-        wrapper.className = 'group relative';
+    Array.from(nav.children).forEach(function (wrapper) {
+        if (!idsAtuais.has(Number(wrapper.dataset.conversaId))) wrapper.remove();
+    });
 
-        let editBtn = '';
-        if (isGrupo && IS_ADMIN) {
-            editBtn = '<button onclick="abrirModalEditarGrupo(' + c.id + ', \'' + c.nome.replace(/'/g, "\\'") + '\')" '
-                + 'class="absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex w-6 h-6 items-center justify-center text-gray-500 hover:text-indigo-400 transition rounded-lg hover:bg-indigo-500/10">'
-                + '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
-                + '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>'
-                + '</svg></button>';
-        }
-
-        wrapper.innerHTML = '<button class="conversa-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left" data-id="' + c.id + '" data-nome="' + c.nome + '" data-tipo="' + c.tipo + '">'
-            + '<div class="w-9 h-9 ' + cor + ' rounded-xl flex items-center justify-center shrink-0 text-sm font-bold">' + icone + '</div>'
-            + '<div class="flex-1 min-w-0">'
-            + '<p class="text-sm font-medium text-white truncate">' + c.nome + '</p>'
-            + '<p class="preview-msg text-xs text-gray-400 truncate">' + (c.ultima_mensagem || 'Sem mensagens') + '</p>'
-            + '</div>'
-            + '<span class="badge-nao-lidas ' + badgeHidden + ' bg-indigo-600 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center px-1 shrink-0">' + badge + '</span>'
-            + '</button>'
-            + editBtn;
-
-        const btn = wrapper.querySelector('.conversa-item');
-        if (conversaSelecionadaAntes && c.id === conversaSelecionadaAntes) {
-            itemSelecionado = btn;
-        }
-        btn.addEventListener('click', function () { selecionarConversa(c.id, c.nome, btn); });
-        nav.appendChild(wrapper);
+    // insertBefore move o nó já existente (não recria), então a reordenação por
+    // atividade recente não pisca nem invalida os listeners.
+    ordenados.forEach(function (wrapper, i) {
+        if (nav.children[i] !== wrapper) nav.insertBefore(wrapper, nav.children[i] || null);
     });
 
     if (sincronizacaoInicialConversasFeita) {
@@ -297,17 +285,106 @@ async function carregarConversas() {
     conversasConhecidas = idsAtuais;
     sincronizacaoInicialConversasFeita = true;
 
-    if (itemSelecionado) {
-        const id = parseInt(itemSelecionado.dataset.id || '0', 10);
-        if (id) {
-            conversaAtualId = id;
-            conversaAtualNome = itemSelecionado.dataset.nome || conversaAtualNome;
-            conversaAtualTipo = itemSelecionado.dataset.tipo || conversaAtualTipo;
-            itemSelecionado.classList.add('bg-gray-800');
-        }
+    // Saiu (ou foi removido) da conversa aberta: volta para a tela inicial em vez
+    // de continuar sincronizando um histórico que não é mais acessível.
+    if (conversaAtualId && !idsAtuais.has(conversaAtualId)) {
+        mostrarEstadoVazioChat();
     }
 
+    // A lista mudou embaixo do filtro de busca: reaplica para não ressuscitar
+    // conversas que o termo digitado tinha escondido.
+    aplicarFiltroBusca();
     atualizarBadgeMenuRecolhido();
+}
+
+/**
+ * Um único listener na lista inteira: o clique continua funcionando mesmo que o
+ * item seja reordenado ou recriado por uma sincronização concorrente.
+ */
+function configurarDelegacaoConversas(nav) {
+    if (nav._delegacaoConfigurada) return;
+    nav._delegacaoConfigurada = true;
+
+    nav.addEventListener('click', function (e) {
+        const editar = e.target.closest('.conversa-editar');
+        if (editar) {
+            const wrapper = editar.closest('[data-conversa-id]');
+            abrirModalEditarGrupo(Number(wrapper.dataset.conversaId), wrapper.dataset.nome || '');
+            return;
+        }
+
+        const btn = e.target.closest('.conversa-item');
+        if (!btn) return;
+        selecionarConversa(Number(btn.dataset.id), btn.dataset.nome || '', btn);
+    });
+}
+
+function obterItemConversa(nav, id) {
+    let wrapper = nav.querySelector('[data-conversa-id="' + id + '"]');
+    if (wrapper) return wrapper;
+
+    wrapper = document.createElement('div');
+    wrapper.className = 'group relative';
+    wrapper.dataset.conversaId = String(id);
+    wrapper.innerHTML = '<button class="conversa-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left" data-id="' + id + '">'
+        + '<div class="conversa-avatar w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold"></div>'
+        + '<div class="flex-1 min-w-0">'
+        + '<p class="conversa-nome text-sm font-medium text-white truncate"></p>'
+        + '<p class="preview-msg text-xs text-gray-400 truncate"></p>'
+        + '</div>'
+        + '<span class="badge-nao-lidas hidden bg-indigo-600 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center px-1 shrink-0"></span>'
+        + '</button>';
+    nav.appendChild(wrapper);
+    return wrapper;
+}
+
+function atualizarItemConversa(wrapper, c) {
+    const id = Number(c.id);
+    const isGrupo = c.tipo === 'grupo' || c.tipo === 'setor';
+    const nome = c.nome || '';
+    const btn = wrapper.querySelector('.conversa-item');
+
+    if (wrapper.dataset.nome !== nome) {
+        wrapper.dataset.nome = nome;
+        btn.dataset.nome = nome;
+        wrapper.querySelector('.conversa-nome').textContent = nome;
+        const avatar = wrapper.querySelector('.conversa-avatar');
+        avatar.textContent = isGrupo ? '#' : (nome ? nome.charAt(0).toUpperCase() : '?');
+    }
+
+    if (btn.dataset.tipo !== c.tipo) {
+        btn.dataset.tipo = c.tipo;
+        const avatar = wrapper.querySelector('.conversa-avatar');
+        avatar.classList.toggle('bg-indigo-700', isGrupo);
+        avatar.classList.toggle('bg-emerald-700', !isGrupo);
+        avatar.textContent = isGrupo ? '#' : (nome ? nome.charAt(0).toUpperCase() : '?');
+    }
+
+    const preview = wrapper.querySelector('.preview-msg');
+    const textoPreview = c.ultima_mensagem || 'Sem mensagens';
+    if (preview.textContent !== textoPreview) preview.textContent = textoPreview;
+
+    // Conversa aberta nunca mostra badge: a marcação de leitura pode ainda estar
+    // a caminho do servidor e o contador voltaria a piscar no ciclo seguinte.
+    const naoLidas = id === conversaAtualId ? 0 : (parseInt(c.nao_lidas, 10) || 0);
+    const badge = wrapper.querySelector('.badge-nao-lidas');
+    const textoBadge = naoLidas > 0 ? String(naoLidas) : '';
+    if (badge.textContent !== textoBadge) badge.textContent = textoBadge;
+    badge.classList.toggle('hidden', naoLidas === 0);
+
+    const precisaEditar = isGrupo && IS_ADMIN;
+    const editBtn = wrapper.querySelector('.conversa-editar');
+    if (precisaEditar && !editBtn) {
+        wrapper.insertAdjacentHTML('beforeend',
+            '<button type="button" class="conversa-editar absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex w-6 h-6 items-center justify-center text-gray-500 hover:text-indigo-400 transition rounded-lg hover:bg-indigo-500/10">'
+            + '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
+            + '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>'
+            + '</svg></button>');
+    } else if (!precisaEditar && editBtn) {
+        editBtn.remove();
+    }
+
+    btn.classList.toggle('bg-gray-800', id === conversaAtualId);
 }
 
 /**
@@ -389,6 +466,8 @@ function mostrarEstadoVazioChat() {
     conversaAtualId = null;
     conversaAtualNome = null;
     conversaAtualTipo = null;
+    conversaCarregadaId = null;
+    carregamentoMensagensToken += 1; // cancela um histórico ainda em trânsito
 
     const header = document.getElementById('chat-header');
     const loadMoreWrap = document.getElementById('chat-load-more-wrap');
@@ -536,6 +615,15 @@ async function carregarUsuarios() {
 
 // ── Selecionar conversa ───────────────────────
 function selecionarConversa(id, nome, el = null) {
+    id = Number(id);
+
+    // Reclicar a conversa já aberta não recarrega nada: só fecharia a sidebar no
+    // mobile e faria o histórico piscar de novo.
+    if (id === conversaAtualId && conversaCarregadaId === id) {
+        if (window.innerWidth < 768) toggleSidebarMobile(false);
+        return;
+    }
+
     mostrarEstadoConversa();
     conversaAtualId = id;
     conversaAtualNome = nome;
@@ -584,13 +672,38 @@ function selecionarConversa(id, nome, el = null) {
 
 // ── Histórico ─────────────────────────────────
 async function carregarMensagens(conversaId) {
+    conversaId = Number(conversaId);
+    const token = ++carregamentoMensagensToken;
+    conversaCarregadaId = null;
+
     mostrarEstadoConversa();
     paginaMensagensAtual = 1;
     const box = document.getElementById('messages');
-    box.innerHTML = '<p class="text-center text-gray-600 text-xs py-4">Carregando...</p>';
-    const res = await fetch('/api/mensagens?conversa_id=' + conversaId + '&pagina=1&_ts=' + Date.now());
-    const msgs = await res.json();
-    podeCarregarMaisMensagens = Array.isArray(msgs) && msgs.length >= 50;
+    box.innerHTML = '';
+
+    // O "Carregando..." só aparece se a resposta demorar: em rede normal ele
+    // piscava por alguns milissegundos em toda troca de conversa.
+    const avisoCarregando = window.setTimeout(function () {
+        if (token === carregamentoMensagensToken) {
+            box.innerHTML = '<p class="text-center text-gray-600 text-xs py-4">Carregando...</p>';
+        }
+    }, 200);
+
+    let msgs = [];
+    try {
+        const res = await fetch('/api/mensagens?conversa_id=' + conversaId + '&pagina=1&_ts=' + Date.now());
+        msgs = await res.json();
+    } finally {
+        window.clearTimeout(avisoCarregando);
+    }
+
+    // Trocou de conversa enquanto isto voltava: descarta em vez de despejar o
+    // histórico antigo por cima do novo.
+    if (token !== carregamentoMensagensToken) return;
+
+    if (!Array.isArray(msgs)) msgs = [];
+    conversaCarregadaId = conversaId;
+    podeCarregarMaisMensagens = msgs.length >= 50;
     atualizarBotaoCarregarMais();
     box.innerHTML = '';
     if (!msgs.length) {
@@ -618,12 +731,16 @@ async function carregarMensagens(conversaId) {
 async function carregarMaisMensagens() {
     if (!conversaAtualId || !podeCarregarMaisMensagens) return;
 
+    const conversaId = conversaAtualId;
+    const token = carregamentoMensagensToken;
     paginaMensagensAtual += 1;
     const box = document.getElementById('messages');
     const scrollAntes = box.scrollHeight;
 
-    const res = await fetch('/api/mensagens?conversa_id=' + conversaAtualId + '&pagina=' + paginaMensagensAtual + '&_ts=' + Date.now());
+    const res = await fetch('/api/mensagens?conversa_id=' + conversaId + '&pagina=' + paginaMensagensAtual + '&_ts=' + Date.now());
     const msgs = await res.json();
+
+    if (token !== carregamentoMensagensToken) return; // conversa trocou no meio
 
     if (!Array.isArray(msgs) || msgs.length === 0) {
         podeCarregarMaisMensagens = false;
@@ -1500,19 +1617,29 @@ function configurarBusca() {
     if (!input) return;
 
     input.addEventListener('input', function () {
+        aplicarFiltroBusca();
+
         const termo = input.value.trim().toLowerCase();
-
-        document.querySelectorAll('.conversa-item').forEach(function (item) {
-            const nome = (item.dataset.nome || '').toLowerCase();
-            const preview = (item.querySelector('.preview-msg')?.textContent || '').toLowerCase();
-            const visivel = !termo || nome.includes(termo) || preview.includes(termo);
-            item.parentElement.style.display = visivel ? '' : 'none';
-        });
-
         document.querySelectorAll('#messages .msg-enter').forEach(function (msg) {
             const texto = (msg.textContent || '').toLowerCase();
             msg.style.display = (!termo || texto.includes(termo)) ? '' : 'none';
         });
+    });
+}
+
+/**
+ * Esconde da sidebar as conversas fora do termo digitado. Chamado também depois
+ * de cada sincronização da lista, senão o refresh de 4s desfaz o filtro.
+ */
+function aplicarFiltroBusca() {
+    const input = document.getElementById('search-input');
+    const termo = (input ? input.value : '').trim().toLowerCase();
+
+    document.querySelectorAll('.conversa-item').forEach(function (item) {
+        const nome = (item.dataset.nome || '').toLowerCase();
+        const preview = (item.querySelector('.preview-msg')?.textContent || '').toLowerCase();
+        const visivel = !termo || nome.includes(termo) || preview.includes(termo);
+        item.parentElement.style.display = visivel ? '' : 'none';
     });
 }
 
@@ -1605,14 +1732,18 @@ async function verificarNovasMensagensNotificacao() {
 }
 
 async function sincronizarMensagensConversaAtual() {
-    if (!conversaAtualId) return;
+    if (!conversaAtualId || conversaCarregadaId !== conversaAtualId) return;
+
+    const conversaId = conversaAtualId;
+    const token = carregamentoMensagensToken;
 
     try {
-        const res = await fetch('/api/mensagens?conversa_id=' + conversaAtualId + '&pagina=1&_ts=' + Date.now());
+        const res = await fetch('/api/mensagens?conversa_id=' + conversaId + '&pagina=1&_ts=' + Date.now());
         if (!res.ok) return;
 
         const msgs = await res.json();
         if (!Array.isArray(msgs)) return;
+        if (token !== carregamentoMensagensToken) return; // conversa trocou no meio
 
         let adicionou = false;
         msgs.forEach(function (m) {
@@ -1625,7 +1756,7 @@ async function sincronizarMensagensConversaAtual() {
         if (adicionou) {
             const box = document.getElementById('messages');
             box.scrollTop = box.scrollHeight;
-            fetch('/api/conversas/' + conversaAtualId + '/lida', { method: 'POST' }).catch(function () { });
+            fetch('/api/conversas/' + conversaId + '/lida', { method: 'POST' }).catch(function () { });
         }
     } catch (_) {
         // Falha silenciosa: fallback não deve interromper o chat.
