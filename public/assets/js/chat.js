@@ -20,6 +20,7 @@ let conversaCarregadaId = null;
 let carregamentoMensagensToken = 0;
 let podeCarregarMaisMensagens = false;
 let sincronizacaoIntervalId = null;
+let diaCorrenteRenderizado = null;
 let conversasConhecidas = new Set();
 let sincronizacaoInicialConversasFeita = false;
 let wsSincronizacaoInicialConcluida = false;
@@ -329,10 +330,15 @@ function obterItemConversa(nav, id) {
     wrapper.innerHTML = '<button class="conversa-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left" data-id="' + id + '">'
         + '<div class="conversa-avatar w-9 h-9 rounded-xl flex items-center justify-center shrink-0 text-sm font-bold"></div>'
         + '<div class="flex-1 min-w-0">'
-        + '<p class="conversa-nome text-sm font-medium text-white truncate"></p>'
-        + '<p class="preview-msg text-xs text-gray-400 truncate"></p>'
+        + '<div class="flex items-baseline gap-2">'
+        + '<p class="conversa-nome text-sm font-medium text-white truncate flex-1 min-w-0"></p>'
+        + '<span class="conversa-quando text-[11px] text-gray-500 shrink-0"></span>'
         + '</div>'
+        + '<div class="flex items-center gap-2">'
+        + '<p class="preview-msg text-xs text-gray-400 truncate flex-1 min-w-0"></p>'
         + '<span class="badge-nao-lidas hidden bg-indigo-600 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center px-1 shrink-0"></span>'
+        + '</div>'
+        + '</div>'
         + '</button>';
     nav.appendChild(wrapper);
     return wrapper;
@@ -363,6 +369,13 @@ function atualizarItemConversa(wrapper, c) {
     const preview = wrapper.querySelector('.preview-msg');
     const textoPreview = c.ultima_mensagem || 'Sem mensagens';
     if (preview.textContent !== textoPreview) preview.textContent = textoPreview;
+
+    // Quando foi a última mensagem: Hoje / Ontem / data. Sem mensagem nenhuma
+    // o campo fica vazio — a data de criação da conversa só confundiria.
+    const quando = wrapper.querySelector('.conversa-quando');
+    const textoQuando = c.ultima_mensagem && c.ultima_atividade ? rotuloDiaCurto(c.ultima_atividade) : '';
+    if (quando.textContent !== textoQuando) quando.textContent = textoQuando;
+    quando.title = textoQuando ? dataHoraCompletaBrasilia(c.ultima_atividade) : '';
 
     // Conversa aberta nunca mostra badge: a marcação de leitura pode ainda estar
     // a caminho do servidor e o contador voltaria a piscar no ciclo seguinte.
@@ -427,6 +440,13 @@ function atualizarPreviewSidebar(msg) {
 
     const preview = btn.querySelector('.preview-msg');
     if (preview) preview.textContent = (msg.conteudo || 'Mensagem apagada').substring(0, 40);
+
+    const quando = btn.querySelector('.conversa-quando');
+    if (quando) {
+        const criadoEm = msg.criado_em || new Date();
+        quando.textContent = rotuloDiaCurto(criadoEm);
+        quando.title = dataHoraCompletaBrasilia(criadoEm);
+    }
 
     if (cId != conversaAtualId) {
         const badge = btn.querySelector('.badge-nao-lidas');
@@ -752,10 +772,25 @@ async function carregarMaisMensagens() {
     atualizarBotaoCarregarMais();
 
     const fragmento = document.createDocumentFragment();
+    let diaAnterior = null;
     msgs.forEach(function (m) {
-        fragmento.appendChild(criarElementoMensagem(m));
+        const item = criarElementoMensagem(m);
+        if (item.dataset.dia && item.dataset.dia !== diaAnterior) {
+            fragmento.appendChild(criarSeparadorData(m.criado_em));
+            diaAnterior = item.dataset.dia;
+        }
+        fragmento.appendChild(item);
     });
+
+    // A página antiga começa com a barra do próprio primeiro dia; se o bloco
+    // que acabou de entrar termina nesse mesmo dia, a barra viraria duplicata.
+    const primeiroAntigo = box.firstElementChild;
     box.prepend(fragmento);
+    if (primeiroAntigo
+        && primeiroAntigo.classList.contains('separador-data')
+        && primeiroAntigo.dataset.dia === diaAnterior) {
+        primeiroAntigo.remove();
+    }
 
     box.scrollTop = box.scrollHeight - scrollAntes;
     configurarScrollParaBotaoCarregar();
@@ -794,11 +829,44 @@ function configurarScrollParaBotaoCarregar() {
 // ── Renderizar mensagem ───────────────────────
 function renderizarMensagem(m) {
     const box = document.getElementById('messages');
-    const div = criarElementoMensagem(m);
 
     const vazio = box.querySelector('#chat-empty-state') || box.querySelector('p.text-center');
     if (vazio) vazio.remove();
+
+    const div = criarElementoMensagem(m);
+
+    // A barra de data só entra quando o dia muda em relação ao que já está na
+    // tela — vale tanto para o histórico carregado de uma vez quanto para a
+    // mensagem que chega pelo WebSocket depois da virada da meia-noite.
+    if (div.dataset.dia && div.dataset.dia !== ultimoDiaNoHistorico(box)) {
+        box.appendChild(criarSeparadorData(m.criado_em));
+    }
+
     box.appendChild(div);
+}
+
+/** Dia da última coisa já renderizada no histórico (barra ou mensagem). */
+function ultimoDiaNoHistorico(box) {
+    for (let i = box.children.length - 1; i >= 0; i--) {
+        const dia = box.children[i].dataset && box.children[i].dataset.dia;
+        if (dia) return dia;
+    }
+    return null;
+}
+
+/**
+ * Barra "Hoje / Ontem / data" entre os blocos de mensagens. Fica `sticky` no
+ * topo do scroll para que, ao rolar o histórico, sempre dê para saber de que
+ * dia é a mensagem que está na tela.
+ */
+function criarSeparadorData(criadoEm) {
+    const div = document.createElement('div');
+    div.className = 'separador-data sticky top-0 z-10 flex justify-center py-2 pointer-events-none';
+    div.dataset.dia = chaveDiaBrasilia(criadoEm);
+    div.innerHTML = '<span class="bg-gray-800 border border-gray-700 text-gray-300 text-[11px] font-semibold uppercase tracking-wide px-3 py-1 rounded-full shadow-lg shadow-black/20">'
+        + escapeHtml(rotuloSeparadorData(criadoEm))
+        + '</span>';
+    return div;
 }
 
 function criarElementoMensagem(m) {
@@ -827,11 +895,12 @@ function criarElementoMensagem(m) {
     const div = document.createElement('div');
     div.className = 'flex items-start gap-3 msg-enter group' + (proprio ? ' flex-row-reverse' : '');
     div.setAttribute('data-msg-id', String(m.id || ''));
+    div.dataset.dia = chaveDiaBrasilia(m.criado_em);
     div.innerHTML = '<div class="w-8 h-8 ' + cor + ' rounded-lg flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">' + inicial + '</div>'
         + '<div class="max-w-lg">'
         + '<div class="flex items-baseline gap-2 mb-1' + (proprio ? ' flex-row-reverse' : '') + '">'
         + '<span class="text-sm font-semibold ' + (proprio ? 'text-indigo-400' : 'text-white') + '">' + (proprio ? 'Você' : m.usuario_nome) + '</span>'
-        + '<span class="text-xs text-gray-500">' + hora + '</span>'
+        + '<span class="text-xs text-gray-500" title="' + escapeHtml(dataHoraCompletaBrasilia(m.criado_em)) + '">' + hora + '</span>'
         + btnApagar
         + '</div>'
         + '<div class="' + (proprio ? 'bg-indigo-600' : 'bg-gray-800') + ' rounded-2xl ' + (proprio ? 'rounded-tr-sm' : 'rounded-tl-sm') + ' px-4 py-2.5 text-sm ' + (proprio ? 'text-white' : 'text-gray-200') + '">' + conteudoHtml + anexoHtml + '</div>'
@@ -884,6 +953,82 @@ function formatarHoraBrasilia(valorData) {
     if (!data) return '--:--';
 
     return data.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'America/Sao_Paulo'
+    });
+}
+
+/**
+ * Chave do dia (AAAA-MM-DD) no fuso de Brasília. É por ela que o histórico
+ * decide onde entra uma barra de data e a lista lateral escolhe "Hoje"/"Ontem"
+ * — comparar objetos Date direto erraria a virada do dia fora do fuso local.
+ */
+function chaveDiaBrasilia(valorData) {
+    const data = parseDataServidorBrasilia(valorData);
+    if (!data) return '';
+
+    return data.toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' });
+}
+
+/** Distância em dias até hoje: 0 = hoje, 1 = ontem, 2+ = mais antigo. */
+function diasAteHoje(valorData) {
+    const chave = chaveDiaBrasilia(valorData);
+    if (!chave) return null;
+
+    const hoje = chaveDiaBrasilia(new Date());
+    return Math.round((Date.parse(hoje + 'T00:00:00Z') - Date.parse(chave + 'T00:00:00Z')) / 86400000);
+}
+
+/**
+ * Rótulo da barra de data do histórico: "Hoje", "Ontem", o dia da semana na
+ * última semana e a data numérica (13/08/2026) no resto.
+ */
+function rotuloSeparadorData(valorData) {
+    const dias = diasAteHoje(valorData);
+    if (dias === null) return '';
+    if (dias === 0) return 'Hoje';
+    if (dias === 1) return 'Ontem';
+
+    const data = parseDataServidorBrasilia(valorData);
+
+    if (dias > 1 && dias < 7) {
+        const semana = data.toLocaleDateString('pt-BR', { weekday: 'long', timeZone: 'America/Sao_Paulo' });
+        return semana.charAt(0).toUpperCase() + semana.slice(1);
+    }
+
+    return data.toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        timeZone: 'America/Sao_Paulo'
+    });
+}
+
+/** Carimbo curto da última mensagem na lista lateral: Hoje, Ontem ou a data. */
+function rotuloDiaCurto(valorData) {
+    const dias = diasAteHoje(valorData);
+    if (dias === null) return '';
+    if (dias === 0) return 'Hoje';
+    if (dias === 1) return 'Ontem';
+
+    return parseDataServidorBrasilia(valorData).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
+        timeZone: 'America/Sao_Paulo'
+    });
+}
+
+/** Data + hora completas — vai no title do horário de cada mensagem. */
+function dataHoraCompletaBrasilia(valorData) {
+    const data = parseDataServidorBrasilia(valorData);
+    if (!data) return '';
+
+    return data.toLocaleString('pt-BR', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
         timeZone: 'America/Sao_Paulo'
@@ -1767,6 +1912,23 @@ function sincronizacaoLeve() {
     carregarConversas().catch(function () { });
     verificarNovasMensagensNotificacao();
     sincronizarMensagensConversaAtual();
+    revisarViradaDeDia();
+}
+
+/**
+ * Com a aba aberta durante a virada da meia-noite, a barra que dizia "Hoje"
+ * passa a mentir. Os rótulos são recalculados a partir do dia guardado em cada
+ * barra, então basta reescrevê-los quando a data do navegador muda.
+ */
+function revisarViradaDeDia() {
+    const hoje = chaveDiaBrasilia(new Date());
+    if (hoje === diaCorrenteRenderizado) return;
+
+    diaCorrenteRenderizado = hoje;
+    document.querySelectorAll('#messages .separador-data').forEach(function (sep) {
+        const span = sep.querySelector('span');
+        if (span && sep.dataset.dia) span.textContent = rotuloSeparadorData(sep.dataset.dia);
+    });
 }
 
 async function atualizarBadgePainelChamados() {
