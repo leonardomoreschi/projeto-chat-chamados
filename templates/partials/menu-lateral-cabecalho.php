@@ -36,8 +36,12 @@ $aberturaEmergencia = $ehChat
 $fechamentoEmergencia = $ehChat ? '</button>' : '</a>';
 ?>
 <!-- Cabeçalho: usuário + atalhos -->
-<div class="p-4 border-b border-gray-800 flex items-center justify-between gap-2">
-    <div class="flex items-center gap-3 min-w-0" data-menu-conteudo>
+<!-- `justify-end` + `flex-1` no bloco do usuário, e não `justify-between`: com
+     `between`, o botão saltava da direita para a esquerda no quadro em que o
+     bloco do usuário saía do fluxo. Assim ele fica colado na borda direita e
+     apenas desliza junto com ela — e a 4rem essa borda já é o centro. -->
+<div class="p-4 border-b border-gray-800 flex items-center justify-end gap-2">
+    <div class="flex items-center gap-3 min-w-0 flex-1" data-menu-conteudo>
         <div class="w-9 h-9 bg-indigo-600 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
             <?= strtoupper(substr((string) $userName, 0, 1)) ?>
         </div>

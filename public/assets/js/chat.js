@@ -269,7 +269,7 @@ document.addEventListener('DOMContentLoaded', async function () {
             sincronizacaoLeve();
         }, 4000);
     } finally {
-        document.documentElement.classList.remove('chat-loading');
+        document.documentElement.classList.remove('pagina-aguardando');
     }
 });
 

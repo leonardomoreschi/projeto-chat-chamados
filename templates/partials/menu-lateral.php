@@ -19,7 +19,7 @@
  */
 ?>
 <aside id="menu-lateral" data-menu-lateral
-       class="w-72 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 transition-all duration-200 h-screen">
+       class="bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 h-screen">
 
     <?php include __DIR__ . '/menu-lateral-cabecalho.php'; ?>
 

@@ -4,17 +4,29 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Chat Interno</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Cópia local do CDN do Tailwind: como script de terceiro no <head>, ele
+         bloqueava a primeira pintura de toda tela. Ver o topo do arquivo. -->
+    <script src="<?= asset('/assets/js/tailwind.js') ?>"></script>
     <script type="module" src="https://cdn.jsdelivr.net/npm/@joeattardi/emoji-button@4.6.4/dist/index.min.js"></script>
     <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
+    <link rel="stylesheet" href="<?= asset('/assets/css/transicao-pagina.css') ?>">
+    <script src="<?= asset('/assets/js/transicao-pagina.js') ?>"></script>
+    <link rel="stylesheet" href="<?= asset('/assets/css/menu-lateral.css') ?>">
     <link rel="manifest" href="/manifest.json">
     <script src="<?= asset('/assets/js/utils.js') ?>"></script>
     <script src="<?= asset('/assets/js/config.js') ?>"></script>
     <script>
-        document.documentElement.classList.add('chat-loading');
+        // Segura a entrada da tela até a lista de conversas estar montada.
+        // Quem solta é o chat.js; a regra está em transicao-pagina.css.
+        document.documentElement.classList.add('pagina-aguardando');
+        // Rede de segurança: se o chat.js não carregar (404, rede, erro de
+        // sintaxe), ninguém remove a classe e a tela ficaria invisível para
+        // sempre. Passado o prazo, a tela aparece mesmo incompleta.
+        setTimeout(function () {
+            document.documentElement.classList.remove('pagina-aguardando');
+        }, 3000);
     </script>
     <style>
-        html.chat-loading body { visibility: hidden; }
         #messages { scroll-behavior: smooth; }
         .msg-enter { animation: fadeUp .2s ease; }
         @keyframes fadeUp {
@@ -43,7 +55,7 @@
 
 <!-- ═══ SIDEBAR ═══ -->
 <aside id="chat-sidebar" data-menu-lateral
-       class="w-72 bg-gray-900 border-r border-gray-800 flex flex-col shrink-0 transition-all duration-200">
+       class="bg-gray-900 border-r border-gray-800 flex flex-col shrink-0">
 
     <div class="md:hidden p-3 border-b border-gray-800 flex justify-end" data-menu-conteudo>
         <button onclick="toggleSidebarMobile(false)" class="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 flex items-center justify-center" title="Fechar menu">

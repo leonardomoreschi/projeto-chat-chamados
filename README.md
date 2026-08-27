@@ -21,7 +21,7 @@ Plataforma interna com chat corporativo em tempo real e gestão de chamados de T
 | Tempo real | Ratchet (WebSocket) |
 | Banco | MySQL 8 |
 | Infra | Docker Compose (mysql, php, nginx, websocket) |
-| Frontend | HTML + Tailwind + JavaScript Vanilla |
+| Frontend | HTML + Tailwind (cópia local do CDN, `public/assets/js/tailwind.js`) + JavaScript Vanilla, sem build step |
 
 ## Arquitetura atual
 
@@ -272,6 +272,17 @@ contexto seguro (HTTPS ou localhost).
 ./scripts/gerar-certificados.sh chat.empresa.local 192.168.0.50   # CA interna + certificado
 docker compose up -d --build nginx                                # entrypoint detecta e liga o 443
 node scripts/testar-avisos.js                                     # matriz de decisão dos avisos
+```
+
+## Testes
+
+Não há suíte formal. Três scripts de node, sem dependência nenhuma, cobrem a
+lógica de front que mais dá trabalho quando quebra:
+
+```bash
+node scripts/testar-avisos.js            # toast x pop-up do SO x silêncio
+node scripts/testar-menu-lateral.js      # minimizar/maximizar do menu lateral
+node scripts/testar-transicao-pagina.js  # quais cliques contam como navegação
 ```
 
 ## Estrutura resumida de dados

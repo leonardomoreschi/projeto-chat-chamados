@@ -4,8 +4,13 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Dashboard TI - Gestão de Chamados</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Cópia local do CDN do Tailwind: como script de terceiro no <head>, ele
+         bloqueava a primeira pintura de toda tela. Ver o topo do arquivo. -->
+    <script src="<?= asset('/assets/js/tailwind.js') ?>"></script>
     <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
+    <link rel="stylesheet" href="<?= asset('/assets/css/transicao-pagina.css') ?>">
+    <script src="<?= asset('/assets/js/transicao-pagina.js') ?>"></script>
+    <link rel="stylesheet" href="<?= asset('/assets/css/menu-lateral.css') ?>">
     <link rel="manifest" href="/manifest.json">
     <script src="<?= asset('/assets/js/utils.js') ?>"></script>
     <script src="<?= asset('/assets/js/config.js') ?>"></script>
@@ -20,6 +25,32 @@
     </script>
     <script src="<?= asset('/assets/js/som-notificacoes.js') ?>"></script>
     <script src="<?= asset('/assets/js/notificacoes.js') ?>"></script>
+    <style>
+        /* Painel de histórico que minimiza. Estas regras precisam existir em
+           CSS de verdade, e não nas classes `lg:w-16`/`rotate-180` do Tailwind:
+           como elas não aparecem em HTML nenhum, o compilador JIT do Tailwind
+           só as geraria no primeiro clique — depois de a transição já ter
+           começado. A primeira minimizada estalava e só a partir da segunda
+           ficava suave. Mesma armadilha do menu lateral; ver
+           public/assets/css/menu-lateral.css. */
+        #painel-historico {
+            /* `transition-all` animava cor e borda junto; só a largura precisa. */
+            transition: width 300ms cubic-bezier(.4, 0, .2, 1);
+        }
+
+        @media (min-width: 1024px) {
+            #painel-historico           { width: 20rem; }
+            #painel-historico.recolhido { width: 4rem; }
+        }
+
+        #icone-historico {
+            transition: transform 300ms cubic-bezier(.4, 0, .2, 1);
+        }
+
+        #painel-historico.recolhido #icone-historico {
+            transform: rotate(180deg);
+        }
+    </style>
 </head>
 <body class="page-dashboard-ti bg-gray-950 text-white h-screen flex overflow-hidden">
 <?php $chamadosBootstrap = $chamadosBootstrap ?? []; ?>
@@ -190,14 +221,14 @@
             </div>
         </section>
 
-        <aside id="painel-historico" class="w-full lg:w-80 flex flex-col shrink-0 bg-gray-900/40 rounded-3xl border border-gray-800/50 transition-all duration-300 min-h-[260px] lg:min-h-0">
+        <aside id="painel-historico" class="w-full flex flex-col shrink-0 bg-gray-900/40 rounded-3xl border border-gray-800/50 min-h-[260px] lg:min-h-0">
             <div class="p-4 border-b border-gray-800/70 flex items-center gap-3">
                 <div id="historico-header-info" class="flex-1 min-w-0 flex items-center justify-between">
                     <h3 class="text-sm font-black text-gray-500 uppercase tracking-widest">Histórico</h3>
                     <span id="count-finalizados" class="bg-green-500/10 text-green-500 text-xs font-bold px-2.5 py-0.5 rounded-full border border-green-500/20">0</span>
                 </div>
                 <button id="btn-toggle-historico" onclick="togglePainelHistorico()" class="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 flex items-center justify-center transition" title="Minimizar histórico">
-                    <svg id="icone-historico" class="w-4 h-4 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
+                    <svg id="icone-historico" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
                 </button>
             </div>
 

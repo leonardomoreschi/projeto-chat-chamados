@@ -4,8 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login — Chat Interno</title>
-    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Cópia local do CDN do Tailwind: como script de terceiro no <head>, ele
+         bloqueava a primeira pintura de toda tela. Ver o topo do arquivo. -->
+    <script src="<?= asset('/assets/js/tailwind.js') ?>"></script>
     <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
+    <link rel="stylesheet" href="<?= asset('/assets/css/transicao-pagina.css') ?>">
+    <script src="<?= asset('/assets/js/transicao-pagina.js') ?>"></script>
     <style>
         #neat-gradient {
             position: fixed;

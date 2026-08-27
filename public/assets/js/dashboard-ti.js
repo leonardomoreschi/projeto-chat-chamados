@@ -456,23 +456,15 @@ function togglePainelHistorico() {
 
     if (!painel || !headerInfo || !conteudo || !icone || !botao || !filtros) return;
 
-    if (historicoMinimizado) {
-        painel.classList.remove('lg:w-80');
-        painel.classList.add('lg:w-16');
-        headerInfo.classList.add('hidden');
-        filtros.classList.add('hidden');
-        conteudo.classList.add('hidden');
-        icone.classList.add('rotate-180');
-        botao.title = 'Expandir histórico';
-    } else {
-        painel.classList.remove('lg:w-16');
-        painel.classList.add('lg:w-80');
-        headerInfo.classList.remove('hidden');
-        filtros.classList.remove('hidden');
-        conteudo.classList.remove('hidden');
-        icone.classList.remove('rotate-180');
-        botao.title = 'Minimizar histórico';
-    }
+    // Largura e giro do ícone vêm de `recolhido` em menu-lateral.css, e não das
+    // classes `lg:w-16`/`rotate-180` do Tailwind: como elas não aparecem em
+    // HTML nenhum, o compilador JIT só geraria as regras no primeiro clique —
+    // tarde demais para a transição pegar, e a primeira minimizada estalava.
+    painel.classList.toggle('recolhido', historicoMinimizado);
+    headerInfo.classList.toggle('hidden', historicoMinimizado);
+    filtros.classList.toggle('hidden', historicoMinimizado);
+    conteudo.classList.toggle('hidden', historicoMinimizado);
+    botao.title = historicoMinimizado ? 'Expandir histórico' : 'Minimizar histórico';
 }
 
 function getAnexoUrl(path) {

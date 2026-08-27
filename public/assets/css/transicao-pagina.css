@@ -1,0 +1,95 @@
+/* ============================================================================
+   Transição entre telas.
+
+   Cada item do menu lateral é um link normal: o navegador troca o documento
+   inteiro. Entre o clique e a primeira pintura da tela nova existe um intervalo
+   em que nada acontece — a janela fica branca e a tela então "aparece no seco".
+
+   Duas frentes, e a ordem importa:
+
+     1. o clique responde NA HORA, ainda na tela antiga (item destacado + barra
+        de progresso no topo) — é o que tira a sensação de clique morto;
+     2. a tela nova ENTRA com um fade curto em vez de estalar na tela.
+
+   De propósito NÃO existe fade de saída: ele adiaria a navegação em mais uns
+   120ms, ou seja, deixaria de fato mais lento aquilo que se quer fazer parecer
+   mais rápido.
+
+   Par de public/assets/js/transicao-pagina.js.
+   ============================================================================ */
+
+/* Entrada da tela. É animação, não transição, de propósito: dispara sozinha no
+   primeiro quadro, sem depender de JS nenhum. Se o JS falhar, a página aparece
+   normalmente — o inverso (opacidade 0 esperando um JS que não veio) deixaria
+   a tela em branco para sempre. */
+@keyframes pagina-entra {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+/* Anima o CONTEÚDO, nunca o <body>.
+ *
+ * Animar o body deixava a página inteira translúcida por 200ms, e o que
+ * aparecia atrás era o fundo do navegador — daí a tela "ficar preta" a cada
+ * troca. O body agora mantém o `bg-gray-950` firme o tempo todo e só o que
+ * mudou de fato surge por cima dele.
+ *
+ * O menu lateral fica de fora de propósito: ele é idêntico em todas as telas.
+ * Não piscar é justamente o que o faz parecer permanente, como se a página
+ * tivesse trocado por baixo dele. */
+body > *:not([data-menu-lateral]):not(script):not(style):not(#barra-progresso-pagina) {
+    /* `backwards`, não `both`: aplica o estado inicial ANTES de a animação
+       começar (é o que evita o pisco de opacidade 1 no primeiro quadro) e, ao
+       terminar, devolve o elemento ao estilo normal dele. Com `forwards` o
+       valor final ficaria grudado, e um modal que sobe depois herdaria um
+       contexto de empilhamento que ninguém pediu. */
+    animation: pagina-entra 180ms ease-out backwards;
+}
+
+/* Telas que montam conteúdo por fetch antes de fazerem sentido (o /chat carrega
+   a lista de conversas) seguram a entrada e a soltam quando estão prontas,
+   removendo esta classe do <html>. Sem isto o fade terminaria em cima de uma
+   tela ainda vazia, e o conteúdo apareceria depois — no seco, de novo. */
+html.pagina-aguardando body > *:not([data-menu-lateral]):not(script):not(style) {
+    animation: none;
+    opacity: 0;
+}
+
+/* ── Barra de progresso ──────────────────────────────────────────────────── */
+
+/* Vive na tela ANTIGA, do clique até o documento novo assumir. É o único sinal
+   possível nesse intervalo: a página velha ainda está no ar e a nova ainda não
+   pintou nada. */
+#barra-progresso-pagina {
+    position: fixed;
+    top: 0;
+    left: 0;
+    height: 2px;
+    width: 0;
+    z-index: 9999;
+    background: linear-gradient(90deg, #6366f1, #818cf8);
+    box-shadow: 0 0 8px rgba(99, 102, 241, .7);
+    transition: width 600ms cubic-bezier(.1, .6, .3, 1);
+    pointer-events: none;
+}
+
+/* Para em 80%: o resto só chega quando a tela nova chega, e fingir 100% antes
+   disso é mentir para o usuário sobre o que está acontecendo. */
+#barra-progresso-pagina.avancando {
+    width: 80%;
+}
+
+/* ── Item clicado ────────────────────────────────────────────────────────── */
+
+/* O destaque do item vale IMEDIATAMENTE, antes de a tela nova existir: é ele
+   que confirma ao usuário que o clique foi registrado. */
+[data-menu-lateral] a[aria-busy="true"] {
+    background-color: #4f46e5;
+    border-color: #6366f1;
+    color: #fff;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    body > * { animation-duration: 1ms; }
+    #barra-progresso-pagina { transition-duration: 1ms; }
+}

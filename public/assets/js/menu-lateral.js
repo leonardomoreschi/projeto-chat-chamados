@@ -24,6 +24,7 @@
         socket: null,
         reconectarTimer: null,
         pingTimer: null,
+        timerAnimacao: null,
         autenticado: false,
         sessaoEncerrada: false,
     };
@@ -57,40 +58,95 @@
         }
     }
 
-    function aplicarRecolhido(recolhido) {
+    // Tempo que o conteúdo leva para sumir. Espelha o `110ms` do fade em
+    // public/assets/css/menu-lateral.css — mudar lá exige mudar aqui, senão o
+    // layout troca com o conteúdo ainda visível (o piscar que isto corrige).
+    const DURACAO_FADE_MS = 110;
+
+    function mostrarBlocos(blocos, ehFaixaRecolhida) {
+        blocos.forEach(function (el) {
+            el.classList.remove('hidden');
+            if (ehFaixaRecolhida) el.classList.add('flex');
+        });
+    }
+
+    function ocultarBlocos(blocos, ehFaixaRecolhida) {
+        blocos.forEach(function (el) {
+            el.classList.add('hidden');
+            if (ehFaixaRecolhida) el.classList.remove('flex');
+        });
+    }
+
+    /**
+     * Aplica o estado do menu, animando a troca.
+     *
+     * `display:none` não anima: trocar a visibilidade num quadro só, enquanto a
+     * largura leva 260ms, era o que fazia o conteúdo piscar e a barra encolher
+     * vazia. A ordem aqui é o que dá a suavidade:
+     *
+     *   1. o que ENTRA volta ao fluxo já (transparente, pelo CSS);
+     *   2. a classe `menu-recolhido` dispara os fades e a largura;
+     *   3. o que SAI só deixa o fluxo depois do fade — e o salto de layout
+     *      acontece num instante em que ninguém está olhando para ele.
+     *
+     * @param {boolean} recolhido estado desejado
+     * @param {boolean} [animar]  false no primeiro paint, para o menu não abrir
+     *                            e fechar sozinho a cada troca de tela
+     */
+    function aplicarRecolhido(recolhido, animar) {
         const menu = elMenu();
         if (!menu) return;
 
-        menu.classList.toggle('w-72', !recolhido);
-        menu.classList.toggle('w-16', recolhido);
+        const comAnimacao = animar !== false;
+        clearTimeout(estado.timerAnimacao);
 
-        menu.querySelectorAll('[data-menu-conteudo]').forEach(function (el) {
-            el.classList.toggle('hidden', recolhido);
-        });
-        menu.querySelectorAll('[data-menu-recolhido]').forEach(function (el) {
-            el.classList.toggle('hidden', !recolhido);
-            el.classList.toggle('flex', recolhido);
-        });
+        const conteudos = Array.from(menu.querySelectorAll('[data-menu-conteudo]'));
+        const faixa = Array.from(menu.querySelectorAll('[data-menu-recolhido]'));
+        const entrando = recolhido ? faixa : conteudos;
+        const saindo = recolhido ? conteudos : faixa;
 
         const botao = menu.querySelector('[data-menu-toggle]');
         if (botao) {
             botao.title = recolhido ? 'Expandir menu' : 'Minimizar menu';
-            botao.classList.toggle('mx-auto', recolhido);
         }
 
-        const icone = menu.querySelector('[data-menu-icone]');
-        if (icone) {
-            // Setas viradas para o lado em que o menu vai se mover.
-            icone.innerHTML = recolhido
-                ? '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>'
-                : '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19l-7-7 7-7m8 14l-7-7 7-7"/>';
+        menu.classList.toggle('menu-sem-animacao', !comAnimacao);
+
+        // A largura vem de `menu-recolhido` em menu-lateral.css, não de
+        // `w-72`/`w-16`: o Tailwind só geraria a regra de `w-16` no primeiro
+        // clique, tarde demais para a transição pegar. Ver o CSS.
+        mostrarBlocos(entrando, recolhido);
+
+        function concluir() {
+            ocultarBlocos(saindo, !recolhido);
         }
+
+        if (comAnimacao) {
+            // Sem ler o layout aqui, o navegador agrupa "voltou ao fluxo" e
+            // "ficou opaco" no mesmo quadro e não há transição para animar.
+            void menu.offsetWidth;
+            menu.classList.toggle('menu-recolhido', recolhido);
+            estado.timerAnimacao = setTimeout(concluir, DURACAO_FADE_MS);
+            return;
+        }
+
+        // Primeiro paint: tudo de uma vez, com a trava ativa.
+        menu.classList.toggle('menu-recolhido', recolhido);
+        concluir();
+
+        // Força o recálculo AINDA travado e só então devolve a animação. Sem
+        // este passo o navegador só veria os dois estados juntos, com a
+        // transição já valendo — e a remoção da trava dispararia exatamente a
+        // animação que ela existe para evitar (o menu "abrindo e fechando
+        // sozinho" ao entrar numa tela com ele minimizado).
+        void menu.offsetWidth;
+        menu.classList.remove('menu-sem-animacao');
     }
 
     function alternarRecolhido() {
         const novo = !estaRecolhido();
         guardarRecolhido(novo);
-        aplicarRecolhido(novo);
+        aplicarRecolhido(novo, true);
     }
 
     // ── Conversas ─────────────────────────────
@@ -263,7 +319,8 @@
     function iniciar() {
         if (!elMenu()) return;
 
-        aplicarRecolhido(estaRecolhido());
+        // Primeiro paint: aplica o estado salvo sem animar.
+        aplicarRecolhido(estaRecolhido(), false);
 
         const botao = elMenu().querySelector('[data-menu-toggle]');
         if (botao) botao.addEventListener('click', alternarRecolhido);

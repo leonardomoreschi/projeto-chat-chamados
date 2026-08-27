@@ -1,0 +1,110 @@
+/* ============================================================================
+   Menu lateral — animação de minimizar/maximizar.
+   Par obrigatório de public/assets/js/menu-lateral.js (aplicarRecolhido).
+
+   O problema que estas regras resolvem: `display:none` não anima. Trocar a
+   visibilidade do conteúdo num quadro só, enquanto a largura leva ~260ms,
+   produzia um piscar seco seguido de uma barra encolhendo vazia.
+
+   A coreografia é sempre a mesma, nos dois sentidos:
+
+     0ms ─────────── 110ms ────────────────── 260ms
+     │               │                        │
+     │ sai o que     │ troca de layout        │ largura chega
+     │ estava (fade) │ (já invisível)         │ ao destino
+     │               └─ entra o que fica (fade, com atraso)
+
+   Tirar o conteúdo do fluxo só DEPOIS do fade é o detalhe que importa: é o
+   momento em que a faixa de ícones salta para o topo, e ninguém vê o salto
+   porque naquele instante ela ainda está transparente.
+   ============================================================================ */
+
+[data-menu-lateral] {
+    /* A largura mora AQUI, e não nas classes `w-72`/`w-16` do Tailwind.
+       Motivo: o Tailwind roda como compilador JIT no navegador e só gera a
+       regra de uma classe quando a encontra no DOM. Como `w-16` não aparece em
+       HTML nenhum, ela só passava a existir no primeiro clique em minimizar —
+       e chegava DEPOIS de a transição já ter começado. Resultado: a primeira
+       minimizada de cada carregamento de página estalava, e só a partir da
+       segunda ficava suave. Definida aqui, a regra existe desde o primeiro
+       quadro. */
+    width: 18rem;
+
+    /* `transition-all` animava cor, borda e sombra junto com a largura — várias
+       propriedades caras no mesmo quadro é o que dava a sensação de engasgo.
+       Só a largura precisa animar. */
+    transition: width 260ms cubic-bezier(.4, 0, .2, 1);
+    /* O conteúdo é CORTADO pela borda da barra em vez de refluir dentro dela:
+       o texto desliza para fora do campo de visão, não se requebra. */
+    overflow: hidden;
+}
+
+[data-menu-lateral].menu-recolhido {
+    width: 4rem;
+}
+
+/* O estado salvo no localStorage é aplicado no primeiro paint. Sem esta classe
+   o usuário veria o menu abrir e fechar sozinho a cada troca de tela. */
+[data-menu-lateral].menu-sem-animacao,
+[data-menu-lateral].menu-sem-animacao * {
+    transition: none !important;
+}
+
+/* ── Conteúdo do menu aberto ─────────────────────────────────────────────── */
+
+[data-menu-conteudo] {
+    opacity: 1;
+    /* Entra depois de o modo recolhido ter saído de cena. */
+    transition: opacity 150ms ease-out 110ms;
+}
+
+/* Blocos de largura inteira: travados na largura aberta para não refluírem
+   enquanto a barra encolhe. O `overflow:hidden` do menu corta o excedente.
+   Só os filhos DIRETOS — o bloco do usuário mora dentro da linha do topo, que
+   precisa continuar acompanhando a largura para o botão não escapar. */
+[data-menu-lateral] > [data-menu-conteudo] {
+    min-width: 18rem;
+}
+
+[data-menu-lateral].menu-recolhido [data-menu-conteudo] {
+    opacity: 0;
+    pointer-events: none;
+    /* Sai primeiro e mais rápido do que entra: a barra parece reagir ao clique
+       na hora, em vez de esperar a animação começar. */
+    transition: opacity 110ms ease-in;
+}
+
+/* ── Faixa do menu recolhido ─────────────────────────────────────────────── */
+
+[data-menu-recolhido] {
+    opacity: 0;
+    transition: opacity 110ms ease-in;
+}
+
+[data-menu-lateral].menu-recolhido [data-menu-recolhido] {
+    opacity: 1;
+    /* O atraso cobre exatamente a saída do conteúdo aberto. Os dois visíveis ao
+       mesmo tempo é o que dava a impressão de sobreposição/piscada. */
+    transition: opacity 170ms ease-out 110ms;
+}
+
+/* ── Botão de minimizar ──────────────────────────────────────────────────── */
+
+/* A seta é a mesma nos dois estados: girar 180° amarra a animação num gesto só
+   e é mais suave do que trocar o `path` do SVG no meio do caminho. */
+[data-menu-icone] {
+    transition: transform 260ms cubic-bezier(.4, 0, .2, 1);
+}
+
+[data-menu-lateral].menu-recolhido [data-menu-icone] {
+    transform: rotate(180deg);
+}
+
+/* Quem prefere menos movimento não deve pagar por esta animação. */
+@media (prefers-reduced-motion: reduce) {
+    [data-menu-lateral],
+    [data-menu-lateral] * {
+        transition-duration: 1ms !important;
+        transition-delay: 0ms !important;
+    }
+}
