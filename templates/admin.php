@@ -14,8 +14,14 @@
             'papel' => (string) ($userPapel ?? 'admin'),
         ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
     </script>
-    <!-- utils.js: redireciona para /login quando a API responde 401. -->
+    <!-- utils.js: redireciona para /login quando a API responde 401 e concentra
+         a decisão de aviso (toast x pop-up do SO) em avisoDoSistema(). -->
     <script src="<?= asset('/assets/js/utils.js') ?>"></script>
+    <link rel="manifest" href="/manifest.json">
+    <!-- Sem menu lateral aqui: quem abre o socket de notificação é o próprio
+         notificacoes.js (APP_USER não marca socketProprio). -->
+    <script src="<?= asset('/assets/js/som-notificacoes.js') ?>"></script>
+    <script src="<?= asset('/assets/js/notificacoes.js') ?>"></script>
     <style>
     </style>
 </head>

@@ -9,6 +9,18 @@
     <link rel="stylesheet" href="<?= asset('/assets/css/light-mode.css') ?>">
     <script src="<?= asset('/assets/js/utils.js') ?>"></script>
     <script src="<?= asset('/assets/js/config.js') ?>"></script>
+    <link rel="manifest" href="/manifest.json">
+    <script>
+        // Sem menu lateral nesta tela: quem abre o socket de notificação é o
+        // próprio notificacoes.js, por isso NÃO marcamos socketProprio.
+        window.APP_USER = <?= json_encode([
+            'id' => (int) ($userId ?? 0),
+            'nome' => (string) ($userName ?? ''),
+            'papel' => (string) ($userPapel ?? 'usuario'),
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?>;
+    </script>
+    <script src="<?= asset('/assets/js/som-notificacoes.js') ?>"></script>
+    <script src="<?= asset('/assets/js/notificacoes.js') ?>"></script>
 </head>
 <body class="page-relatorio-chamados bg-gray-950 text-white min-h-screen">
     <header class="sticky top-0 z-30 bg-gray-900/70 backdrop-blur border-b border-gray-800">

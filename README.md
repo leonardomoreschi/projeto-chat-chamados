@@ -81,6 +81,12 @@ Com WEB_HOST_PORT=8188:
 - Admin: http://localhost:8188/admin
 - WebSocket: ws://localhost:8080
 
+Com TLS habilitado (`WEB_HOST_PORT_HTTPS=8443`), as mesmas rotas respondem em
+`https://localhost:8443/...` e o WebSocket passa a ser `wss://localhost:8443/ws`,
+proxiado pelo nginx. **O HTTPS é pré-requisito das notificações do navegador**:
+em origem insegura o navegador nega a permissão automaticamente. Ver
+`docs/notificacoes.md`.
+
 Credenciais iniciais (se não alteradas no .env):
 
 - E-mail: admin@empresa.com
@@ -244,7 +250,29 @@ Eventos usados no canal:
 - notification_created
 - typing
 - message_deleted
+- new_conversation
+- schedule_updated
 - presence_updated (usuário ficou online/offline; enviado **apenas** para conexões de admin)
+- sessao_encerrada
+- ping / pong (keepalive de 25 s do front — aba de segundo plano congelada deixa de notificar)
+
+Endereço do canal: o front nunca escreve a URL na mão, usa `window.urlWebSocket()`
+(`public/assets/js/utils.js`), que devolve `wss://<host>/ws` sob HTTPS e
+`ws://<host>:8080` em HTTP.
+
+## Notificações
+
+Som, toast, sino, pop-up do sistema operacional e o requisito de TLS estão em
+**`docs/notificacoes.md`** — leia antes de mexer em qualquer aviso. Em resumo:
+todo aviso passa por `window.avisoDoSistema()`; janela ativa recebe toast,
+janela minimizada ou desfocada recebe pop-up do SO; e o pop-up só existe em
+contexto seguro (HTTPS ou localhost).
+
+```bash
+./scripts/gerar-certificados.sh chat.empresa.local 192.168.0.50   # CA interna + certificado
+docker compose up -d --build nginx                                # entrypoint detecta e liga o 443
+node scripts/testar-avisos.js                                     # matriz de decisão dos avisos
+```
 
 ## Estrutura resumida de dados
 

@@ -101,14 +101,21 @@ services:
     restart: unless-stopped
     depends_on:
       - php
+      # O bloco TLS faz proxy de wss://<host>/ws para este container; sem ele
+      # no ar o nginx recusa a configuração por não resolver o nome.
+      - websocket
     volumes:
       - ./public:/var/www/html/public:ro
       - uploads_data:/var/www/html/public/uploads:ro
+      # Certificados da CA interna (scripts/gerar-certificados.sh). Diretório
+      # vazio = só HTTP, e o entrypoint avisa no log.
+      - ./docker/nginx/certs:/etc/nginx/certs:ro
     networks:
       chat_network:
         ipv4_address: 172.20.0.30
     ports:
       - "${WEB_HOST_PORT:-8188}:80"
+      - "${WEB_HOST_PORT_HTTPS:-8443}:443"
     healthcheck:
       test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
       interval: 30s

@@ -116,6 +116,14 @@ class ChatServer implements MessageComponentInterface
                 $from->send(json_encode(['type' => 'auth_ok', 'userId' => $from->userId]));
                 break;
 
+            case 'ping':
+                // Keepalive do front. O navegador congela a aba de segundo
+                // plano que fica ociosa, e e' isso que corta a notificacao com
+                // a janela minimizada: manter trafego na conexao evita o
+                // congelamento e ainda impede o proxy de derrubar o socket.
+                $from->send(json_encode(['type' => 'pong']));
+                break;
+
             case 'join':
                 $from->conversaId = (int) ($data['conversa_id'] ?? 0);
                 break;

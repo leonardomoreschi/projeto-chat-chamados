@@ -25,6 +25,7 @@ let conversasConhecidas = new Set();
 let sincronizacaoInicialConversasFeita = false;
 let wsSincronizacaoInicialConcluida = false;
 let wsSessaoEncerrada = false;
+let wsPingIntervalId = null;
 let emojiPicker = null;
 let emojiPickerVisivel = false;
 let emojiFallbackVisivel = false;
@@ -54,8 +55,7 @@ const MAX_NOTIFICACOES_INICIO = 8;
 
 // ── WebSocket ─────────────────────────────────
 function conectarWS() {
-    const host = window.location.hostname;
-    ws = new WebSocket('ws://' + host + ':8080');
+    ws = new WebSocket(window.urlWebSocket());
 
     ws.onopen = function () {
         console.log('WebSocket conectado!');
@@ -66,6 +66,16 @@ function conectarWS() {
             user_papel: CURRENT_USER_PAPEL,
             conversa_id: conversaAtualId || 0,
         }));
+
+        // Mantém a conexão comprovadamente ativa: o Chrome não congela aba que
+        // segura conexão viva, e é isso que faz a mensagem continuar chegando
+        // (e notificando) com a janela minimizada por muito tempo.
+        clearInterval(wsPingIntervalId);
+        wsPingIntervalId = window.setInterval(function () {
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: 'ping' }));
+            }
+        }, 25000);
     };
 
     ws.onmessage = function (event) {
@@ -78,35 +88,45 @@ function conectarWS() {
             case 'new_conversation':
                 carregarConversas().catch(function () { });
                 if (wsSincronizacaoInicialConcluida && data.conversa && data.conversa.nome) {
-                    notificarMensagem('Novo chat iniciado', 'Você foi adicionado(a) em "' + data.conversa.nome + '".');
+                    notificarMensagem(
+                        'Novo chat iniciado',
+                        'Você foi adicionado(a) em "' + data.conversa.nome + '".',
+                        { url: '/chat?conversa=' + Number(data.conversa.id || 0), tag: 'conversa-nova:' + Number(data.conversa.id || 0) }
+                    );
                 }
                 break;
             case 'new_message':
                 if (!data.message || !data.message.id) break;
                 if (document.querySelector('[data-msg-id="' + data.message.id + '"]')) break;
 
-                // Som só para mensagem de outro usuário e fora do replay que o
-                // servidor faz no auth (últimas 100 mensagens viram new_message).
-                if (wsSincronizacaoInicialConcluida
-                    && Number(data.message.usuario_id) !== CURRENT_USER_ID
-                    && window.SomNotificacoes) {
-                    window.SomNotificacoes.tocar('mensagem', 'msg:' + data.message.id);
-                }
-
                 // Se a mensagem é de uma conversa desconhecida, recarrega a lista
                 if (!document.querySelector('[data-conversa-id="' + data.message.conversa_id + '"]')) {
                     carregarConversas().catch(function () { });
                 }
 
-                if (data.message.conversa_id == conversaAtualId) {
+                const conversaAberta = data.message.conversa_id == conversaAtualId;
+
+                if (conversaAberta) {
                     renderizarMensagem(data.message);
                     document.getElementById('messages').scrollTop = 99999;
-                    fetch('/api/conversas/' + conversaAtualId + '/lida', { method: 'POST' });
-                } else {
-                    if (wsSincronizacaoInicialConcluida) {
-                        notificarMensagem('Nova mensagem de ' + (data.message.usuario_nome || 'Contato'), (data.message.conteudo || 'Nova mensagem').substring(0, 100));
+                    // Só marca como lida se o usuário está de fato na frente da
+                    // tela; minimizado, a mensagem continua não lida (e o aviso
+                    // abaixo é o pop-up do sistema).
+                    if (window.appAtivo()) {
+                        fetch('/api/conversas/' + conversaAtualId + '/lida', { method: 'POST' });
                     }
                 }
+
+                // Avisa por um caminho só (NotificationCenterUI → avisoDoSistema):
+                // ele toca o som, decide entre toast e pop-up do SO e deduplica.
+                // Fora do replay do auth, que reenvia as últimas 100 mensagens.
+                if (wsSincronizacaoInicialConcluida && window.NotificationCenterUI) {
+                    window.NotificationCenterUI.notificarMensagemChat(
+                        data.message,
+                        { conversaAberta: conversaAberta }
+                    );
+                }
+
                 atualizarPreviewSidebar(data.message);
                 break;
             case 'message_deleted':
@@ -144,6 +164,7 @@ function conectarWS() {
 
     ws.onclose = function () {
         wsSincronizacaoInicialConcluida = false;
+        clearInterval(wsPingIntervalId);
         if (wsSessaoEncerrada) return;
 
         console.log('WS desconectado. Reconectando em 3s...');
@@ -187,6 +208,22 @@ document.addEventListener('DOMContentLoaded', async function () {
         document.addEventListener('visibilitychange', function () {
             if (!document.hidden) {
                 atualizarBadgePainelChamados();
+            }
+        });
+
+        // Voltando à janela: a conversa aberta só é dada como lida agora (com o
+        // usuário de fato na frente dela), e o socket pode ter caído em segundo
+        // plano sem disparar o timer de reconexão.
+        window.aoMudarAtividade(function (ativo) {
+            if (!ativo) return;
+
+            if (conversaAtualId) {
+                fetch('/api/conversas/' + conversaAtualId + '/lida', { method: 'POST' })
+                    .then(function () { carregarConversas().catch(function () { }); })
+                    .catch(function () { });
+            }
+            if (!ws || ws.readyState === WebSocket.CLOSED) {
+                conectarWS();
             }
         });
         fecharAoClicarNoFundo('modal-emergencia', fecharEmergencia);
@@ -278,7 +315,11 @@ async function carregarConversas() {
         lista.forEach(function (c) {
             const id = Number(c.id);
             if (!conversasConhecidas.has(id)) {
-                notificarMensagem('Nova conversa disponível', 'Você foi adicionado(a) em "' + c.nome + '".');
+                notificarMensagem(
+                    'Nova conversa disponível',
+                    'Você foi adicionado(a) em "' + c.nome + '".',
+                    { url: '/chat?conversa=' + id, tag: 'conversa-nova:' + id }
+                );
             }
         });
     }
@@ -1829,22 +1870,36 @@ function configurarAnexosMensagem() {
 }
 
 function configurarNotificacoes() {
-    if (!('Notification' in window)) return;
-    if (Notification.permission === 'default') {
-        Notification.requestPermission().catch(() => { });
+    // Quem pede a permissão (e mostra o banner de um clique quando o navegador
+    // exige gesto) é o notificacoes.js. Aqui só garantimos o pedido caso esta
+    // tela carregue antes dele.
+    if (window.pedirPermissaoDeAviso) {
+        window.pedirPermissaoDeAviso();
     }
 }
 
-function notificarMensagem(titulo, corpo) {
-    if (!('Notification' in window)) return;
-    if (document.hasFocus()) {
-        mostrarToastNotificacao(titulo, corpo);
-        return;
-    }
-    if (Notification.permission !== 'granted') return;
+/**
+ * Aviso avulso desta tela (conversa nova, chat criado).
+ *
+ * Mensagem recebida NÃO passa por aqui: ela vai por
+ * NotificationCenterUI.notificarMensagemChat(), que deduplica por id.
+ */
+function notificarMensagem(titulo, corpo, opcoes) {
+    const extra = opcoes || {};
 
-    const n = new Notification(titulo, { body: corpo });
-    setTimeout(function () { n.close(); }, 5000);
+    const exibiuPopup = window.avisoDoSistema({
+        titulo: titulo,
+        corpo: corpo,
+        url: extra.url || '/chat',
+        tag: extra.tag || 'chat-interno',
+        tipoSom: extra.tipoSom || 'geral',
+        chaveSom: extra.tag || (titulo + '|' + corpo),
+    });
+
+    // Nunca sai só o som: sem pop-up, o toast é obrigatório.
+    if (!exibiuPopup) {
+        mostrarToastNotificacao(titulo, corpo);
+    }
 }
 
 function mostrarToastNotificacao(titulo, corpo) {
@@ -1864,9 +1919,18 @@ async function verificarNovasMensagensNotificacao() {
             return acc + (parseInt(c.nao_lidas, 10) || 0);
         }, 0);
 
-        if (notificacoesInicializadas && total > ultimoTotalNaoLidas) {
+        // Rede de segurança para o socket caído. Com o WebSocket no ar quem
+        // avisa é o `new_message`, mensagem por mensagem — avisar aqui também
+        // duplicaria o aviso de cada mensagem recebida.
+        const socketNoAr = ws && ws.readyState === WebSocket.OPEN;
+
+        if (notificacoesInicializadas && total > ultimoTotalNaoLidas && !socketNoAr) {
             const delta = total - ultimoTotalNaoLidas;
-            notificarMensagem('Chat Interno', 'Voce recebeu ' + delta + ' nova(s) mensagem(ns).');
+            notificarMensagem(
+                'Chat Interno',
+                'Você recebeu ' + delta + ' nova(s) mensagem(ns).',
+                { url: '/chat', tag: 'chat-nao-lidas', tipoSom: 'mensagem' }
+            );
         }
 
         ultimoTotalNaoLidas = total;

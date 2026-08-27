@@ -216,6 +216,7 @@ $app->get('/dashboard-ti/relatorio', function ($request, $response) {
 
     return TemplateRenderer::render($response, __DIR__ . '/../templates/relatorio_chamados.php', [
         'userName' => $userName,
+        'userId' => $userId,
         'userPapel' => $userPapel,
         'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), $userId),
     ]);

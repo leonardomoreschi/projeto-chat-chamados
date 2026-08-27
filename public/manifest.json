@@ -1,0 +1,25 @@
+{
+    "name": "Chat Interno",
+    "short_name": "Chat",
+    "description": "Chat interno e gestão de chamados",
+    "lang": "pt-BR",
+    "start_url": "/chat",
+    "scope": "/",
+    "display": "standalone",
+    "background_color": "#111827",
+    "theme_color": "#4f46e5",
+    "icons": [
+        {
+            "src": "/assets/img/icone-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/assets/img/icone-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any"
+        }
+    ]
+}

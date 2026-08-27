@@ -23,6 +23,7 @@
         conversas: [],
         socket: null,
         reconectarTimer: null,
+        pingTimer: null,
         autenticado: false,
         sessaoEncerrada: false,
     };
@@ -183,7 +184,7 @@
         if (estado.socket && (estado.socket.readyState === WebSocket.OPEN || estado.socket.readyState === WebSocket.CONNECTING)) return;
 
         try {
-            estado.socket = new WebSocket('ws://' + window.location.hostname + ':8080');
+            estado.socket = new WebSocket(window.urlWebSocket());
         } catch (_) {
             return;
         }
@@ -197,6 +198,16 @@
                 user_papel: eu.papel || 'usuario',
                 conversa_id: 0,
             }));
+
+            // Mantém a conexão comprovadamente ativa: o Chrome não congela aba
+            // que segura conexão viva, e é isso que faz o aviso continuar
+            // chegando com a janela minimizada por muito tempo.
+            clearInterval(estado.pingTimer);
+            estado.pingTimer = setInterval(function () {
+                if (estado.socket && estado.socket.readyState === WebSocket.OPEN) {
+                    estado.socket.send(JSON.stringify({ type: 'ping' }));
+                }
+            }, 25000);
         };
 
         estado.socket.onmessage = function (evento) {
@@ -215,7 +226,13 @@
                     carregarConversas();
                     break;
                 case 'new_message':
-                    if (estado.autenticado) aplicarMensagem(msg.message);
+                    if (!estado.autenticado) break;   // replay das últimas 100 no auth
+                    aplicarMensagem(msg.message);
+                    // Fora do /chat nenhuma conversa está aberta na tela: toda
+                    // mensagem recebida vira aviso (som + toast ou pop-up do SO).
+                    if (window.NotificationCenterUI) {
+                        window.NotificationCenterUI.notificarMensagemChat(msg.message);
+                    }
                     break;
                 case 'new_conversation':
                     if (estado.autenticado) carregarConversas();
@@ -236,6 +253,7 @@
 
         estado.socket.onclose = function () {
             estado.autenticado = false;
+            clearInterval(estado.pingTimer);
             if (estado.sessaoEncerrada) return;
             clearTimeout(estado.reconectarTimer);
             estado.reconectarTimer = setTimeout(conectar, 3000);
@@ -257,6 +275,12 @@
         conectar();
         // Rede de segurança para o intervalo em que o socket estiver caído.
         setInterval(carregarConversas, 30000);
+
+        // Voltando à aba depois de um tempo fora: o navegador pode ter derrubado
+        // o socket em segundo plano sem disparar o timer de reconexão.
+        window.aoMudarAtividade(function (ativo) {
+            if (ativo) conectar();
+        });
     }
 
     document.addEventListener('DOMContentLoaded', iniciar);

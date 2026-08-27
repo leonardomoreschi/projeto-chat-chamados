@@ -11,3 +11,8 @@ uploads_backup.tar.gz
 CLAUDE.md
 opencode.json
 skills-lock.json
+
+# Certificados TLS: chave privada e certificado da CA interna nunca entram no
+# repositório. Gere com scripts/gerar-certificados.sh.
+docker/nginx/certs/*
+!docker/nginx/certs/.gitkeep

@@ -560,7 +560,7 @@ function conectarPresencaWS() {
     if (!usuario.id || !('WebSocket' in window)) return;
 
     try {
-        wsPresenca = new WebSocket('ws://' + window.location.hostname + ':8080');
+        wsPresenca = new WebSocket(window.urlWebSocket());
     } catch (_) {
         return;
     }
