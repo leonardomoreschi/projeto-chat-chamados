@@ -28,10 +28,32 @@
     </script>
     <style>
         #messages { scroll-behavior: smooth; }
-        .msg-enter { animation: fadeUp .2s ease; }
-        @keyframes fadeUp {
-            from { opacity: 0; transform: translateY(8px); }
-            to   { opacity: 1; transform: translateY(0); }
+
+        /* Botão de editar grupo (admin): em vez de flutuar por cima da data da
+           última mensagem e do badge de não lidas, ele abre uma calha à direita
+           — no hover o conteúdo do item desliza para a esquerda e nada fica
+           encoberto. As transições moram aqui, em CSS de verdade: classe do
+           Tailwind alternada por JS não animaria na primeira vez. E a
+           especificidade é de dois seletores de propósito — o `.transition` do
+           Tailwind entra no <head> depois deste bloco e venceria um empate,
+           levando junto o padding-right. */
+        .tem-editar > .conversa-item {
+            transition: padding-right .12s ease, background-color .15s ease;
+        }
+        .tem-editar:hover > .conversa-item,
+        .tem-editar:has(.conversa-editar:focus-visible) > .conversa-item {
+            padding-right: 2.25rem;
+        }
+
+        .tem-editar .conversa-editar {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity .12s ease, color .12s ease, background-color .12s ease;
+        }
+        .tem-editar:hover .conversa-editar,
+        .conversa-editar:focus-visible {
+            opacity: 1;
+            pointer-events: auto;
         }
 
         @media (max-width: 767px) {

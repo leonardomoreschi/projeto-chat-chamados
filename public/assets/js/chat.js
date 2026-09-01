@@ -429,14 +429,17 @@ function atualizarItemConversa(wrapper, c) {
     const precisaEditar = isGrupo && IS_ADMIN;
     const editBtn = wrapper.querySelector('.conversa-editar');
     if (precisaEditar && !editBtn) {
+        // O botão fica na calha que o hover abre à direita (regras em
+        // templates/chat.php): não cobre a data nem o badge de não lidas.
         wrapper.insertAdjacentHTML('beforeend',
-            '<button type="button" class="conversa-editar absolute right-2 top-1/2 -translate-y-1/2 hidden group-hover:flex w-6 h-6 items-center justify-center text-gray-500 hover:text-indigo-400 transition rounded-lg hover:bg-indigo-500/10">'
+            '<button type="button" title="Editar grupo" aria-label="Editar grupo" class="conversa-editar absolute right-1.5 top-1/2 -translate-y-1/2 flex w-7 h-7 items-center justify-center text-gray-500 hover:text-indigo-400 rounded-lg hover:bg-indigo-500/10">'
             + '<svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
             + '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>'
             + '</svg></button>');
     } else if (!precisaEditar && editBtn) {
         editBtn.remove();
     }
+    wrapper.classList.toggle('tem-editar', precisaEditar);
 
     btn.classList.toggle('bg-gray-800', id === conversaAtualId);
 }
