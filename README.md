@@ -1,317 +1,404 @@
-# Chat Interno + Chamados
 
-Plataforma interna com chat corporativo em tempo real e gestão de chamados de TI.
 
-## O que o sistema cobre
+# Chat Interno + Chamados 
 
-- Chat com conversas privadas, em grupo e por setor.
-- Chamados com prioridade, categoria e subcategoria.
-- Comentários técnicos com anexos.
-- Fluxo de triagem, classificação, resolução e histórico.
-- Painel administrativo para usuários e setores.
-- Relatórios de chamados com exportação CSV.
-- Central de notificações em tempo real para chamados e agendamentos.
+**Chat corporativo em tempo real e gestão de chamados de TI — num login só.**
+
+[![PHP](https://img.shields.io/badge/PHP-8.3-777BB4?style=for-the-badge&logo=php&logoColor=white)](https://www.php.net/)
+[![Slim](https://img.shields.io/badge/Slim-4-6DB33F?style=for-the-badge&logo=laravel&logoColor=white)](https://www.slimframework.com/)
+[![Ratchet](https://img.shields.io/badge/Ratchet-WebSocket-FF6B35?style=for-the-badge&logo=socketdotio&logoColor=white)](http://socketo.me/)
+[![MySQL](https://img.shields.io/badge/MySQL-8-4479A1?style=for-the-badge&logo=mysql&logoColor=white)](https://www.mysql.com/)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+[![Tailwind](https://img.shields.io/badge/Tailwind-3.4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com/)
+
+
+---
+
+Plataforma interna que junta, num único login, o **chat corporativo em tempo
+real** e a **gestão de chamados de TI** — com agendamento de serviços,
+relatórios e uma central de notificações que avisa mesmo com a janela
+minimizada.
+
+Feita para rodar na infraestrutura da própria empresa — uma VM, Docker Compose,
+rede local — sem depender de serviço externo: **nenhum dado de conversa ou
+chamado sai do servidor.**
+
+---
+
+## Funcionalidades
+
+| Módulo | O que faz |
+|---|---|
+| **Chat** | Conversas privadas, em grupo e por setor, em tempo real |
+| **Chamados** | Abertura, triagem, atendimento e histórico |
+| **Agendamentos** | Serviços agendados com aprovação e reagendamento |
+| **Relatórios** | Filtros e exportação CSV |
+| **Notificações** | Toast, som, sino e pop-up do sistema operacional |
+| **Administração** | Usuários, setores, papéis e sessões |
+
+### 💬 Chat
+
+- Conversas **privadas**, em **grupo** e por **setor**.
+- Mensagens em tempo real via WebSocket, com indicador de digitação, marcação de
+  lida, contador de não lidas e exclusão de mensagem.
+- Envio de anexos na conversa.
+- Data da última mensagem na lista lateral — *Hoje* / *Ontem* / data — e busca
+  de conversas.
+- Administração do grupo — renomear, descrição, adicionar e remover
+  participantes — direto pela lista.
+- Presença online/offline dos usuários.
+
+### 🎫 Chamados
+
+Todo chamado nasce com **prioridade**, **categoria**, **subcategoria** e, se
+precisar, anexos. Daí em diante ele caminha assim:
+
+```mermaid
+flowchart LR
+    A[" aberto"] --> B[" classificado"]
+    B --> C[" em_andamento"]
+    C --> D[" resolvido"]
+    A -.-> X[" cancelado"]
+    B -.-> X
+    C -.-> X
+
+    classDef novo        fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
+    classDef triagem     fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#4c1d95
+    classDef andamento   fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
+    classDef ok          fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#064e3b
+    classDef cancelado   fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+
+    class A novo
+    class B triagem
+    class C andamento
+    class D ok
+    class X cancelado
+```
+
+- Comentários técnicos com anexos e histórico por chamado.
+- Acionamento de outro setor a partir do chamado.
+- Tela **Meus chamados** para quem abriu e **Dashboard de TI** para quem
+  atende.
+- Taxonomias — categorias e subcategorias — editáveis pelo próprio time.
+
+### 📅 Agendamentos
+
+O usuário pede um serviço, o time de TI aprova, recusa ou propõe outro horário:
+
+```mermaid
+flowchart LR
+    S["solicitado"] --> A["agendado"]
+    A --> E["em_avaliacao"]
+    E --> F["encerrado"]
+    S -.-> C["cancelado"]
+    A -.-> C
+    A -.->|"reagendar"| S
+
+    classDef pedido    fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
+    classDef marcado   fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#4c1d95
+    classDef avaliando fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
+    classDef fim       fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#064e3b
+    classDef cancelado fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+
+    class S pedido
+    class A marcado
+    class E avaliando
+    class F fim
+    class C cancelado
+```
+
+- **Painel de agendamentos** para o time de TI.
+- Proposta de reagendamento, com aceite ou recusa do solicitante.
+- Agendamentos vencidos migram sozinhos para `em_avaliacao` — rotina
+  periódica no processo WebSocket.
+- Catálogo de serviços agendáveis administrável.
+
+### 📊 Relatórios
+
+- Relatório de chamados com filtros e **exportação CSV**.
+
+### 🔔 Notificações
+
+- Central de notificações com sino, contador e histórico.
+- **Toast** quando a janela está ativa e **pop-up do sistema operacional**
+  quando está minimizada ou sem foco, mais som de alerta.
+
+
+> O pop-up do sistema operacional exige **contexto seguro (HTTPS)**. Em
+> `http://<ip>:8188` o navegador nega a permissão automaticamente — ver o
+> passo **Habilitar HTTPS**, na execução.
+
+### 🛡️ Administração
+
+- CRUD de usuários e setores, com coluna de conexão — online / último acesso.
+- Papéis `admin`, `ti` e `usuario`.
+- Alterações sensíveis — editar ou excluir usuário — pedem a confirmação da
+  senha do admin logado.
+- Trocar e-mail, senha, papel ou desativar alguém **derruba a sessão daquela
+  pessoa em todos os dispositivos**, na web e no WebSocket.
+
+---
 
 ## Stack
 
-| Camada | Tecnologia |
-|---|---|
-| Backend | PHP 8.3 (compatível com requisito de projeto >= 8.1) |
-| Framework | Slim 4 |
-| Tempo real | Ratchet (WebSocket) |
-| Banco | MySQL 8 |
-| Infra | Docker Compose (mysql, php, nginx, websocket) |
-| Frontend | HTML + Tailwind (cópia local do CDN, `public/assets/js/tailwind.js`) + JavaScript Vanilla, sem build step |
 
-## Arquitetura atual
 
-- mysql: banco de dados.
-- php: aplicação HTTP em PHP-FPM.
-- nginx: entrada web em porta publicada no host.
-- websocket: processo dedicado Ratchet com Supervisor e healthcheck TCP na porta 8080.
+**Backend**
 
-## Seed e bootstrap automáticos
+![PHP](https://img.shields.io/badge/PHP_8.3-777BB4?style=flat-square&logo=php&logoColor=white)
+![Slim](https://img.shields.io/badge/Slim_4-6DB33F?style=flat-square&logo=laravel&logoColor=white)
+![PSR-7](https://img.shields.io/badge/slim%2Fpsr7-8892BF?style=flat-square)
+![dotenv](https://img.shields.io/badge/phpdotenv-ECD53F?style=flat-square&logo=dotenv&logoColor=black)
 
-Na inicialização:
+**Tempo real e dados**
 
-- o bootstrap roda automaticamente na aplicação HTTP e no serviço WebSocket;
-- setores padrão são semeados uma única vez por banco (marcador `setores_padrao` em `bootstrap_marcadores`), para que setores excluídos pelo admin não voltem;
-- usuário admin inicial é criado automaticamente (se não existir);
-- setores duplicados são deduplicados com reassociação de usuários;
-- chave única de nome de setor é garantida para evitar duplicação futura.
+![Ratchet](https://img.shields.io/badge/Ratchet_WebSocket-FF6B35?style=flat-square&logo=socketdotio&logoColor=white)
+![MySQL](https://img.shields.io/badge/MySQL_8-4479A1?style=flat-square&logo=mysql&logoColor=white)
+![PDO](https://img.shields.io/badge/PDO-00758F?style=flat-square)
 
-## Variáveis de ambiente
+**Front-end**
 
-Arquivo base:
+![HTML5](https://img.shields.io/badge/HTML5-E34F26?style=flat-square&logo=html5&logoColor=white)
+![Tailwind](https://img.shields.io/badge/Tailwind_3.4-06B6D4?style=flat-square&logo=tailwindcss&logoColor=white)
+![JavaScript](https://img.shields.io/badge/JS_Vanilla-F7DF1E?style=flat-square&logo=javascript&logoColor=black)
+![No build](https://img.shields.io/badge/sem_build_step-22C55E?style=flat-square)
 
-- .env.docker.example
+**Infraestrutura**
 
-Passos:
+![Docker](https://img.shields.io/badge/Docker_Compose-2496ED?style=flat-square&logo=docker&logoColor=white)
+![nginx](https://img.shields.io/badge/nginx-009639?style=flat-square&logo=nginx&logoColor=white)
+![PHP-FPM](https://img.shields.io/badge/PHP--FPM-777BB4?style=flat-square&logo=php&logoColor=white)
+![Supervisor](https://img.shields.io/badge/Supervisor-4B5563?style=flat-square)
+![GitHub Actions](https://img.shields.io/badge/GitHub_Actions-2088FF?style=flat-square&logo=githubactions&logoColor=white)
+![Docker Hub](https://img.shields.io/badge/Docker_Hub-0DB7ED?style=flat-square&logo=docker&logoColor=white)
+
+
+| Camada | Tecnologia | Por quê |
+|---|---|---|
+| Linguagem | **PHP 8.3** *(mínimo 8.1)* | `strict_types` em todo arquivo |
+| Framework HTTP | **Slim 4** + `slim/psr7` | roteamento enxuto, sem ORM |
+| Tempo real | **Ratchet** *(porta 8080)* | WebSocket em processo próprio |
+| Banco | **MySQL 8** | acesso por PDO, sem ORM |
+| Front-end | **Tailwind + JS vanilla** | sem build step, sem `node_modules` |
+| Servidor web | **nginx + PHP-FPM** | gzip ligado, proxy `/ws`, TLS opcional |
+| Processos | **Supervisor** | mantém o servidor WebSocket vivo |
+| Infra | **Docker Compose** | `mysql` · `php` · `nginx` · `websocket` |
+| CI/CD | **GitHub Actions → Docker Hub** | lint de PHP + build das 3 imagens |
+
+
+> O Tailwind é uma **cópia local** do CDN (`public/assets/js/tailwind.js`), não
+> um script de terceiro: mantém o JIT em runtime sem bloquear a primeira pintura
+> da tela nem depender de internet.
+
+---
+
+## 🏗️ Como a aplicação está organizada
+
+Dois processos independentes, compartilhando o mesmo banco MySQL:
+
+```mermaid
+flowchart LR
+    U[" Navegador"] -->|HTTPS| N[" nginx"]
+    U -.->|"WebSocket /ws"| N
+    N --> P[" php-fpm<br/>Slim 4"]
+    N -.-> W[" websocket<br/>Ratchet"]
+    P -->|"grava"| D[(" MySQL")]
+    W -->|"polling 0,8s"| D
+    W -.->|"broadcast"| U
+
+    classDef cliente fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
+    classDef web     fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#064e3b
+    classDef app     fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#4c1d95
+    classDef rt      fill:#ffedd5,stroke:#ea580c,stroke-width:2px,color:#7c2d12
+    classDef db      fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
+
+    class U cliente
+    class N web
+    class P app
+    class W rt
+    class D db
+```
+
+1. **HTTP** — `public/index.php` (Slim 4 atrás do nginx/PHP-FPM). Concentra
+   todas as rotas de página e de API.
+2. **WebSocket** — `bin/chat-server.php` → `App\Services\ChatServer` (Ratchet).
+
+Não há fila nem barramento entre eles: **a integração é por polling do banco**.
+O `ChatServer` varre mensagens, conversas e notificações novas a cada 0,8 s e
+faz a manutenção dos agendamentos a cada 60 s. Na prática, um controller HTTP
+que precisa avisar alguém só grava no banco — o broadcast sai sozinho no ciclo
+seguinte.
+
+```
+projeto-chat-chamados/
+├── 📂 app/
+│   ├── Controllers/    # regras de negócio (falam PDO direto)
+│   ├── Middleware/     # autenticação e autorização
+│   ├── Services/       # ChatServer (WebSocket)
+│   ├── Support/        # notificações, templates, helpers de schema
+│   └── Helpers/        # respostas JSON padronizadas
+├── ⚡ bin/chat-server.php  # entrada do processo WebSocket
+├── ⚙️  config/          # conexão, schema.sql e bootstrap idempotente
+├── 🐳 docker/          # imagens e configuração de nginx, php e websocket
+├── 📚 docs/            # documentação complementar
+├── 🌐 public/          # index.php (rotas) + assets (js/css) + uploads
+├── 🧪 scripts/         # certificados TLS e testes de front em node
+└── 🎨 templates/       # telas (HTML + PHP)
+```
+
+O schema tem **bootstrap idempotente** (`config/bootstrap.php`), não migrations:
+tabelas e colunas novas são criadas e ajustadas automaticamente no boot, e os
+setores padrão e o usuário admin são semeados na primeira execução.
+
+---
+
+##  Passo a passo para executar
+
+###  Pré-requisitos
+
+- Docker e Docker Compose instalados.
+- 🔌 Portas livres no host: `8188` (HTTP), `8443` (HTTPS), `8080` (WebSocket) e
+  `3307` (MySQL) — todas configuráveis no `.env`.
+
+###  Clonar e configurar
 
 ```bash
+git clone <url-do-repositorio>
+cd projeto-chat-chamados
 cp .env.docker.example .env
 ```
 
-## Subir com Docker
+Edite o `.env` e troque, no mínimo:
+
+| Variável | Para quê |
+|---|---|
+|  `APP_SECRET` | string aleatória de 64 caracteres |
+|  `DB_PASS` / `DB_ROOT_PASS` | senhas do MySQL |
+|  `ADMIN_EMAIL` / `ADMIN_PASSWORD` | conta admin criada no primeiro boot |
+|  `WEB_HOST_PORT` / `WEB_HOST_PORT_HTTPS` | portas publicadas no host |
+|  `SESSION_LIFETIME_DIAS` | duração do login (padrão: 7 dias) |
+|  `UPLOAD_MAX_SIZE` / `UPLOAD_ALLOWED` | limite e tipos de anexo |
+
+### Subir a stack
 
 ```bash
 docker compose up -d --build
-docker compose ps
+docker compose ps      # mysql, php, nginx e websocket devem ficar "healthy"
 ```
 
-Serviços esperados:
+O primeiro boot cria o banco, aplica o schema e semeia setores e admin. Pode
+levar alguns segundos até o MySQL ficar saudável.
 
-- mysql: healthy
-- php: healthy
-- nginx: healthy
-- websocket: healthy
+### Acessar
 
-## Acessos padrão
+| | Endereço |
+|---|---|
+| Aplicação | <http://localhost:8188/> — redireciona para `/chat` ou `/login` |
+| WebSocket | `ws://localhost:8080` |
 
-Com WEB_HOST_PORT=8188:
+Credenciais iniciais (as do `.env`; por padrão):
 
-- Raiz: http://localhost:8188/ — manda para `/chat` se já houver sessão, senão para `/login`
-- Login: http://localhost:8188/login (com sessão viva, redireciona para `/chat`)
-- Chat: http://localhost:8188/chat
-- Agendamentos: http://localhost:8188/agendamentos
-- Meus chamados: http://localhost:8188/meus-chamados
-- Dashboard TI: http://localhost:8188/dashboard-ti
-- Painel de agendamentos: http://localhost:8188/painel-agendamentos
-- Relatório TI: http://localhost:8188/dashboard-ti/relatorio
-- Admin: http://localhost:8188/admin
-- WebSocket: ws://localhost:8080
+- **E-mail:** `admin@empresa.com`
+- **Senha:** `password`
 
-Com TLS habilitado (`WEB_HOST_PORT_HTTPS=8443`), as mesmas rotas respondem em
-`https://localhost:8443/...` e o WebSocket passa a ser `wss://localhost:8443/ws`,
-proxiado pelo nginx. **O HTTPS é pré-requisito das notificações do navegador**:
-em origem insegura o navegador nega a permissão automaticamente. Ver
-`docs/notificacoes.md`.
+> Troque a senha do admin logo no primeiro acesso.
 
-Credenciais iniciais (se não alteradas no .env):
+### *(Recomendado)* Habilitar HTTPS
 
-- E-mail: admin@empresa.com
-- Senha: password
-
-## Comandos úteis
-
-Subir stack:
-
-```bash
-docker compose up -d
-```
-
-Rebuild completo:
-
-```bash
-docker compose up -d --build
-```
-
-Reiniciar apenas websocket:
-
-```bash
-docker compose restart websocket
-```
-
-Ver status:
-
-```bash
-docker compose ps
-```
-
-Logs do websocket:
-
-```bash
-docker logs -f chat_websocket
-```
-
-Parar stack:
-
-```bash
-docker compose down
-```
-
-Reset total (remove volumes de dados):
-
-```bash
-docker compose down -v
-```
-
-## Endpoints principais
-
-Todas as rotas de API exigem sessão autenticada.
-
-A sessão morre sozinha quando o admin altera e-mail, senha ou papel da conta, ou
-a desativa: essas mudanças incrementam `usuarios.sessao_versao`, e o
-`AuthMiddleware` compara com o valor gravado no login — vale para todos os
-dispositivos onde a pessoa estiver logada. Página perdida vai para `/login`;
-rota `/api/*` recebe `401` com `{"sessao_encerrada": true}` (o `utils.js`
-redireciona), e o `ChatServer` fecha as conexões WebSocket em até 5s com o
-evento `sessao_encerrada`.
-
-### Chat
-
-- GET /api/conversas
-- POST /api/conversas
-- GET /api/conversas/{id}
-- PATCH /api/conversas/{id}
-- PATCH /api/conversas/{id}/descricao
-- DELETE /api/conversas/{id}
-- POST /api/conversas/{id}/lida
-- GET /api/conversas/{id}/participantes
-- POST /api/conversas/{id}/participantes
-- DELETE /api/conversas/{id}/participantes/{uid}
-- GET /api/mensagens
-- POST /api/mensagens
-- DELETE /api/mensagens/{id}
-- GET /api/usuarios (lista para montar conversas; **não** devolve presença)
-
-### Chamados
-
-- POST /api/chamados
-- GET /api/chamados
-- GET /api/chamados/{id}/anexos
-- GET /api/chamados/{id}/comentarios
-- POST /api/chamados/{id}/comentarios
-- DELETE /api/chamados/{id}/comentarios/{comentarioId}
-- PATCH /api/chamados/{id}/status
-- PATCH /api/chamados/{id}/cancelar
-- PATCH /api/chamados/{id}/classificar
-- PATCH /api/chamados/{id}/classificacao
-- PATCH /api/chamados/{id}/finalizar
-- GET /api/chamados/relatorio
-- GET /api/chamados/relatorio/csv
-- GET /api/chamados-taxonomias
-- GET /api/chamados-taxonomias/detalhe
-- POST /api/chamados-taxonomias
-- DELETE /api/chamados-taxonomias/{id}
-
-### Agendamentos
-
-- GET /agendamentos
-- GET /painel-agendamentos
-- GET /api/agendamentos
-- GET /api/agendamentos/{id}
-- POST /api/agendamentos
-- PATCH /api/agendamentos/{id}/aprovar
-- PATCH /api/agendamentos/{id}/recusar
-- PATCH /api/agendamentos/{id}/reagendar
-- PATCH /api/agendamentos/{id}/reagendamento/aceitar
-- PATCH /api/agendamentos/{id}/reagendamento/recusar
-- PATCH /api/agendamentos/{id}/cancelar
-- PATCH /api/agendamentos/{id}/encerrar
-- GET /api/servicos-agendamento
-- POST /api/servicos-agendamento
-- PATCH /api/servicos-agendamento/{id}
-- DELETE /api/servicos-agendamento/{id}
-
-### Notificações
-
-- GET /notificacoes
-- GET /api/notificacoes
-- GET /api/notificacoes/resumo
-- PATCH /api/notificacoes/{id}/lida
-- PATCH /api/notificacoes/lida
-
-### Admin
-
-Todas sob `AdminMiddleware` (403 para quem não é admin).
-
-Alterar um usuário que já existe (PATCH e DELETE) exige reconferir a identidade:
-os campos `admin_email` e `admin_senha` do **admin logado na sessão** vão no
-corpo da requisição e são validados com `password_verify`. Criar usuário não
-exige (não altera dado de ninguém).
-
-- GET /api/admin/usuarios (inclui `online`/`last_seen` para a coluna "Conexão")
-- GET /api/admin/usuarios/presenca (ids online; reconciliação do tempo real)
-- POST /api/admin/usuarios
-- PATCH /api/admin/usuarios/{id}
-- DELETE /api/admin/usuarios/{id}
-- GET /api/admin/setores
-- POST /api/admin/setores
-- DELETE /api/admin/setores/{id}
-
-## WebSocket
-
-Processo dedicado rodando no container websocket, gerenciado por Supervisor.
-
-Comportamento:
-
-- auto-restart em falhas do processo Ratchet;
-- healthcheck por conexão TCP em localhost:8080;
-- sincronização periódica para refletir eventos gerados fora do socket.
-
-Eventos usados no canal:
-
-- auth (aceita `somente_presenca: true` — conexão que só acompanha presença, sem replay de mensagens)
-- auth_ok
-- join
-- send_message
-- new_message
-- notification_created
-- typing
-- message_deleted
-- new_conversation
-- schedule_updated
-- presence_updated (usuário ficou online/offline; enviado **apenas** para conexões de admin)
-- sessao_encerrada
-- ping / pong (keepalive de 25 s do front — aba de segundo plano congelada deixa de notificar)
-
-Endereço do canal: o front nunca escreve a URL na mão, usa `window.urlWebSocket()`
-(`public/assets/js/utils.js`), que devolve `wss://<host>/ws` sob HTTPS e
-`ws://<host>:8080` em HTTP.
-
-## Notificações
-
-Som, toast, sino, pop-up do sistema operacional e o requisito de TLS estão em
-**`docs/notificacoes.md`** — leia antes de mexer em qualquer aviso. Em resumo:
-todo aviso passa por `window.avisoDoSistema()`; janela ativa recebe toast,
-janela minimizada ou desfocada recebe pop-up do SO; e o pop-up só existe em
-contexto seguro (HTTPS ou localhost).
+**O pop-up de notificação do navegador só funciona em contexto seguro.**
 
 ```bash
 ./scripts/gerar-certificados.sh chat.empresa.local 192.168.0.50   # CA interna + certificado
-docker compose up -d --build nginx                                # entrypoint detecta e liga o 443
-node scripts/testar-avisos.js                                     # matriz de decisão dos avisos
+docker compose up -d --build nginx
+docker logs chat_nginx | grep '\[nginx\]'                          # "TLS habilitado: ..."
 ```
 
-## Testes
+Com o certificado no lugar, a aplicação responde em `https://localhost:8443/` e
+o WebSocket passa a ser `wss://localhost:8443/ws`, proxiado pelo nginx. Instale
+a CA gerada nas máquinas clientes.
 
-Não há suíte formal. Três scripts de node, sem dependência nenhuma, cobrem a
-lógica de front que mais dá trabalho quando quebra:
+ Detalhes em [`docs/notificacoes.md`](docs/notificacoes.md).
+
+### 🐧 Rodar sem Docker
+
+Guia dedicado: [`docs/rodar-sem-docker-na-vm.md`](docs/rodar-sem-docker-na-vm.md).
+Migração de uma VM bare metal: [`docs/migration-guide.md`](docs/migration-guide.md).
+
+---
+
+## Comandos do dia a dia
 
 ```bash
-node scripts/testar-avisos.js            # toast x pop-up do SO x silêncio
-node scripts/testar-menu-lateral.js      # minimizar/maximizar do menu lateral
-node scripts/testar-transicao-pagina.js  # quais cliques contam como navegação
+docker compose up -d --build        # subir / rebuildar
+docker compose ps                   # status dos serviços
+docker compose restart websocket    # obrigatório após mudar código do WebSocket
+docker compose restart php          # após mudar template ou código PHP (opcache)
+docker logs -f chat_websocket       # acompanhar o servidor de tempo real
+docker compose down                 # parar
+docker compose down -v              # RESET TOTAL — apaga o volume do MySQL
 ```
 
-## Estrutura resumida de dados
+> `docker compose down -v` remove o volume do MySQL: **todas as conversas,
+> chamados e usuários são perdidos.**
+
+Código PHP da aplicação HTTP é montado no container (`./:/var/www/html`), então
+não exige rebuild; o servidor WebSocket, sim, carrega o código no boot do
+processo.
+
+Lint de um arquivo:
+
+```bash
+docker exec chat_php php -l app/Controllers/ChamadoController.php
+```
+
+---
+
+## 🧪 Testes
+
+Não há suíte formal — nem PHPUnit, nem linter configurado. Três scripts de node,
+**sem nenhuma dependência**, cobrem a lógica de front que mais dá trabalho
+quando quebra. Rodam da raiz do repositório:
+
+```bash
+node scripts/testar-avisos.js            # 🔔 toast x pop-up do SO x silêncio
+node scripts/testar-menu-lateral.js      # 📐 minimizar/maximizar do menu lateral
+node scripts/testar-transicao-pagina.js  # 🖱️ quais cliques contam como navegação
+```
+
+O CI (`.github/workflows/ci-cd-dockerhub.yml`, em push para `main`) valida o
+`composer.json`, instala dependências, roda `php -l` em todos os arquivos PHP e
+publica as três imagens no Docker Hub.
+
+---
+
+## 🗄️ Dados
 
 Tabelas principais:
 
-- setores
-- usuarios
-- conversas
-- participantes
-- mensagens
-- chamados
-- chamado_anexos
-- chamado_comentarios
-- chamado_comentario_anexos
-- chamado_taxonomias
-- servicos_agendamento
-- agendamentos
-- notificacoes
-- user_presenca
+`setores` · `usuarios` · `conversas` · `participantes` · `mensagens` ·
+`chamados` · `chamado_anexos` · `chamado_comentarios` ·
+`chamado_comentario_anexos` · `chamado_taxonomias` · `servicos_agendamento` ·
+`agendamentos` · `notificacoes` · `user_presenca`
 
-## Execução sem Docker
+- 🕒 Timezone fixo em `America/Sao_Paulo` — PHP HTTP, PHP WebSocket e sessão
+  MySQL.
+- 📎 Anexos ficam em disco (`public/uploads/`, volume `uploads_data`); o banco
+  guarda apenas os metadados.
 
-Guia dedicado em:
+---
 
-- docs/rodar-sem-docker-na-vm.md
+## Documentação complementar
 
-## Observações de operação
+| Arquivo | Assunto |
+|---|---|
+| [`docs/notificacoes.md`](docs/notificacoes.md) | Som, toast, sino, pop-up do SO e TLS — documento único do assunto |
+| [`docs/onboarding-arquitetura-projeto.md`](docs/onboarding-arquitetura-projeto.md) | Visão de arquitetura para quem está chegando |
+| [`docs/rodar-sem-docker-na-vm.md`](docs/rodar-sem-docker-na-vm.md) | Execução sem Docker |
+| [`docs/migration-guide.md`](docs/migration-guide.md) | Migração de VM bare metal |
+| [`docs/REFACTOR.md`](docs/REFACTOR.md) | Histórico de refatorações |
+| [`CLAUDE.md`](CLAUDE.md) | Convenções e armadilhas do código |
 
-- Timezone padrão: America/Sao_Paulo.
-- Uploads ficam em disco e o banco salva metadados.
-- O schema inicial é aplicado automaticamente no primeiro boot do MySQL quando o volume está vazio.
+O catálogo de rotas — páginas e API — vive em `public/index.php`: é o arquivo
+único onde todo endpoint é declarado.
+
+---
