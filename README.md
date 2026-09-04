@@ -2,7 +2,7 @@
 
 # Chat Interno + Chamados 
 
-**Chat corporativo em tempo real e gestão de chamados de TI — num login só.**
+**Chat corporativo em tempo real e gestão de chamados de TI**
 
 [![PHP](https://img.shields.io/badge/PHP-8.3-777BB4?style=for-the-badge&logo=php&logoColor=white)](https://www.php.net/)
 [![Slim](https://img.shields.io/badge/Slim-4-6DB33F?style=for-the-badge&logo=laravel&logoColor=white)](https://www.slimframework.com/)
@@ -16,8 +16,7 @@
 
 Plataforma interna que junta, num único login, o **chat corporativo em tempo
 real** e a **gestão de chamados de TI** — com agendamento de serviços,
-relatórios e uma central de notificações que avisa mesmo com a janela
-minimizada.
+relatórios e uma central de notificações.
 
 Feita para rodar na infraestrutura da própria empresa — uma VM, Docker Compose,
 rede local — sem depender de serviço externo: **nenhum dado de conversa ou
@@ -62,11 +61,11 @@ flowchart LR
     B -.-> X
     C -.-> X
 
-    classDef novo        fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
-    classDef triagem     fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#4c1d95
-    classDef andamento   fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
-    classDef ok          fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#064e3b
-    classDef cancelado   fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    classDef novo        fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
+    classDef triagem     fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
+    classDef andamento   fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
+    classDef ok          fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
+    classDef cancelado   fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
 
     class A novo
     class B triagem
@@ -94,11 +93,11 @@ flowchart LR
     A -.-> C
     A -.->|"reagendar"| S
 
-    classDef pedido    fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
-    classDef marcado   fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#4c1d95
-    classDef avaliando fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
-    classDef fim       fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#064e3b
-    classDef cancelado fill:#fee2e2,stroke:#dc2626,stroke-width:2px,color:#7f1d1d
+    classDef pedido    fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
+    classDef marcado   fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
+    classDef avaliando fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
+    classDef fim       fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
+    classDef cancelado fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
 
     class S pedido
     class A marcado
@@ -206,11 +205,11 @@ flowchart LR
     W -->|"polling 0,8s"| D
     W -.->|"broadcast"| U
 
-    classDef cliente fill:#dbeafe,stroke:#2563eb,stroke-width:2px,color:#1e3a8a
-    classDef web     fill:#d1fae5,stroke:#059669,stroke-width:2px,color:#064e3b
-    classDef app     fill:#ede9fe,stroke:#7c3aed,stroke-width:2px,color:#4c1d95
-    classDef rt      fill:#ffedd5,stroke:#ea580c,stroke-width:2px,color:#7c2d12
-    classDef db      fill:#fef3c7,stroke:#d97706,stroke-width:2px,color:#78350f
+    classDef cliente fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
+    classDef web     fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
+    classDef app     fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
+    classDef rt      fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
+    classDef db      fill:#e9ecef,stroke:#6c757d,stroke-width:1.5px,color:#212529
 
     class U cliente
     class N web
