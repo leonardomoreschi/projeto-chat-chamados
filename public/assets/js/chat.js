@@ -198,7 +198,17 @@ document.addEventListener('DOMContentLoaded', async function () {
             url.searchParams.delete('emergencia');
             window.history.replaceState({}, document.title, url.pathname + url.search);
         }
+
+        // Mesmo truque para o "+" de nova conversa do menu lateral das outras
+        // telas: o modal também só existe aqui.
+        if (new URLSearchParams(window.location.search).get('nova_conversa') === '1') {
+            abrirModalNovaConversa();
+            const url = new URL(window.location.href);
+            url.searchParams.delete('nova_conversa');
+            window.history.replaceState({}, document.title, url.pathname + url.search);
+        }
         carregarUsuarios();
+        configurarSecaoConversas();
         configurarBusca();
         configurarNotificacoes();
         configurarAnexoChamado();
@@ -1799,6 +1809,43 @@ async function confirmarExcluirGrupo() {
         }
         carregarConversas();
     }
+}
+
+// ── Seção "Conversas" recolhível ──────────────
+// Mesma chave em menu-lateral.js: recolher a lista aqui mantém o estado ao
+// navegar para as outras telas — é o que "disponível em todas as telas" pede.
+const CHAVE_CONVERSAS_RECOLHIDAS = 'menu-lateral:conversas-recolhidas';
+
+function conversasEstaoRecolhidas() {
+    try {
+        return window.localStorage.getItem(CHAVE_CONVERSAS_RECOLHIDAS) === '1';
+    } catch (_) {
+        return false;
+    }
+}
+
+function configurarSecaoConversas() {
+    const secao = document.querySelector('[data-secao="conversas"]');
+    const botao = secao && secao.querySelector('[data-secao-toggle]');
+    if (!secao || !botao) return;
+
+    secao.classList.toggle('secao-recolhida', conversasEstaoRecolhidas());
+
+    botao.addEventListener('click', function () {
+        const recolhido = !secao.classList.contains('secao-recolhida');
+        secao.classList.toggle('secao-recolhida', recolhido);
+        botao.title = recolhido ? 'Expandir conversas' : 'Recolher conversas';
+
+        try {
+            if (recolhido) {
+                window.localStorage.setItem(CHAVE_CONVERSAS_RECOLHIDAS, '1');
+            } else {
+                window.localStorage.removeItem(CHAVE_CONVERSAS_RECOLHIDAS);
+            }
+        } catch (_) {
+            // localStorage bloqueado: a preferência vale só para esta tela.
+        }
+    });
 }
 
 function configurarBusca() {

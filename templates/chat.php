@@ -105,11 +105,96 @@
         </button>
     </div>
 
+    <!-- "Conversas" é recolhível — com muitos chats abertos, dá pra encolher a
+         lista sem perder o acesso a "Usuários" logo abaixo. Estado (aberto ou
+         recolhido) fica em localStorage, então acompanha o usuário para as
+         outras telas — ver CHAVE_CONVERSAS_RECOLHIDAS em chat.js/menu-lateral.js. -->
     <nav class="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5 min-h-0" data-menu-conteudo>
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 pt-3 pb-2">Conversas</p>
-        <div id="lista-conversas" class="space-y-0.5"></div>
+        <div data-secao="conversas">
+            <button type="button" data-secao-toggle title="Recolher conversas"
+                    class="w-full flex items-center justify-between px-3 pt-3 pb-2 text-xs font-semibold text-gray-500 uppercase tracking-wider hover:text-gray-300 transition">
+                <span>Conversas</span>
+                <svg data-secao-icone class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+                </svg>
+            </button>
+            <div data-secao-corpo>
+                <?php
+                /**
+                 * Pré-renderizado a partir de $conversasBootstrap (ver rota /chat em
+                 * public/index.php) com a MESMA marcação que obterItemConversa()/
+                 * atualizarItemConversa() esperam em chat.js — data-conversa-id,
+                 * data-nome e data-tipo já corretos. Assim, quando carregarConversas()
+                 * roda no load, ela RESSUSA estes nós em vez de recriá-los (é a checagem
+                 * `if (wrapper.dataset.nome !== nome)`), e a lista não pisca ao entrar
+                 * na tela — mesmo motivo que already evita recriar tudo a cada
+                 * sincronização de 4s.
+                 */
+                $conversaAtualId = (int) ($_GET['conversa'] ?? 0);
+                ?>
+                <div id="lista-conversas" class="space-y-0.5">
+                    <?php foreach (($conversasBootstrap ?? []) as $c):
+                        $id = (int) $c['id'];
+                        $tipo = (string) ($c['tipo'] ?? 'privada');
+                        $ehGrupo = in_array($tipo, ['grupo', 'setor'], true);
+                        $nome = (string) ($c['nome'] ?? '');
+                        $avatarTexto = $ehGrupo ? '#' : ($nome !== '' ? mb_strtoupper(mb_substr($nome, 0, 1)) : '?');
+                        $avatarCor = $ehGrupo ? 'bg-indigo-700' : 'bg-emerald-700';
+                        $naoLidas = $id === $conversaAtualId ? 0 : (int) ($c['nao_lidas'] ?? 0);
+                        $preview = (string) ($c['ultima_mensagem'] ?? 'Sem mensagens');
+                        $precisaEditar = $ehGrupo && $userPapel === 'admin';
+                    ?>
+                    <div class="group relative<?= $precisaEditar ? ' tem-editar' : '' ?>"
+                         data-conversa-id="<?= $id ?>" data-nome="<?= htmlspecialchars($nome) ?>">
+                        <button class="conversa-item w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left"
+                                data-id="<?= $id ?>" data-nome="<?= htmlspecialchars($nome) ?>" data-tipo="<?= htmlspecialchars($tipo) ?>">
+                            <div class="conversa-avatar w-9 h-9 <?= $avatarCor ?> rounded-xl flex items-center justify-center shrink-0 text-sm font-bold"><?= htmlspecialchars($avatarTexto) ?></div>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-baseline gap-2">
+                                    <p class="conversa-nome text-sm font-medium text-white truncate flex-1 min-w-0"><?= htmlspecialchars($nome) ?></p>
+                                    <span class="conversa-quando text-[11px] text-gray-500 shrink-0"></span>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <p class="preview-msg text-xs text-gray-400 truncate flex-1 min-w-0"><?= htmlspecialchars($preview) ?></p>
+                                    <span class="badge-nao-lidas <?= $naoLidas > 0 ? '' : 'hidden' ?> bg-indigo-600 text-white text-xs rounded-full min-w-5 h-5 flex items-center justify-center px-1 shrink-0"><?= $naoLidas > 0 ? $naoLidas : '' ?></span>
+                                </div>
+                            </div>
+                        </button>
+                        <?php if ($precisaEditar): ?>
+                        <button type="button" title="Editar grupo" aria-label="Editar grupo" class="conversa-editar absolute right-1.5 top-1/2 -translate-y-1/2 flex w-7 h-7 items-center justify-center text-gray-500 hover:text-indigo-400 rounded-lg hover:bg-indigo-500/10">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/>
+                            </svg>
+                        </button>
+                        <?php endif; ?>
+                    </div>
+                    <?php endforeach; ?>
+                </div>
+            </div>
+        </div>
         <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 pt-4 pb-2">Usuários</p>
-        <div id="lista-usuarios" class="space-y-0.5"></div>
+        <?php
+        /** Pré-renderizado a partir de $usuariosBootstrap — mesma marcação de
+         *  carregarUsuarios() em chat.js. Como esta lista é sempre recriada por
+         *  inteiro (sem reaproveitar nós), o ganho aqui é só não nascer vazia. */
+        $coresAvatarUsuario = ['bg-pink-700', 'bg-emerald-700', 'bg-amber-700', 'bg-purple-700'];
+        ?>
+        <div id="lista-usuarios" class="space-y-0.5">
+            <?php if (empty($usuariosBootstrap)): ?>
+            <p class="text-xs text-gray-600 px-3 py-2">Nenhum outro usuário cadastrado</p>
+            <?php else: foreach ($usuariosBootstrap as $u):
+                $nome = (string) ($u['nome'] ?? '');
+                $cor = $coresAvatarUsuario[((int) $u['id']) % count($coresAvatarUsuario)];
+            ?>
+            <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left">
+                <div class="w-9 h-9 <?= $cor ?> rounded-xl flex items-center justify-center text-sm font-bold shrink-0"><?= htmlspecialchars($nome !== '' ? mb_strtoupper(mb_substr($nome, 0, 1)) : '?') ?></div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-white truncate"><?= htmlspecialchars($nome) ?></p>
+                    <p class="text-xs text-gray-400 truncate"><?= htmlspecialchars((string) ($u['setor'] ?? $u['papel'] ?? '')) ?></p>
+                </div>
+            </button>
+            <?php endforeach; endif; ?>
+        </div>
     </nav>
 
     <!-- Só aparece com o menu minimizado -->

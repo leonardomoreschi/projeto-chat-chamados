@@ -25,9 +25,19 @@ class ChatController
     // GET /api/conversas
     public function listarConversas(Request $request, Response $response): Response
     {
-        $userId = $request->getAttribute('user_id');
-        $pdo    = getDbConnection();
+        $userId = (int) $request->getAttribute('user_id');
 
+        return Json::json($response, $this->buscarConversas(getDbConnection(), $userId));
+    }
+
+    /**
+     * Mesma consulta de listarConversas(), reaproveitada pelas rotas de
+     * página em public/index.php para pré-carregar a lista no HTML — sem
+     * isso, o menu lateral nasce com "Carregando…" e pisca ao trocar de tela
+     * assim que o fetch do JS termina, mesmo quando o conteúdo é o mesmo.
+     */
+    public function buscarConversas(\PDO $pdo, int $userId): array
+    {
         $stmt = $pdo->prepare("
             SELECT
                 c.id,
@@ -65,7 +75,7 @@ class ChatController
         ");
         $stmt->execute([$userId, $userId, $userId]);
 
-        return Json::json($response, $stmt->fetchAll());
+        return $stmt->fetchAll();
     }
 
     // GET /api/mensagens?conversa_id=1&pagina=1
@@ -256,9 +266,17 @@ class ChatController
      */
     public function listarUsuarios(Request $request, Response $response): Response
     {
-        $userId = $request->getAttribute('user_id');
-        $pdo    = getDbConnection();
+        $userId = (int) $request->getAttribute('user_id');
 
+        return Json::json($response, $this->buscarUsuarios(getDbConnection(), $userId));
+    }
+
+    /**
+     * Mesma consulta de listarUsuarios(), reaproveitada pelas rotas de página
+     * em public/index.php — ver o comentário de buscarConversas().
+     */
+    public function buscarUsuarios(\PDO $pdo, int $userId): array
+    {
         $stmt = $pdo->prepare('
             SELECT u.id, u.nome, u.papel, s.nome AS setor, u.ativo
             FROM usuarios u
@@ -268,7 +286,7 @@ class ChatController
         ');
         $stmt->execute([$userId]);
 
-        return Json::json($response, $stmt->fetchAll());
+        return $stmt->fetchAll();
     }
 
     // POST /api/conversas

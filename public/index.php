@@ -73,42 +73,62 @@ $app->get('/admin', function ($request, $response) {
 
 $app->get('/chat', function ($request, $response) {
     $userName  = $request->getAttribute('user_nome');
-    $userId    = $request->getAttribute('user_id');
+    $userId    = (int) $request->getAttribute('user_id');
     $userPapel = $request->getAttribute('user_papel');
+    $pdo = getDbConnection();
+    $chatController = new ChatController();
+
     return TemplateRenderer::render($response, __DIR__ . '/../templates/chat.php', [
         'userName' => $userName,
         'userId' => $userId,
         'userPapel' => $userPapel,
-        'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $userId),
+        'notificationCount' => NotificationCenter::contarNaoLidas($pdo, $userId),
+        // Pré-carregadas para o menu lateral já nascer com a lista real — sem
+        // isso o JS mostra "Carregando…"/vazio até o fetch voltar, e o menu
+        // pisca a cada troca de página. Ver ChatController::buscarConversas().
+        'conversasBootstrap' => $chatController->buscarConversas($pdo, $userId),
+        'usuariosBootstrap' => $chatController->buscarUsuarios($pdo, $userId),
     ]);
 })->add(new AuthMiddleware());
 
 $app->get('/agendamentos', function ($request, $response) {
     $userName  = $request->getAttribute('user_nome');
-    $userId    = $request->getAttribute('user_id');
+    $userId    = (int) $request->getAttribute('user_id');
     $userPapel = $request->getAttribute('user_papel');
+    $pdo = getDbConnection();
+    $chatController = new ChatController();
 
     return TemplateRenderer::render($response, __DIR__ . '/../templates/agendamentos.php', [
         'userName' => $userName,
         'userId' => $userId,
         'userPapel' => $userPapel,
-        'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $userId),
+        'notificationCount' => NotificationCenter::contarNaoLidas($pdo, $userId),
+        // Ver comentário equivalente na rota /chat.
+        'conversasBootstrap' => $chatController->buscarConversas($pdo, $userId),
+        'usuariosBootstrap' => $chatController->buscarUsuarios($pdo, $userId),
     ]);
 })->add(new AuthMiddleware());
 
 $app->get('/painel-agendamentos', function ($request, $response) {
     $userName  = $request->getAttribute('user_nome');
+    $userId    = (int) $request->getAttribute('user_id');
     $userPapel = $request->getAttribute('user_papel');
 
     if (!in_array($userPapel, ['ti', 'admin'], true)) {
         return $response->withHeader('Location', '/chat')->withStatus(302);
     }
 
+    $pdo = getDbConnection();
+    $chatController = new ChatController();
+
     return TemplateRenderer::render($response, __DIR__ . '/../templates/painel_agendamentos.php', [
         'userName' => $userName,
-        'userId' => $request->getAttribute('user_id'),
+        'userId' => $userId,
         'userPapel' => $userPapel,
-        'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $request->getAttribute('user_id')),
+        'notificationCount' => NotificationCenter::contarNaoLidas($pdo, $userId),
+        // Ver comentário equivalente na rota /chat.
+        'conversasBootstrap' => $chatController->buscarConversas($pdo, $userId),
+        'usuariosBootstrap' => $chatController->buscarUsuarios($pdo, $userId),
     ]);
 })->add(new AuthMiddleware());
 
@@ -131,18 +151,23 @@ $app->get('/meus-chamados', function ($request, $response) {
     );
     $stmt->execute([(int) $userId]);
     $chamadosUsuario = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    $chatController = new ChatController();
 
     return TemplateRenderer::render($response, __DIR__ . '/../templates/meus_chamados.php', [
         'userName' => $userName,
         'userId' => $userId,
         'userPapel' => $userPapel,
         'chamadosUsuario' => $chamadosUsuario,
-        'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $userId),
+        'notificationCount' => NotificationCenter::contarNaoLidas($pdo, (int) $userId),
+        // Ver comentário equivalente na rota /chat.
+        'conversasBootstrap' => $chatController->buscarConversas($pdo, (int) $userId),
+        'usuariosBootstrap' => $chatController->buscarUsuarios($pdo, (int) $userId),
     ]);
 })->add(new AuthMiddleware());
 
 $app->get('/dashboard-ti', function ($request, $response) {
     $userName  = $request->getAttribute('user_nome');
+    $userId    = (int) $request->getAttribute('user_id');
     $userPapel = $request->getAttribute('user_papel');
 
     $pdo = getDbConnection();
@@ -180,21 +205,28 @@ $app->get('/dashboard-ti', function ($request, $response) {
         return $response->withHeader('Location', '/chat')->withStatus(302);
     }
 
+    $chatController = new ChatController();
+
     return TemplateRenderer::render($response, __DIR__ . '/../templates/dashboard_ti.php', [
         'userName' => $userName,
-        'userId' => $request->getAttribute('user_id'),
+        'userId' => $userId,
         'userPapel' => $userPapel,
         'chamadosBootstrap' => $chamadosBootstrap,
         'triagemBootstrap' => $triagemBootstrap,
-        'notificationCount' => NotificationCenter::contarNaoLidas(getDbConnection(), (int) $request->getAttribute('user_id')),
+        'notificationCount' => NotificationCenter::contarNaoLidas($pdo, $userId),
+        // Ver comentário equivalente na rota /chat.
+        'conversasBootstrap' => $chatController->buscarConversas($pdo, $userId),
+        'usuariosBootstrap' => $chatController->buscarUsuarios($pdo, $userId),
     ]);
 })->add(new AuthMiddleware());
 
 $app->get('/notificacoes', function ($request, $response) {
     $userName = $request->getAttribute('user_nome');
     $userId = (int) $request->getAttribute('user_id');
-    $notificationCount = NotificationCenter::contarNaoLidas(getDbConnection(), $userId);
-    $notificacoes = NotificationCenter::listar(getDbConnection(), $userId, 100);
+    $pdo = getDbConnection();
+    $notificationCount = NotificationCenter::contarNaoLidas($pdo, $userId);
+    $notificacoes = NotificationCenter::listar($pdo, $userId, 100);
+    $chatController = new ChatController();
 
     return TemplateRenderer::render($response, __DIR__ . '/../templates/notificacoes.php', [
         'userName' => $userName,
@@ -202,6 +234,9 @@ $app->get('/notificacoes', function ($request, $response) {
         'userPapel' => $request->getAttribute('user_papel'),
         'notificationCount' => $notificationCount,
         'notificacoes' => $notificacoes,
+        // Ver comentário equivalente na rota /chat.
+        'conversasBootstrap' => $chatController->buscarConversas($pdo, $userId),
+        'usuariosBootstrap' => $chatController->buscarUsuarios($pdo, $userId),
     ]);
 })->add(new AuthMiddleware());
 

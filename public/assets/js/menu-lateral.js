@@ -149,6 +149,43 @@
         aplicarRecolhido(novo, true);
     }
 
+    // ── Seção "Conversas" recolhível ───────────
+    // Mesma chave em chat.js: recolher a lista numa tela mantém o estado ao
+    // navegar para outra — é o que "disponível em todas as telas" pede aqui.
+    const CHAVE_CONVERSAS_RECOLHIDAS = 'menu-lateral:conversas-recolhidas';
+
+    function conversasEstaoRecolhidas() {
+        try {
+            return window.localStorage.getItem(CHAVE_CONVERSAS_RECOLHIDAS) === '1';
+        } catch (_) {
+            return false;
+        }
+    }
+
+    function configurarSecaoConversas() {
+        const secao = elMenu() && elMenu().querySelector('[data-secao="conversas"]');
+        const botao = secao && secao.querySelector('[data-secao-toggle]');
+        if (!secao || !botao) return;
+
+        secao.classList.toggle('secao-recolhida', conversasEstaoRecolhidas());
+
+        botao.addEventListener('click', function () {
+            const recolhido = !secao.classList.contains('secao-recolhida');
+            secao.classList.toggle('secao-recolhida', recolhido);
+            botao.title = recolhido ? 'Expandir conversas' : 'Recolher conversas';
+
+            try {
+                if (recolhido) {
+                    window.localStorage.setItem(CHAVE_CONVERSAS_RECOLHIDAS, '1');
+                } else {
+                    window.localStorage.removeItem(CHAVE_CONVERSAS_RECOLHIDAS);
+                }
+            } catch (_) {
+                // localStorage bloqueado: a preferência vale só para esta tela.
+            }
+        });
+    }
+
     // ── Conversas ─────────────────────────────
     function totalNaoLidas() {
         return estado.conversas.reduce(function (acc, c) {
@@ -405,6 +442,7 @@
         // No /chat quem cuida das conversas (e do socket) é o chat.js.
         if (!document.getElementById('menu-lista-conversas')) return;
 
+        configurarSecaoConversas();
         configurarBusca();
         carregarConversas();
         carregarUsuarios();
