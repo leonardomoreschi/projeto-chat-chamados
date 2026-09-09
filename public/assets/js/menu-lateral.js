@@ -156,6 +156,9 @@
         }, 0);
     }
 
+    // Mesmo critério visual de atualizarItemConversa() em chat.js: grupo/setor
+    // vira "#", conversa privada vira a inicial do nome. Divergir daqui é
+    // exatamente o que fazia o ícone da conversa mudar ao sair do /chat.
     function renderizar() {
         const lista = document.getElementById('menu-lista-conversas');
         if (!lista) return;
@@ -166,11 +169,16 @@
             lista.innerHTML = estado.conversas.map(function (c) {
                 const naoLidas = parseInt(c.nao_lidas, 10) || 0;
                 const nome = c.display_nome || c.nome || 'Conversa';
+                const ehGrupo = c.tipo === 'grupo' || c.tipo === 'setor';
+                const avatarTexto = ehGrupo ? '#' : (nome ? nome.charAt(0).toUpperCase() : '?');
+                const avatarCor = ehGrupo ? 'bg-indigo-700' : 'bg-emerald-700';
 
-                return '<a href="/chat?conversa=' + Number(c.id) + '" '
-                    + 'class="w-full flex items-center gap-3 px-3 py-2 rounded-xl hover:bg-gray-800 transition text-left">'
-                    + '<div class="w-8 h-8 bg-gray-800 border border-gray-700 rounded-lg flex items-center justify-center text-xs font-bold text-indigo-300 shrink-0">'
-                    + escapeHtml(nome.charAt(0).toUpperCase()) + '</div>'
+                const busca = (nome + ' ' + (c.ultima_mensagem || '')).toLowerCase();
+
+                return '<a href="/chat?conversa=' + Number(c.id) + '" data-busca="' + escapeHtml(busca) + '" '
+                    + 'class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left">'
+                    + '<div class="w-9 h-9 ' + avatarCor + ' rounded-xl flex items-center justify-center text-sm font-bold shrink-0">'
+                    + escapeHtml(avatarTexto) + '</div>'
                     + '<div class="flex-1 min-w-0">'
                     + '<p class="text-sm text-white truncate">' + escapeHtml(nome) + '</p>'
                     + '<p class="text-xs text-gray-500 truncate">' + escapeHtml(c.ultima_mensagem || 'Sem mensagens') + '</p>'
@@ -189,6 +197,10 @@
             badge.textContent = total > 0 ? String(total) : '';
             badge.classList.toggle('hidden', total === 0);
         }
+
+        // A sincronização de 30s (ou o socket) recria a lista inteira: sem isto
+        // o filtro digitado sumiria a cada atualização.
+        aplicarFiltroBusca();
     }
 
     async function carregarConversas() {
@@ -202,6 +214,71 @@
         } catch (_) {
             // Mantém o que já estava na tela.
         }
+    }
+
+    // ── Usuários ──────────────────────────────
+    // Mesma lista de carregarUsuarios() em chat.js — sem indicador de presença
+    // (informação restrita ao painel admin) e sem ação de clique, também igual
+    // ao chat: é só "quem mais existe no sistema", útil para abrir uma
+    // conversa nova a partir do botão "+" (só disponível dentro do /chat).
+    const CORES_AVATAR_USUARIO = ['bg-pink-700', 'bg-emerald-700', 'bg-amber-700', 'bg-purple-700'];
+
+    function renderizarUsuarios(lista) {
+        const nav = document.getElementById('menu-lista-usuarios');
+        if (!nav) return;
+
+        if (!lista.length) {
+            nav.innerHTML = '<p class="px-3 py-2 text-xs text-gray-600">Nenhum outro usuário cadastrado</p>';
+            return;
+        }
+
+        nav.innerHTML = lista.map(function (u) {
+            const cor = CORES_AVATAR_USUARIO[u.id % CORES_AVATAR_USUARIO.length];
+            const nome = u.nome || '';
+            const busca = (nome + ' ' + (u.setor || '') + ' ' + (u.papel || '')).toLowerCase();
+
+            return '<div data-busca="' + escapeHtml(busca) + '" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left">'
+                + '<div class="w-9 h-9 ' + cor + ' rounded-xl flex items-center justify-center text-sm font-bold shrink-0">'
+                + escapeHtml(nome.charAt(0).toUpperCase()) + '</div>'
+                + '<div class="flex-1 min-w-0">'
+                + '<p class="text-sm font-medium text-white truncate">' + escapeHtml(nome) + '</p>'
+                + '<p class="text-xs text-gray-400 truncate">' + escapeHtml(u.setor || u.papel || '') + '</p>'
+                + '</div>'
+                + '</div>';
+        }).join('');
+
+        aplicarFiltroBusca();
+    }
+
+    async function carregarUsuarios() {
+        try {
+            const res = await fetch('/api/usuarios');
+            if (!res.ok) return;
+
+            const lista = await res.json();
+            renderizarUsuarios(Array.isArray(lista) ? lista : []);
+        } catch (_) {
+            // Mantém o que já estava na tela.
+        }
+    }
+
+    // ── Busca ─────────────────────────────────
+    // Mesmo campo #search-input do chat.js, mas filtrando as duas listas desta
+    // barra (aqui não há mensagens abertas para filtrar junto).
+    function aplicarFiltroBusca() {
+        const input = document.getElementById('search-input');
+        const termo = (input ? input.value : '').trim().toLowerCase();
+
+        document.querySelectorAll('#menu-lista-conversas [data-busca], #menu-lista-usuarios [data-busca]').forEach(function (item) {
+            item.style.display = (!termo || item.dataset.busca.includes(termo)) ? '' : 'none';
+        });
+    }
+
+    function configurarBusca() {
+        const input = document.getElementById('search-input');
+        if (!input) return;
+
+        input.addEventListener('input', aplicarFiltroBusca);
     }
 
     /**
@@ -328,7 +405,9 @@
         // No /chat quem cuida das conversas (e do socket) é o chat.js.
         if (!document.getElementById('menu-lista-conversas')) return;
 
+        configurarBusca();
         carregarConversas();
+        carregarUsuarios();
         conectar();
         // Rede de segurança para o intervalo em que o socket estiver caído.
         setInterval(carregarConversas, 30000);
