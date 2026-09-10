@@ -71,6 +71,78 @@
                 transform: translateX(0);
             }
         }
+
+        /* Painel de usuários (direita) — um item flex normal (igual ao
+           #chat-sidebar), não `position: fixed`: assim ele reserva o próprio
+           espaço e o limite real da área de mensagens é a borda dele, tanto
+           aberto quanto minimizado (`<main>` tem `flex-1`, então acompanha a
+           largura dele a cada quadro da transição). Mesma coreografia de
+           fade do menu esquerdo (public/assets/css/menu-lateral.css), só que
+           autocontida aqui por ser exclusiva desta tela. Larguras iguais às
+           do menu esquerdo (18rem/4rem) de propósito: 4rem = padding (p-4,
+           2rem) + botão (w-8, 2rem), o mesmo cálculo que faz o botão do
+           cabeçalho caber exatamente na faixa recolhida. */
+        #painel-usuarios {
+            width: 18rem;
+            transition: width 220ms cubic-bezier(.4, 0, .2, 1);
+            overflow: hidden;
+        }
+
+        #painel-usuarios.painel-recolhido {
+            width: 4rem;
+        }
+
+        #painel-usuarios.painel-sem-animacao,
+        #painel-usuarios.painel-sem-animacao * {
+            transition: none !important;
+        }
+
+        /* Só os blocos de largura inteira (a lista) travam a largura aberta —
+           o bloco do título, dentro do cabeçalho, encolhe junto com a faixa
+           (mesmo motivo do comentário em menu-lateral-cabecalho.php). */
+        #painel-usuarios > [data-painel-conteudo] {
+            min-width: 18rem;
+        }
+
+        #painel-usuarios [data-painel-conteudo] {
+            opacity: 1;
+            transition: opacity 150ms ease-out 110ms;
+        }
+
+        #painel-usuarios.painel-recolhido [data-painel-conteudo] {
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 110ms ease-in;
+        }
+
+        #painel-usuarios [data-painel-recolhido] {
+            opacity: 0;
+            transition: opacity 110ms ease-in;
+        }
+
+        #painel-usuarios.painel-recolhido [data-painel-recolhido] {
+            opacity: 1;
+            transition: opacity 170ms ease-out 110ms;
+        }
+
+        /* A seta é a mesma nos dois estados: girar 180° amarra a animação num
+           gesto só, igual ao botão do menu esquerdo ([data-menu-icone] em
+           menu-lateral.css). */
+        #painel-usuarios [data-painel-icone] {
+            transition: transform 220ms ease;
+        }
+
+        #painel-usuarios.painel-recolhido [data-painel-icone] {
+            transform: rotate(180deg);
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            #painel-usuarios,
+            #painel-usuarios * {
+                transition-duration: 1ms !important;
+                transition-delay: 0ms !important;
+            }
+        }
     </style>
 </head>
 <body class="page-chat bg-gray-950 text-white h-screen flex overflow-hidden">
@@ -105,10 +177,9 @@
         </button>
     </div>
 
-    <!-- "Conversas" é recolhível — com muitos chats abertos, dá pra encolher a
-         lista sem perder o acesso a "Usuários" logo abaixo. Estado (aberto ou
-         recolhido) fica em localStorage, então acompanha o usuário para as
-         outras telas — ver CHAVE_CONVERSAS_RECOLHIDAS em chat.js/menu-lateral.js. -->
+    <!-- "Usuários" virou o painel próprio à direita (ver #painel-usuarios
+         abaixo); "Conversas" continua recolhível como antes — útil por si só
+         com muitos chats abertos, não só para abrir espaço pra outra seção. -->
     <nav class="flex-1 overflow-y-auto px-2 pb-4 space-y-0.5 min-h-0" data-menu-conteudo>
         <div data-secao="conversas">
             <button type="button" data-secao-toggle title="Recolher conversas"
@@ -171,29 +242,6 @@
                     <?php endforeach; ?>
                 </div>
             </div>
-        </div>
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 pt-4 pb-2">Usuários</p>
-        <?php
-        /** Pré-renderizado a partir de $usuariosBootstrap — mesma marcação de
-         *  carregarUsuarios() em chat.js. Como esta lista é sempre recriada por
-         *  inteiro (sem reaproveitar nós), o ganho aqui é só não nascer vazia. */
-        $coresAvatarUsuario = ['bg-pink-700', 'bg-emerald-700', 'bg-amber-700', 'bg-purple-700'];
-        ?>
-        <div id="lista-usuarios" class="space-y-0.5">
-            <?php if (empty($usuariosBootstrap)): ?>
-            <p class="text-xs text-gray-600 px-3 py-2">Nenhum outro usuário cadastrado</p>
-            <?php else: foreach ($usuariosBootstrap as $u):
-                $nome = (string) ($u['nome'] ?? '');
-                $cor = $coresAvatarUsuario[((int) $u['id']) % count($coresAvatarUsuario)];
-            ?>
-            <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left">
-                <div class="w-9 h-9 <?= $cor ?> rounded-xl flex items-center justify-center text-sm font-bold shrink-0"><?= htmlspecialchars($nome !== '' ? mb_strtoupper(mb_substr($nome, 0, 1)) : '?') ?></div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-white truncate"><?= htmlspecialchars($nome) ?></p>
-                    <p class="text-xs text-gray-400 truncate"><?= htmlspecialchars((string) ($u['setor'] ?? $u['papel'] ?? '')) ?></p>
-                </div>
-            </button>
-            <?php endforeach; endif; ?>
         </div>
     </nav>
 
@@ -292,6 +340,83 @@
         <p class="text-xs text-gray-600 mt-2 ml-1">Enter para enviar · Shift+Enter para nova linha</p>
     </div>
 </main>
+
+<!-- ═══ PAINEL DE USUÁRIOS (direita, só no /chat) ═══
+     Item flex normal (ver <style> no <head>) — reserva o próprio espaço, então
+     o limite real da área de mensagens é a borda dele, minimizado ou não
+     (`<main>`, logo acima, tem `flex-1` e acompanha a largura dele a cada
+     quadro da transição). Precisa vir DEPOIS de `<main>` no HTML: numa
+     `<body class="flex">`, a ordem dos irmãos é a ordem visual — antes de
+     `<main>` este painel apareceria no meio da tela, não na direita. Some
+     abaixo de 768px (classes `hidden md:flex` — sem espaço pra abrir uma
+     terceira coluna sem tampar o composer). Quem alimenta é
+     carregarPainelUsuarios() em chat.js; o estado minimizado é independente
+     do menu esquerdo (chave própria no localStorage) porque são painéis sem
+     relação um com o outro. -->
+<aside id="painel-usuarios" data-painel-usuarios
+       class="hidden md:flex flex-col bg-gray-900 border-l border-gray-800 shrink-0">
+
+    <!-- Botão sempre no mesmo lugar, dentro do cabeçalho — nunca some, nos
+         dois estados. O botão vem ANTES do bloco do título (e não depois,
+         como no menu esquerdo): aqui o painel fica ancorado à direita da
+         tela, então é a borda ESQUERDA desta faixa que se move ao recolher;
+         o botão precisa ficar colado nela para não sair da faixa visível de
+         4rem — mesmo raciocínio do `justify-end` em
+         menu-lateral-cabecalho.php, só que espelhado. O ícone é o mesmo nos
+         dois estados, só gira 180° ao recolher (ver a regra de
+         [data-painel-icone] no <style> acima) — mesma linguagem do botão do
+         menu esquerdo. -->
+    <div class="p-4 border-b border-gray-800 flex items-center gap-2">
+        <button type="button" data-painel-usuarios-toggle title="Minimizar lista de usuários"
+                class="w-8 h-8 rounded-lg bg-gray-800 hover:bg-gray-700 text-gray-300 flex items-center justify-center shrink-0 transition">
+            <svg data-painel-icone class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 5l7 7-7 7M5 5l7 7-7 7"/>
+            </svg>
+        </button>
+        <div class="min-w-0 flex-1" data-painel-conteudo>
+            <p class="text-sm font-semibold text-white truncate">Usuários</p>
+            <p class="text-xs text-gray-500"><span id="painel-usuarios-total-online">0</span> online</p>
+        </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto p-2 min-h-0" data-painel-conteudo>
+        <?php
+        /** Pré-renderizado a partir de $usuariosBootstrap — mesma marcação de
+         *  renderizarPainelUsuarios() em chat.js. Como esta lista é sempre
+         *  recriada por inteiro (sem reaproveitar nós), o ganho aqui é só não
+         *  nascer vazia. */
+        $coresAvatarUsuario = ['bg-pink-700', 'bg-emerald-700', 'bg-amber-700', 'bg-purple-700'];
+        ?>
+        <div id="painel-lista-usuarios" class="space-y-0.5">
+            <?php if (empty($usuariosBootstrap)): ?>
+            <p class="text-xs text-gray-600 px-3 py-2">Nenhum outro usuário cadastrado</p>
+            <?php else: foreach ($usuariosBootstrap as $u):
+                $nome = (string) ($u['nome'] ?? '');
+                $cor = $coresAvatarUsuario[((int) $u['id']) % count($coresAvatarUsuario)];
+                $online = !empty($u['online']);
+            ?>
+            <button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left"
+                    data-usuario-id="<?= (int) $u['id'] ?>" data-usuario-nome="<?= htmlspecialchars($nome) ?>" title="Conversar com <?= htmlspecialchars($nome) ?>">
+                <div class="relative shrink-0">
+                    <div class="w-9 h-9 <?= $cor ?> rounded-xl flex items-center justify-center text-sm font-bold"><?= htmlspecialchars($nome !== '' ? mb_strtoupper(mb_substr($nome, 0, 1)) : '?') ?></div>
+                    <span data-painel-dot-usuario="<?= (int) $u['id'] ?>" class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-gray-900 <?= $online ? 'bg-green-400' : 'bg-gray-500' ?>"></span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-white truncate"><?= htmlspecialchars($nome) ?></p>
+                    <p class="text-xs text-gray-400 truncate"><?= htmlspecialchars((string) ($u['setor'] ?? $u['papel'] ?? '')) ?></p>
+                </div>
+                <span data-painel-presenca-usuario="<?= (int) $u['id'] ?>" class="text-[11px] font-medium shrink-0 <?= $online ? 'text-green-400' : 'text-gray-500' ?>"><?= $online ? 'Online' : 'Offline' ?></span>
+            </button>
+            <?php endforeach; endif; ?>
+        </div>
+    </div>
+
+    <!-- Só aparece com o painel minimizado: só os avatares, com a bolinha de
+         status — dá pra ver quem está online sem abrir o painel inteiro. -->
+    <div class="hidden flex-1 flex-col items-center gap-2 pt-3 overflow-y-auto min-h-0" data-painel-recolhido>
+        <div id="painel-avatares-recolhido" class="flex flex-col items-center gap-2"></div>
+    </div>
+</aside>
 
 <div id="sidebar-overlay" class="hidden md:hidden fixed inset-0 bg-black/50 z-40" onclick="toggleSidebarMobile(false)"></div>
 

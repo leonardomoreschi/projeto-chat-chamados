@@ -110,13 +110,11 @@
 }
 
 /* ── Seção "Conversas" recolhível ─────────────────────────────────────────
-   Com muitos chats abertos, a lista some sem levar "Usuários" junto para
-   fora da tela. `grid-template-rows: 1fr → 0fr` anima uma altura que não dá
-   pra conhecer de antemão (a lista cresce com o número de conversas) sem
-   precisar medir pixel nenhum em JS — o truque é o wrapper interno cortar o
-   conteúdo (`overflow: hidden`) enquanto a linha do grid encolhe por baixo
-   dele. Par de public/assets/js/menu-lateral.js e chat.js
-   (CHAVE_CONVERSAS_RECOLHIDAS). */
+   `grid-template-rows: 1fr → 0fr` anima uma altura que não dá pra conhecer de
+   antemão (a lista cresce com o número de conversas) sem precisar medir pixel
+   nenhum em JS — o truque é o wrapper interno cortar o conteúdo
+   (`overflow: hidden`) enquanto a linha do grid encolhe por baixo dele. Par
+   de public/assets/js/menu-lateral.js e chat.js (CHAVE_CONVERSAS_RECOLHIDAS). */
 [data-secao-corpo] {
     display: grid;
     grid-template-rows: 1fr;

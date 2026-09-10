@@ -5,12 +5,12 @@
  * O /chat monta a própria `<aside>` (com o modal de nova conversa), mas
  * reaproveita `menu-lateral-cabecalho.php` e `menu-lateral-recolhido.php`
  * daqui — é o que mantém os mesmos botões nas mesmas posições nas duas telas.
- * Esta versão acrescenta a busca e as listas de conversas e de usuários ao
- * vivo — mesmo campo #search-input e mesmo conteúdo/visual de
- * #lista-conversas/#lista-usuarios no chat.js, só que clicar numa conversa
- * leva para /chat?conversa=ID em vez de abrir na hora, e o "+" leva para
- * /chat?nova_conversa=1 em vez de abrir o modal na hora (ele só existe
- * dentro do /chat).
+ * Esta versão acrescenta a busca e a lista de conversas ao vivo — mesmo campo
+ * #search-input e mesmo conteúdo/visual de #lista-conversas no chat.js, só
+ * que clicar numa conversa leva para /chat?conversa=ID em vez de abrir na
+ * hora, e o "+" leva para /chat?nova_conversa=1 em vez de abrir o modal na
+ * hora (ele só existe dentro do /chat). A lista de usuários não mora mais
+ * aqui: só aparece no painel próprio do /chat (ver templates/chat.php).
  * Quem alimenta é o `public/assets/js/menu-lateral.js`.
  *
  * Espera as variáveis já extraídas pelo TemplateRenderer: $userName, $userPapel,
@@ -48,11 +48,10 @@
         </a>
     </div>
 
-    <!-- Conversas e usuários ao vivo. "Conversas" é recolhível — com muitos
-         chats abertos, dá pra encolher a lista sem perder o acesso a
-         "Usuários" logo abaixo. Estado (aberto ou recolhido) fica em
-         localStorage, então acompanha o usuário para as outras telas — ver
-         CHAVE_CONVERSAS_RECOLHIDAS em menu-lateral.js/chat.js. -->
+    <!-- Conversas ao vivo, recolhível como sempre foi. "Usuários" mudou para
+         o painel próprio do /chat (ver templates/chat.php) — aqui só sobrou
+         este conteúdo, mas o toggle continua valendo por si só: útil com
+         muitos chats abertos. -->
     <nav class="flex-1 overflow-y-auto px-2 pb-4 min-h-0" data-menu-conteudo>
         <div data-secao="conversas">
             <button type="button" data-secao-toggle title="Recolher conversas"
@@ -98,29 +97,6 @@
                     <?php endforeach; endif; ?>
                 </div>
             </div>
-        </div>
-        <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider px-3 pt-4 pb-2">Usuários</p>
-        <?php
-        /** Pré-renderizado a partir de $usuariosBootstrap — mesma marcação de
-         *  renderizarUsuarios() em menu-lateral.js. */
-        $coresAvatarUsuario = ['bg-pink-700', 'bg-emerald-700', 'bg-amber-700', 'bg-purple-700'];
-        ?>
-        <div id="menu-lista-usuarios" class="space-y-0.5">
-            <?php if (empty($usuariosBootstrap)): ?>
-            <p class="px-3 py-2 text-xs text-gray-600">Nenhum outro usuário cadastrado</p>
-            <?php else: foreach ($usuariosBootstrap as $u):
-                $nome = (string) ($u['nome'] ?? '');
-                $cor = $coresAvatarUsuario[((int) $u['id']) % count($coresAvatarUsuario)];
-                $busca = mb_strtolower($nome . ' ' . ($u['setor'] ?? '') . ' ' . ($u['papel'] ?? ''));
-            ?>
-            <div data-busca="<?= htmlspecialchars($busca) ?>" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left">
-                <div class="w-9 h-9 <?= $cor ?> rounded-xl flex items-center justify-center text-sm font-bold shrink-0"><?= htmlspecialchars($nome !== '' ? mb_strtoupper(mb_substr($nome, 0, 1)) : '?') ?></div>
-                <div class="flex-1 min-w-0">
-                    <p class="text-sm font-medium text-white truncate"><?= htmlspecialchars($nome) ?></p>
-                    <p class="text-xs text-gray-400 truncate"><?= htmlspecialchars((string) ($u['setor'] ?? $u['papel'] ?? '')) ?></p>
-                </div>
-            </div>
-            <?php endforeach; endif; ?>
         </div>
     </nav>
 

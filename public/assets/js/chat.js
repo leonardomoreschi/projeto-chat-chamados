@@ -142,6 +142,9 @@ function conectarWS() {
                     window.NotificationCenterUI.handleRealtimeNotification(data.notification);
                 }
                 break;
+            case 'presence_updated':
+                marcarPresencaPainel(data.usuario_id, !!data.online);
+                break;
             case 'typing':
                 if (data.conversa_id == conversaAtualId) {
                     mostrarTyping(data.user_nome);
@@ -207,7 +210,8 @@ document.addEventListener('DOMContentLoaded', async function () {
             url.searchParams.delete('nova_conversa');
             window.history.replaceState({}, document.title, url.pathname + url.search);
         }
-        carregarUsuarios();
+        carregarPainelUsuarios();
+        configurarPainelUsuarios();
         configurarSecaoConversas();
         configurarBusca();
         configurarNotificacoes();
@@ -215,6 +219,9 @@ document.addEventListener('DOMContentLoaded', async function () {
         configurarAnexosMensagem();
         atualizarBadgePainelChamados();
         setInterval(atualizarBadgePainelChamados, 5000);
+        // Rede de segurança para o intervalo em que o WebSocket esteve caído —
+        // mesma lógica do poll de presença em admin.js.
+        setInterval(carregarPainelUsuarios, 30000);
         document.addEventListener('visibilitychange', function () {
             if (!document.hidden) {
                 atualizarBadgePainelChamados();
@@ -660,30 +667,239 @@ function mostrarEstadoConversa() {
     }
 }
 
-// ── Usuários (sidebar) ────────────────────────
-async function carregarUsuarios() {
-    const res = await fetch('/api/usuarios');
-    const lista = await res.json();
-    const nav = document.getElementById('lista-usuarios');
-    nav.innerHTML = '';
+// ── Painel de usuários (direita) ──────────────
+// Diretório de todo mundo cadastrado + presença (online/offline), no mesmo
+// visual do badge de /admin (ver admin.js:badgePresenca). Sem ação de clique
+// por enquanto — só diretório, igual ao comportamento anterior desta lista.
+const CORES_AVATAR_PAINEL_USUARIOS = ['bg-pink-700', 'bg-emerald-700', 'bg-amber-700', 'bg-purple-700'];
+let usuariosPainelCache = [];
 
-    if (!lista.length) {
-        nav.innerHTML = '<p class="text-xs text-gray-600 px-3 py-2">Nenhum outro usuário cadastrado</p>';
+function badgePresencaPainel(online) {
+    const ponto = online ? 'bg-green-400' : 'bg-gray-500';
+    const cor = online ? 'text-green-400' : 'text-gray-500';
+    return { ponto: ponto, texto: online ? 'Online' : 'Offline', cor: cor };
+}
+
+function linhaPainelUsuario(u) {
+    const cor = CORES_AVATAR_PAINEL_USUARIOS[u.id % CORES_AVATAR_PAINEL_USUARIOS.length];
+    const nome = u.nome || '';
+    const online = Number(u.online || 0) === 1;
+    const presenca = badgePresencaPainel(online);
+
+    return '<button type="button" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left" '
+        + 'data-usuario-id="' + u.id + '" data-usuario-nome="' + escapeHtml(nome) + '" title="Conversar com ' + escapeHtml(nome) + '">'
+        + '<div class="relative shrink-0">'
+        + '<div class="w-9 h-9 ' + cor + ' rounded-xl flex items-center justify-center text-sm font-bold">' + escapeHtml(nome.charAt(0).toUpperCase()) + '</div>'
+        + '<span data-painel-dot-usuario="' + u.id + '" class="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-gray-900 ' + presenca.ponto + '"></span>'
+        + '</div>'
+        + '<div class="flex-1 min-w-0">'
+        + '<p class="text-sm font-medium text-white truncate">' + escapeHtml(nome) + '</p>'
+        + '<p class="text-xs text-gray-400 truncate">' + escapeHtml(u.setor || u.papel || '') + '</p>'
+        + '</div>'
+        + '<span data-painel-presenca-usuario="' + u.id + '" class="text-[11px] font-medium shrink-0 ' + presenca.cor + '">' + presenca.texto + '</span>'
+        + '</button>';
+}
+
+function avatarPainelRecolhido(u) {
+    const cor = CORES_AVATAR_PAINEL_USUARIOS[u.id % CORES_AVATAR_PAINEL_USUARIOS.length];
+    const nome = u.nome || '';
+    const online = Number(u.online || 0) === 1;
+    const ponto = online ? 'bg-green-400' : 'bg-gray-500';
+
+    return '<button type="button" class="relative shrink-0" '
+        + 'data-usuario-id="' + u.id + '" data-usuario-nome="' + escapeHtml(nome) + '" title="Conversar com ' + escapeHtml(nome) + ' — ' + (online ? 'Online' : 'Offline') + '">'
+        + '<div class="w-8 h-8 ' + cor + ' rounded-lg flex items-center justify-center text-xs font-bold">' + escapeHtml(nome.charAt(0).toUpperCase()) + '</div>'
+        + '<span data-painel-dot-recolhido-usuario="' + u.id + '" class="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-gray-900 ' + ponto + '"></span>'
+        + '</button>';
+}
+
+function atualizarContagemOnlinePainel() {
+    const total = usuariosPainelCache.reduce(function (acc, u) { return acc + (Number(u.online || 0) === 1 ? 1 : 0); }, 0);
+    const el = document.getElementById('painel-usuarios-total-online');
+    if (el) el.textContent = String(total);
+}
+
+function renderizarPainelUsuarios() {
+    const lista = document.getElementById('painel-lista-usuarios');
+    const recolhido = document.getElementById('painel-avatares-recolhido');
+    if (!lista || !recolhido) return;
+
+    if (!usuariosPainelCache.length) {
+        lista.innerHTML = '<p class="text-xs text-gray-600 px-3 py-2">Nenhum outro usuário cadastrado</p>';
+        recolhido.innerHTML = '';
+        atualizarContagemOnlinePainel();
         return;
     }
 
-    // Sem indicador de presença aqui: quem está online é informação restrita ao
-    // painel administrativo (coluna "Conexão" em /admin).
-    const cores = ['bg-pink-700', 'bg-emerald-700', 'bg-amber-700', 'bg-purple-700'];
-    lista.forEach(function (u) {
-        const cor = cores[u.id % cores.length];
+    lista.innerHTML = usuariosPainelCache.map(linhaPainelUsuario).join('');
+    recolhido.innerHTML = usuariosPainelCache.map(avatarPainelRecolhido).join('');
+    atualizarContagemOnlinePainel();
+}
 
-        const btn = document.createElement('button');
-        btn.className = 'w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left';
-        btn.innerHTML = '<div class="w-9 h-9 ' + cor + ' rounded-xl flex items-center justify-center text-sm font-bold shrink-0">' + u.nome.charAt(0).toUpperCase() + '</div>'
-            + '<div class="flex-1 min-w-0"><p class="text-sm font-medium text-white truncate">' + u.nome + '</p>'
-            + '<p class="text-xs text-gray-400 truncate">' + (u.setor || u.papel) + '</p></div>';
-        nav.appendChild(btn);
+async function carregarPainelUsuarios() {
+    try {
+        const res = await fetch('/api/usuarios');
+        if (!res.ok) return;
+
+        const lista = await res.json();
+        usuariosPainelCache = Array.isArray(lista) ? lista : [];
+        renderizarPainelUsuarios();
+    } catch (_) {
+        // Mantém o que já estava na tela.
+    }
+}
+
+/** Chamado pelo case 'presence_updated' do WebSocket — atualiza só o usuário
+ *  que mudou, sem redesenhar o painel inteiro. */
+function marcarPresencaPainel(usuarioId, online) {
+    const id = Number(usuarioId);
+    const usuario = usuariosPainelCache.find(function (u) { return Number(u.id) === id; });
+    if (!usuario) return;
+
+    usuario.online = online ? 1 : 0;
+    const presenca = badgePresencaPainel(online);
+
+    const dot = document.querySelector('[data-painel-dot-usuario="' + id + '"]');
+    if (dot) dot.className = 'absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-gray-900 ' + presenca.ponto;
+
+    const label = document.querySelector('[data-painel-presenca-usuario="' + id + '"]');
+    if (label) {
+        label.textContent = presenca.texto;
+        label.className = 'text-[11px] font-medium shrink-0 ' + presenca.cor;
+    }
+
+    const dotRecolhido = document.querySelector('[data-painel-dot-recolhido-usuario="' + id + '"]');
+    if (dotRecolhido) dotRecolhido.className = 'absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-gray-900 ' + presenca.ponto;
+
+    atualizarContagemOnlinePainel();
+}
+
+// ── Painel de usuários — minimizar ────────────
+// Chave própria: é um painel independente do menu esquerdo (menu-lateral.js),
+// sem relação de estado entre os dois.
+const CHAVE_PAINEL_USUARIOS_RECOLHIDO = 'chat:painel-usuarios-recolhido';
+
+function painelUsuariosEstaRecolhido() {
+    try {
+        return window.localStorage.getItem(CHAVE_PAINEL_USUARIOS_RECOLHIDO) === '1';
+    } catch (_) {
+        return false;
+    }
+}
+
+// Tempo que o conteúdo leva para sumir — mesmo valor do menu esquerdo
+// (DURACAO_FADE_MS em menu-lateral.js), pra manter a mesma sensação nos dois
+// painéis. Mudar aqui exige mudar o CSS de #painel-usuarios em chat.php.
+const DURACAO_FADE_PAINEL_USUARIOS_MS = 110;
+let timerAnimacaoPainelUsuarios = null;
+
+/** Mesmo truque de mostrarBlocos()/ocultarBlocos() em menu-lateral.js: a
+ *  faixa recolhida usa `flex-col` sem a classe `flex` no HTML (Tailwind só
+ *  gera a regra quando a vê em algum lugar do DOM), então quem liga/desliga
+ *  o `display:flex` dela é este helper — não dá pra confiar só em remover
+ *  `hidden`. */
+function mostrarBlocosPainelUsuarios(blocos, ehFaixaRecolhida) {
+    blocos.forEach(function (el) {
+        el.classList.remove('hidden');
+        if (ehFaixaRecolhida) el.classList.add('flex');
+    });
+}
+
+function ocultarBlocosPainelUsuarios(blocos, ehFaixaRecolhida) {
+    blocos.forEach(function (el) {
+        el.classList.add('hidden');
+        if (ehFaixaRecolhida) el.classList.remove('flex');
+    });
+}
+
+/**
+ * Aplica o estado do painel, com a mesma coreografia do menu esquerdo
+ * (aplicarRecolhido em menu-lateral.js): o que entra volta ao fluxo já (a
+ * largura anima 220ms via CSS), e o que sai só deixa o fluxo depois do fade
+ * — daí o salto de layout (min-width:18rem clipado pelo overflow:hidden)
+ * acontecer num instante em que já está transparente.
+ */
+function aplicarPainelUsuariosRecolhido(recolhido, animar) {
+    const painel = document.getElementById('painel-usuarios');
+    if (!painel) return;
+
+    const comAnimacao = animar !== false;
+    clearTimeout(timerAnimacaoPainelUsuarios);
+
+    const conteudos = Array.from(painel.querySelectorAll('[data-painel-conteudo]'));
+    const faixa = Array.from(painel.querySelectorAll('[data-painel-recolhido]'));
+    const entrando = recolhido ? faixa : conteudos;
+    const saindo = recolhido ? conteudos : faixa;
+
+    const botao = painel.querySelector('[data-painel-usuarios-toggle]');
+    if (botao) botao.title = recolhido ? 'Expandir lista de usuários' : 'Minimizar lista de usuários';
+
+    painel.classList.toggle('painel-sem-animacao', !comAnimacao);
+    mostrarBlocosPainelUsuarios(entrando, recolhido);
+
+    function concluir() {
+        ocultarBlocosPainelUsuarios(saindo, !recolhido);
+    }
+
+    if (comAnimacao) {
+        void painel.offsetWidth;
+        painel.classList.toggle('painel-recolhido', recolhido);
+        timerAnimacaoPainelUsuarios = setTimeout(concluir, DURACAO_FADE_PAINEL_USUARIOS_MS);
+        return;
+    }
+
+    painel.classList.toggle('painel-recolhido', recolhido);
+    concluir();
+
+    void painel.offsetWidth;
+    painel.classList.remove('painel-sem-animacao');
+}
+
+/**
+ * Clique num usuário (aberto ou recolhido) abre/cria a conversa privada com
+ * ele — mesma ação do "+"/nova conversa, reaproveitando iniciarConversaPrivada
+ * em vez de duplicar a chamada a /api/conversas.
+ */
+function configurarCliquePainelUsuarios(painel) {
+    function aoClicar(evento) {
+        const el = evento.target.closest('[data-usuario-id]');
+        if (!el) return;
+
+        const id = Number(el.dataset.usuarioId);
+        if (!id) return;
+
+        iniciarConversaPrivada(id, el.dataset.usuarioNome || '');
+    }
+
+    const lista = painel.querySelector('#painel-lista-usuarios');
+    const recolhidos = painel.querySelector('#painel-avatares-recolhido');
+    if (lista) lista.addEventListener('click', aoClicar);
+    if (recolhidos) recolhidos.addEventListener('click', aoClicar);
+}
+
+function configurarPainelUsuarios() {
+    const painel = document.getElementById('painel-usuarios');
+    if (!painel) return;
+
+    aplicarPainelUsuariosRecolhido(painelUsuariosEstaRecolhido(), false);
+    configurarCliquePainelUsuarios(painel);
+
+    const botao = painel.querySelector('[data-painel-usuarios-toggle]');
+    if (!botao) return;
+
+    botao.addEventListener('click', function () {
+        const recolhido = !painel.classList.contains('painel-recolhido');
+        aplicarPainelUsuariosRecolhido(recolhido, true);
+
+        try {
+            if (recolhido) {
+                window.localStorage.setItem(CHAVE_PAINEL_USUARIOS_RECOLHIDO, '1');
+            } else {
+                window.localStorage.removeItem(CHAVE_PAINEL_USUARIOS_RECOLHIDO);
+            }
+        } catch (_) {
+            // localStorage bloqueado: a preferência vale só para esta sessão de tela.
+        }
     });
 }
 

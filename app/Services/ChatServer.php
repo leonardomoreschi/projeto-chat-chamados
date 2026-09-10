@@ -349,8 +349,9 @@ class ChatServer implements MessageComponentInterface
     }
 
     /**
-     * Presenca so interessa ao painel administrativo, entao o evento vai apenas
-     * para as conexoes de admin.
+     * Presenca agora interessa a todo mundo: o painel administrativo (coluna
+     * "Conexao") e tambem o painel de usuarios do /chat, entao o evento vai
+     * para todas as conexoes vivas.
      */
     private function broadcastPresenca(int $userId, bool $online): void
     {
@@ -362,9 +363,7 @@ class ChatServer implements MessageComponentInterface
         ], JSON_UNESCAPED_UNICODE);
 
         foreach ($this->clients as $client) {
-            if (($client->userPapel ?? '') === 'admin') {
-                $client->send($payload);
-            }
+            $client->send($payload);
         }
     }
 

@@ -83,9 +83,12 @@ $app->get('/chat', function ($request, $response) {
         'userId' => $userId,
         'userPapel' => $userPapel,
         'notificationCount' => NotificationCenter::contarNaoLidas($pdo, $userId),
-        // Pré-carregadas para o menu lateral já nascer com a lista real — sem
-        // isso o JS mostra "Carregando…"/vazio até o fetch voltar, e o menu
-        // pisca a cada troca de página. Ver ChatController::buscarConversas().
+        // Pré-carregadas para a sidebar de conversas e o painel de usuários já
+        // nascerem com a lista real — sem isso o JS mostra "Carregando…"/vazio
+        // até o fetch voltar, e a tela pisca a cada troca de página. Ver
+        // ChatController::buscarConversas()/buscarUsuarios(). Só o /chat
+        // precisa de usuariosBootstrap: é o único lugar onde a lista de
+        // usuários aparece (painel direito, ver templates/chat.php).
         'conversasBootstrap' => $chatController->buscarConversas($pdo, $userId),
         'usuariosBootstrap' => $chatController->buscarUsuarios($pdo, $userId),
     ]);
@@ -105,7 +108,6 @@ $app->get('/agendamentos', function ($request, $response) {
         'notificationCount' => NotificationCenter::contarNaoLidas($pdo, $userId),
         // Ver comentário equivalente na rota /chat.
         'conversasBootstrap' => $chatController->buscarConversas($pdo, $userId),
-        'usuariosBootstrap' => $chatController->buscarUsuarios($pdo, $userId),
     ]);
 })->add(new AuthMiddleware());
 
@@ -128,7 +130,6 @@ $app->get('/painel-agendamentos', function ($request, $response) {
         'notificationCount' => NotificationCenter::contarNaoLidas($pdo, $userId),
         // Ver comentário equivalente na rota /chat.
         'conversasBootstrap' => $chatController->buscarConversas($pdo, $userId),
-        'usuariosBootstrap' => $chatController->buscarUsuarios($pdo, $userId),
     ]);
 })->add(new AuthMiddleware());
 
@@ -161,7 +162,6 @@ $app->get('/meus-chamados', function ($request, $response) {
         'notificationCount' => NotificationCenter::contarNaoLidas($pdo, (int) $userId),
         // Ver comentário equivalente na rota /chat.
         'conversasBootstrap' => $chatController->buscarConversas($pdo, (int) $userId),
-        'usuariosBootstrap' => $chatController->buscarUsuarios($pdo, (int) $userId),
     ]);
 })->add(new AuthMiddleware());
 
@@ -216,7 +216,6 @@ $app->get('/dashboard-ti', function ($request, $response) {
         'notificationCount' => NotificationCenter::contarNaoLidas($pdo, $userId),
         // Ver comentário equivalente na rota /chat.
         'conversasBootstrap' => $chatController->buscarConversas($pdo, $userId),
-        'usuariosBootstrap' => $chatController->buscarUsuarios($pdo, $userId),
     ]);
 })->add(new AuthMiddleware());
 
@@ -236,7 +235,6 @@ $app->get('/notificacoes', function ($request, $response) {
         'notificacoes' => $notificacoes,
         // Ver comentário equivalente na rota /chat.
         'conversasBootstrap' => $chatController->buscarConversas($pdo, $userId),
-        'usuariosBootstrap' => $chatController->buscarUsuarios($pdo, $userId),
     ]);
 })->add(new AuthMiddleware());
 

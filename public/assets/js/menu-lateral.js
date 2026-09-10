@@ -5,7 +5,7 @@
  * carrega por HTTP e atualiza pelo WebSocket (mesma conexão que traz as
  * notificações). Clicar em uma conversa leva para /chat?conversa=ID.
  *
- * No /chat a sidebar é a do próprio chat.js (com busca e lista de usuários),
+ * No /chat a sidebar é a do próprio chat.js (com busca e lista de conversas),
  * então aqui só entra a parte de minimizar — a lista e o socket ficam de fora,
  * detectados pela ausência de `#menu-lista-conversas`.
  *
@@ -253,60 +253,14 @@
         }
     }
 
-    // ── Usuários ──────────────────────────────
-    // Mesma lista de carregarUsuarios() em chat.js — sem indicador de presença
-    // (informação restrita ao painel admin) e sem ação de clique, também igual
-    // ao chat: é só "quem mais existe no sistema", útil para abrir uma
-    // conversa nova a partir do botão "+" (só disponível dentro do /chat).
-    const CORES_AVATAR_USUARIO = ['bg-pink-700', 'bg-emerald-700', 'bg-amber-700', 'bg-purple-700'];
-
-    function renderizarUsuarios(lista) {
-        const nav = document.getElementById('menu-lista-usuarios');
-        if (!nav) return;
-
-        if (!lista.length) {
-            nav.innerHTML = '<p class="px-3 py-2 text-xs text-gray-600">Nenhum outro usuário cadastrado</p>';
-            return;
-        }
-
-        nav.innerHTML = lista.map(function (u) {
-            const cor = CORES_AVATAR_USUARIO[u.id % CORES_AVATAR_USUARIO.length];
-            const nome = u.nome || '';
-            const busca = (nome + ' ' + (u.setor || '') + ' ' + (u.papel || '')).toLowerCase();
-
-            return '<div data-busca="' + escapeHtml(busca) + '" class="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-gray-800 transition text-left">'
-                + '<div class="w-9 h-9 ' + cor + ' rounded-xl flex items-center justify-center text-sm font-bold shrink-0">'
-                + escapeHtml(nome.charAt(0).toUpperCase()) + '</div>'
-                + '<div class="flex-1 min-w-0">'
-                + '<p class="text-sm font-medium text-white truncate">' + escapeHtml(nome) + '</p>'
-                + '<p class="text-xs text-gray-400 truncate">' + escapeHtml(u.setor || u.papel || '') + '</p>'
-                + '</div>'
-                + '</div>';
-        }).join('');
-
-        aplicarFiltroBusca();
-    }
-
-    async function carregarUsuarios() {
-        try {
-            const res = await fetch('/api/usuarios');
-            if (!res.ok) return;
-
-            const lista = await res.json();
-            renderizarUsuarios(Array.isArray(lista) ? lista : []);
-        } catch (_) {
-            // Mantém o que já estava na tela.
-        }
-    }
-
     // ── Busca ─────────────────────────────────
-    // Mesmo campo #search-input do chat.js, mas filtrando as duas listas desta
-    // barra (aqui não há mensagens abertas para filtrar junto).
+    // Mesmo campo #search-input do chat.js, filtrando a lista de conversas
+    // desta barra (aqui não há mensagens abertas para filtrar junto).
     function aplicarFiltroBusca() {
         const input = document.getElementById('search-input');
         const termo = (input ? input.value : '').trim().toLowerCase();
 
-        document.querySelectorAll('#menu-lista-conversas [data-busca], #menu-lista-usuarios [data-busca]').forEach(function (item) {
+        document.querySelectorAll('#menu-lista-conversas [data-busca]').forEach(function (item) {
             item.style.display = (!termo || item.dataset.busca.includes(termo)) ? '' : 'none';
         });
     }
@@ -445,7 +399,6 @@
         configurarSecaoConversas();
         configurarBusca();
         carregarConversas();
-        carregarUsuarios();
         conectar();
         // Rede de segurança para o intervalo em que o socket estiver caído.
         setInterval(carregarConversas, 30000);

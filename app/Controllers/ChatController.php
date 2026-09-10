@@ -260,9 +260,11 @@ class ChatController
     /**
      * GET /api/usuarios
      *
-     * Lista para montar conversas (sidebar, nova conversa, grupos). **Não**
-     * devolve presença de propósito: quem está online só o admin vê, no painel
-     * administrativo (`/api/admin/usuarios/presenca`).
+     * Lista para montar conversas (sidebar, nova conversa, grupos) e para o
+     * painel de usuários do /chat. Inclui presença (online/last_seen) para
+     * todo mundo — deixou de ser exclusivo do painel administrativo quando o
+     * painel de usuários do /chat passou a mostrar o mesmo indicador que o
+     * `/admin` já tinha (ver `AdminController::listarUsuarios`).
      */
     public function listarUsuarios(Request $request, Response $response): Response
     {
@@ -277,13 +279,23 @@ class ChatController
      */
     public function buscarUsuarios(\PDO $pdo, int $userId): array
     {
-        $stmt = $pdo->prepare('
-            SELECT u.id, u.nome, u.papel, s.nome AS setor, u.ativo
+        // Mesmo esquema de AdminController::listarUsuarios(): presença é
+        // opcional (tabela pode não existir em bancos mais antigos).
+        $temPresenca = $this->tableExists($pdo, 'user_presenca');
+        $selectPresenca = $temPresenca
+            ? 'COALESCE(up.online, 0) AS online, up.last_seen'
+            : '0 AS online, NULL AS last_seen';
+        $joinPresenca = $temPresenca ? 'LEFT JOIN user_presenca up ON up.usuario_id = u.id' : '';
+
+        $stmt = $pdo->prepare("
+            SELECT u.id, u.nome, u.papel, s.nome AS setor, u.ativo,
+                   {$selectPresenca}
             FROM usuarios u
             LEFT JOIN setores s ON s.id = u.setor_id
+            {$joinPresenca}
             WHERE u.ativo = 1 AND u.id != ?
             ORDER BY u.nome ASC
-        ');
+        ");
         $stmt->execute([$userId]);
 
         return $stmt->fetchAll();
